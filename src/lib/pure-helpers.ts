@@ -71,6 +71,32 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
 }
 
 /**
+ * The ids of ALL valid table rows — including disabled ones. Used by the stale-object
+ * cleanup: a disabled account is paused, not deleted; only rows removed from the
+ * table lose their tree.
+ *
+ * @param raw the native.accounts value
+ * @returns the id-safe ids of every valid row
+ */
+export function validAccountIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const ids: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const row = entry as Record<string, unknown>;
+    const id = sanitizeId(typeof row.name === "string" ? row.name : "");
+    if (id && id !== "info" && id !== "total" && !ids.includes(id)) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+/**
  * Clamp the poll interval to the safe range: minimum 60 s (provider throttling locks
  * whole accounts), default 300 s for anything unusable.
  *

@@ -1,4 +1,4 @@
-import { clampPollInterval, parseAccounts, sanitizeId } from "./pure-helpers";
+import { clampPollInterval, parseAccounts, sanitizeId, validAccountIds } from "./pure-helpers";
 
 describe("sanitizeId", () => {
   test("keeps safe characters and collapses the rest to single underscores", () => {
@@ -59,5 +59,21 @@ describe("clampPollInterval", () => {
     expect(clampPollInterval(999999)).toBe(3600);
     expect(clampPollInterval("abc")).toBe(300);
     expect(clampPollInterval(undefined)).toBe(300);
+  });
+});
+
+describe("validAccountIds", () => {
+  test("includes disabled rows (paused, not deleted) and skips reserved/empty/duplicate ids", () => {
+    expect(
+      validAccountIds([
+        { name: "Claude Max", provider: "claude-sub", enabled: true },
+        { name: "Paused", provider: "openrouter", enabled: false },
+        { name: "info" },
+        { name: "  " },
+        { name: "Claude Max" },
+        null,
+      ]),
+    ).toEqual(["Claude_Max", "Paused"]);
+    expect(validAccountIds(undefined)).toEqual([]);
   });
 });

@@ -21,7 +21,8 @@ __export(pure_helpers_exports, {
   PROVIDER_KINDS: () => PROVIDER_KINDS,
   clampPollInterval: () => clampPollInterval,
   parseAccounts: () => parseAccounts,
-  sanitizeId: () => sanitizeId
+  sanitizeId: () => sanitizeId,
+  validAccountIds: () => validAccountIds
 });
 module.exports = __toCommonJS(pure_helpers_exports);
 function sanitizeId(name) {
@@ -60,6 +61,23 @@ function parseAccounts(raw) {
   }
   return accounts;
 }
+function validAccountIds(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const ids = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const row = entry;
+    const id = sanitizeId(typeof row.name === "string" ? row.name : "");
+    if (id && id !== "info" && id !== "total" && !ids.includes(id)) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
 function clampPollInterval(raw) {
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) {
@@ -72,6 +90,7 @@ function clampPollInterval(raw) {
   PROVIDER_KINDS,
   clampPollInterval,
   parseAccounts,
-  sanitizeId
+  sanitizeId,
+  validAccountIds
 });
 //# sourceMappingURL=pure-helpers.js.map
