@@ -148,7 +148,10 @@ function claudeSubProvider(store, fetchJson = import_http.getJson, postJson, now
       }
       const body = await fetchJson(import_claude_auth.CLAUDE_OAUTH.usageUrl, {
         Authorization: `Bearer ${cached.accessToken}`,
-        "anthropic-beta": import_claude_auth.CLAUDE_OAUTH.betaHeader
+        "anthropic-beta": import_claude_auth.CLAUDE_OAUTH.betaHeader,
+        // Identify ourselves — an unset/odd user agent lands in a harder-throttled
+        // bucket of this endpoint (community-measured; sources in the concept doc).
+        "User-Agent": "ioBroker.ai-usage"
       });
       return parseClaudeUsage(body);
     }

@@ -43,6 +43,18 @@
       "uk": "Відстежує використання, ліміти та витрати акаунтів ШІ (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
       "zh-cn": "监控 AI 账户的使用量、限额和费用（Claude、OpenAI、OpenRouter、DeepSeek、GitHub Copilot）"
     },
+    "keywords": [
+      "ai",
+      "usage",
+      "limits",
+      "costs",
+      "claude",
+      "openai",
+      "openrouter",
+      "deepseek",
+      "copilot",
+      "monitoring"
+    ],
     "authors": [
       "krobi <krobi@power-dreams.com>"
     ],
@@ -76,7 +88,7 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=8.4.15"
+        "admin": ">=8.0.0"
       }
     ]
   },
@@ -188,8 +200,9 @@
             "uk": "Акаунт ШІ перевищив поріг попередження або його облікові дані перестали працювати.",
             "zh-cn": "某个 AI 账户超过了警告阈值，或其凭据已失效。"
           },
-          "regularity": "once",
-          "severity": "alert"
+          "severity": "notify",
+          "regex": [],
+          "limit": 1
         }
       ]
     }

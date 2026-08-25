@@ -32,7 +32,7 @@ dashboards, history and automations ("send a message at 90 % of the weekly limit
 
 - Node.js >= 22
 - ioBroker js-controller >= 7.2.2
-- **ioBroker Admin >= 8.4.15** — the adapter uses the central credential storage introduced there
+- **ioBroker Admin >= 8.0.0** — the adapter uses the admin's central credential storage
 
 ---
 
@@ -104,7 +104,9 @@ This adapter is free and open source. If you find it useful, consider buying me 
 
 ## License
 
-MIT License — Copyright (c) 2026 krobi <krobi@power-dreams.com>
+MIT License
+
+Copyright (c) 2026 krobi <krobi@power-dreams.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

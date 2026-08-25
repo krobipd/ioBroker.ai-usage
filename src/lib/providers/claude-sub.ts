@@ -174,6 +174,9 @@ export function claudeSubProvider(
       const body = await fetchJson(CLAUDE_OAUTH.usageUrl, {
         Authorization: `Bearer ${cached.accessToken}`,
         "anthropic-beta": CLAUDE_OAUTH.betaHeader,
+        // Identify ourselves — an unset/odd user agent lands in a harder-throttled
+        // bucket of this endpoint (community-measured; sources in the concept doc).
+        "User-Agent": "ioBroker.ai-usage",
       });
       return parseClaudeUsage(body);
     },
