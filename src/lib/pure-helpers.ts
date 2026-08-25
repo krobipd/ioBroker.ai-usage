@@ -29,6 +29,9 @@ export function sanitizeId(name: string): string {
 /** The provider kinds the adapter knows. */
 export const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api"];
 
+/** Top-level object roots the adapter owns — no account may use them as id. */
+export const RESERVED_ROOT_IDS = ["info", "total", "auth"];
+
 /**
  * Parse and validate the admin accounts table. Rows without a usable name or with an
  * unknown provider are skipped (type-guarded — the table is external input); disabled
@@ -54,7 +57,7 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
     const name = typeof row.name === "string" ? row.name.trim() : "";
     const id = sanitizeId(name);
     const provider = typeof row.provider === "string" ? row.provider : "";
-    if (!id || id === "info" || id === "total" || !PROVIDER_KINDS.includes(provider) || seen.has(id)) {
+    if (!id || RESERVED_ROOT_IDS.includes(id) || !PROVIDER_KINDS.includes(provider) || seen.has(id)) {
       continue;
     }
     seen.add(id);
@@ -89,7 +92,7 @@ export function validAccountIds(raw: unknown): string[] {
     }
     const row = entry as Record<string, unknown>;
     const id = sanitizeId(typeof row.name === "string" ? row.name : "");
-    if (id && id !== "info" && id !== "total" && !ids.includes(id)) {
+    if (id && !RESERVED_ROOT_IDS.includes(id) && !ids.includes(id)) {
       ids.push(id);
     }
   }

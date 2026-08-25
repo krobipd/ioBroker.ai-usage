@@ -1,0 +1,23 @@
+{
+    "aiu_claudeTitle": "Claude-abonnement",
+    "aiu_claudeSubtitle": "Gebruikslimieten van uw Claude-abonnement — meld u eenmalig aan met uw Claude-account.",
+    "aiu_signedIn": "Aangemeld",
+    "aiu_signInAgain": "Opnieuw aanmelden",
+    "aiu_saveFirst": "Sla eerst de instellingen op — de aanmeldlink verschijnt dan hier.",
+    "aiu_waitingForLink": "Wachten op de aanmeldlink van de instantie …",
+    "aiu_step1": "1. Open de aanmeldpagina en log in met uw Claude-account.",
+    "aiu_step2": "2. Kopieer de code van de laatste pagina en wissel die hier in.",
+    "aiu_openSignIn": "Aanmeldpagina openen",
+    "aiu_copyLink": "Link kopiëren",
+    "aiu_codeLabel": "Code",
+    "aiu_redeem": "Inwisselen",
+    "aiu_signInDone": "Aangemeld — de gebruiksgegevens komen bij de volgende opvraging.",
+    "aiu_signInFailed": "Aanmelden mislukt",
+    "aiu_instanceNotRunning": "De instantie draait niet — start deze om aan te melden.",
+    "aiu_storedTitle": "Opgeslagen AI-toegangsgegevens",
+    "aiu_storedHint": "Alle vermeldingen van de centrale opslag met categorie AI. Schakel in wat u wilt bewaken; nieuwe sleutels via Instellingen → Toegangsgegevens.",
+    "aiu_noCredentials": "Nog geen AI-toegangsgegevens opgeslagen — voeg ze toe in de admin-instellingen.",
+    "aiu_unsupported": "Geen verbruiksopvraging beschikbaar",
+    "aiu_provider": "Aanbieder",
+    "aiu_warnAt": "Waarschuwen vanaf %"
+}

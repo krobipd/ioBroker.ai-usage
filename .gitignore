@@ -34,3 +34,7 @@ CLAUDE.local.md
 
 # dev-server (local ioBroker test instance)
 .dev-server/
+
+# Admin custom component build intermediates (admin/custom itself IS tracked — GitHub install)
+src-admin/build/
+src-admin/.__mf__temp/

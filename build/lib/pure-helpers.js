@@ -19,6 +19,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var pure_helpers_exports = {};
 __export(pure_helpers_exports, {
   PROVIDER_KINDS: () => PROVIDER_KINDS,
+  RESERVED_ROOT_IDS: () => RESERVED_ROOT_IDS,
   clampPollInterval: () => clampPollInterval,
   parseAccounts: () => parseAccounts,
   sanitizeId: () => sanitizeId,
@@ -29,6 +30,7 @@ function sanitizeId(name) {
   return name.trim().replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_{2,}/g, "_").replace(/^_+|_+$/g, "");
 }
 const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api"];
+const RESERVED_ROOT_IDS = ["info", "total", "auth"];
 function parseAccounts(raw) {
   if (!Array.isArray(raw)) {
     return [];
@@ -46,7 +48,7 @@ function parseAccounts(raw) {
     const name = typeof row.name === "string" ? row.name.trim() : "";
     const id = sanitizeId(name);
     const provider = typeof row.provider === "string" ? row.provider : "";
-    if (!id || id === "info" || id === "total" || !PROVIDER_KINDS.includes(provider) || seen.has(id)) {
+    if (!id || RESERVED_ROOT_IDS.includes(id) || !PROVIDER_KINDS.includes(provider) || seen.has(id)) {
       continue;
     }
     seen.add(id);
@@ -72,7 +74,7 @@ function validAccountIds(raw) {
     }
     const row = entry;
     const id = sanitizeId(typeof row.name === "string" ? row.name : "");
-    if (id && id !== "info" && id !== "total" && !ids.includes(id)) {
+    if (id && !RESERVED_ROOT_IDS.includes(id) && !ids.includes(id)) {
       ids.push(id);
     }
   }
@@ -88,6 +90,7 @@ function clampPollInterval(raw) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   PROVIDER_KINDS,
+  RESERVED_ROOT_IDS,
   clampPollInterval,
   parseAccounts,
   sanitizeId,

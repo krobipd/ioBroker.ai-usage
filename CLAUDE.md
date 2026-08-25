@@ -33,6 +33,9 @@ src/lib/snapshot-tree.ts       → Snapshot → Objekt-Definitionen + Werte (cap
 src/lib/totals.ts              → total.* aus den Snapshots im Speicher
 src/lib/pure-helpers.ts        → Konten-Tabelle parsen (API-Boundary), sanitizeId, Cleanup-Ids
 src/types/adapter-config.d.ts  → native-Typen
+src-admin/                     → React-Konfig-Panel (Module-Federation, Admin-8-only, guiApi 2):
+                                 Claude-Karte + Zugangs-Liste; Build → admin/custom (git-getrackt,
+                                 sonst GitHub-Install leer) via `npm run build:admin` (tasks.js)
 ```
 
 Warum so: Die Anbieter-Module sind reine Funktionen hinter EINEM Vertrag — bricht die inoffizielle
@@ -43,7 +46,7 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
 
 1. **Admin-8-only** (krobi 2026-08-25): Zugänge über den zentralen Zugangsdaten-Speicher des Admin
    (`system.credentials.*`, jsonConfig-Komponente `credential`, Lese-Helfer in adapter-core) —
-   keine eigenen encryptedNative-Schlüsselfelder. `globalDependencies admin >= 8.0.0` (Speicher seit Admin 7.9.0; ⚠️ die 8.4.x-Nummern der Formular-Doku sind jsonConfig-PAKET-Versionen, keine Admin-Versionen).
+   keine eigenen encryptedNative-Schlüsselfelder. `globalDependencies admin >= 8.0.1` (Speicher seit Admin 7.9.0; ⚠️ die 8.4.x-Nummern der Formular-Doku sind jsonConfig-PAKET-Versionen, keine Admin-Versionen).
 2. **Claude-Abo = eigener geführter Anmelde-Fluss** (der zentrale Speicher kennt nur statische
    Schlüssel): Tokens verschlüsselt im Instanz-Datenverzeichnis (native-Schreiben würde restarten).
    Fluss-Details am QUELLCODE des HA-Vorbilds trickv/hass-claude-usage verifizieren, nicht an Blogs.
@@ -53,8 +56,18 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
    = gleicher Pfad über alle Anbieter (`limits.*`/`credits.*`/`costs.*`/`tokens.*`).
 5. **total.costs summiert nur echtes Geld gleicher Währung** — Stück-Guthaben (pieces:true)
    und Fremdwährungen bleiben draußen.
-6. **Admin-Seitenlayout adapter-individuell** (krobi): aktuell EIN Panel; die Claude-Anmeldung
-   bekommt bei Bedarf einen eigenen Reiter — Seitenzahl ist kein Fleet-Standard.
+6. **Konfiguration = React-Komponente statt jsonConfig-Tabelle** (krobi 2026-08-25: „die Tabelle
+   ist ultra kompliziert … schau dir mal homeconnect an"): `src-admin/` (Module-Federation,
+   GUI-API-Gen-2, Blaupause homeconnect) rendert die gesamte Konten-Wahl — Claude-Abo-Karte mit
+   geführter Anmeldung + die zentral gespeicherten KI-Zugänge als An/Aus-Liste (Anbieter wird aus
+   Vorlagen-Name/Anzeige-Name geraten, sonst einmalige Auswahl; Gemini = ausgegraut, kein
+   Abfrageweg). Die Komponente besitzt NUR das native-Feld `accounts` — Backend-Modell unverändert.
+7. **Der Adapter besitzt den Claude-Anmelde-Fluss** (homeconnect-Muster): er erzeugt das
+   PKCE-Geheimnis EINMAL, veröffentlicht den Link als Datenpunkt `auth.<Konto>.signInUrl`
+   (+ `signedIn`), die Karte zeigt ihn nur live an; Code-Einlösung per Nachricht gegen das stabile
+   Geheimnis. Der alte jsonConfig-Weg (textSendTo, das sich bei jeder Feld-Änderung neu erzeugte
+   und den Link entwertete) ist damit strukturell weg — genau daran scheiterte krobis erster
+   Anmelde-Versuch (v0.1.0).
 
 ## Tests
 

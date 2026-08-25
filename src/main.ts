@@ -54,15 +54,14 @@ export class AiUsageAdapter extends utils.Adapter {
     try {
       switch (obj.command) {
         case "claudeAuthStart": {
+          // Regenerate the sign-in link for one account (invalidates the previous one).
           const accountId = this.claudeAccountIdFrom(obj.message);
           if (!accountId) {
-            // Plain string — this feeds a textSendTo display in the admin.
-            this.respond(obj, "→ Enter the exact name of a Claude subscription row from the table above");
+            this.respond(obj, { error: "Save the settings with a Claude subscription account first" });
             return;
           }
-          const pkce = generatePkce();
-          this.pendingClaudeAuth.set(accountId, pkce);
-          this.respond(obj, buildAuthorizeUrl(pkce));
+          const url = await this.publishClaudeSignInUrl(accountId);
+          this.respond(obj, { url });
           return;
         }
         case "claudeAuthCode": {
@@ -71,7 +70,7 @@ export class AiUsageAdapter extends utils.Adapter {
             typeof (obj.message as { code?: unknown })?.code === "string" ? (obj.message as { code: string }).code : "";
           const pkce = accountId ? this.pendingClaudeAuth.get(accountId) : undefined;
           if (!accountId || !pkce) {
-            this.respond(obj, { error: "Generate the sign-in link first (step 1)" });
+            this.respond(obj, { error: "Save the settings with a Claude subscription account first" });
             return;
           }
           if (!code.trim()) {
@@ -82,7 +81,8 @@ export class AiUsageAdapter extends utils.Adapter {
             const tokens = await exchangeCode(code, pkce, postJson, Date.now());
             await this.claudeTokenStore(accountId).save(tokens);
             this.pendingClaudeAuth.delete(accountId);
-            this.respond(obj, { result: "Signed in — restart the instance (or save the settings) to start polling" });
+            await this.setClaudeAuthStates(accountId, "", true);
+            this.respond(obj, { result: "ok" });
           } catch (e) {
             this.respond(obj, { error: `Sign-in failed: ${e instanceof Error ? e.message : String(e)}` });
           }
@@ -129,6 +129,109 @@ export class AiUsageAdapter extends utils.Adapter {
   }
 
   /**
+   * Create the `auth.<id>` states of one Claude account and publish a FRESH
+   * sign-in link (the adapter owns the secret; the link stays valid until it is
+   * regenerated or redeemed — the admin card only displays it).
+   *
+   * @param accountId the id-safe account id
+   * @returns the sign-in URL
+   */
+  private async publishClaudeSignInUrl(accountId: string): Promise<string> {
+    const pkce = generatePkce();
+    this.pendingClaudeAuth.set(accountId, pkce);
+    const url = buildAuthorizeUrl(pkce);
+    await this.setClaudeAuthStates(accountId, url, false);
+    return url;
+  }
+
+  /**
+   * Create (once) and write the two `auth.<id>` states of one Claude account.
+   *
+   * @param accountId the id-safe account id
+   * @param url the current sign-in URL ("" when signed in)
+   * @param signedIn whether a usable sign-in exists
+   */
+  private async setClaudeAuthStates(accountId: string, url: string, signedIn: boolean): Promise<void> {
+    await this.extendObject("auth", {
+      type: "folder",
+      common: { name: { en: "Sign-in", de: "Anmeldung" } },
+      native: {},
+    });
+    await this.extendObject(`auth.${accountId}`, {
+      type: "channel",
+      common: { name: accountId },
+      native: {},
+    });
+    await this.extendObject(`auth.${accountId}.signInUrl`, {
+      type: "state",
+      common: {
+        name: { en: "Sign-in link", de: "Anmelde-Link" },
+        type: "string",
+        role: "url",
+        read: true,
+        write: false,
+        def: "",
+      },
+      native: {},
+    });
+    await this.extendObject(`auth.${accountId}.signedIn`, {
+      type: "state",
+      common: {
+        name: { en: "Signed in", de: "Angemeldet" },
+        type: "boolean",
+        role: "indicator",
+        read: true,
+        write: false,
+        def: false,
+      },
+      native: {},
+    });
+    await this.setState(`auth.${accountId}.signInUrl`, { val: url, ack: true });
+    await this.setState(`auth.${accountId}.signedIn`, { val: signedIn, ack: true });
+  }
+
+  /**
+   * Prepare the guided sign-in of every Claude subscription account: publish the
+   * live status, and for accounts without a usable sign-in a stable sign-in link.
+   *
+   * @param accounts the validated account configs
+   */
+  private async prepareClaudeAuth(accounts: AccountConfig[]): Promise<void> {
+    const claudeAccounts = accounts.filter(a => a.provider === "claude-sub");
+    // Remove sign-in channels of accounts that are gone (the account cleanup only
+    // handles top-level account trees, not the shared auth folder).
+    try {
+      const wanted = new Set(claudeAccounts.map(a => a.id));
+      const objects = await this.getAdapterObjectsAsync();
+      const stale = new Set<string>();
+      for (const id of Object.keys(objects)) {
+        const relative = id.substring(this.namespace.length + 1);
+        const [root, child] = relative.split(".");
+        if (root === "auth" && child && !wanted.has(child)) {
+          stale.add(child);
+        }
+      }
+      for (const child of stale) {
+        await this.delObjectAsync(`auth.${child}`, { recursive: true });
+      }
+    } catch {
+      // cleanup only — never block startup
+    }
+    for (const account of claudeAccounts) {
+      try {
+        const tokens = await this.claudeTokenStore(account.id).load();
+        if (tokens) {
+          await this.setClaudeAuthStates(account.id, "", true);
+        } else {
+          await this.publishClaudeSignInUrl(account.id);
+        }
+      } catch (e) {
+        this.log.warn(`${account.name}: cannot prepare sign-in (${e instanceof Error ? e.message : String(e)})`);
+      }
+    }
+  }
+
+  /**
    * The persistent token storage for one Claude account: an encrypted JSON file in
    * the instance data directory (a `native` write would restart the instance).
    *
@@ -168,6 +271,7 @@ export class AiUsageAdapter extends utils.Adapter {
       const accounts = parseAccounts(this.config.accounts);
       const interval = clampPollInterval(this.config.pollInterval);
       await this.cleanupStaleAccounts();
+      await this.prepareClaudeAuth(accounts);
       if (accounts.length === 0) {
         this.log.info("No AI accounts configured — add accounts in the instance settings");
         await this.setState("info.connection", { val: false, ack: true });
@@ -290,7 +394,7 @@ export class AiUsageAdapter extends utils.Adapter {
     if (keepIds.length === 0) {
       return;
     }
-    const keep = new Set([...keepIds, "info", "total"]);
+    const keep = new Set([...keepIds, "info", "total", "auth"]);
     try {
       const objects = await this.getAdapterObjectsAsync();
       const roots = new Set<string>();

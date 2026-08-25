@@ -1,0 +1,23 @@
+{
+    "aiu_claudeTitle": "Suscripción Claude",
+    "aiu_claudeSubtitle": "Límites de uso de su suscripción Claude — inicie sesión una vez con su cuenta Claude.",
+    "aiu_signedIn": "Sesión iniciada",
+    "aiu_signInAgain": "Iniciar sesión de nuevo",
+    "aiu_saveFirst": "Guarde primero la configuración — el enlace de inicio de sesión aparecerá aquí.",
+    "aiu_waitingForLink": "Esperando el enlace de inicio de sesión de la instancia …",
+    "aiu_step1": "1. Abra la página de inicio de sesión y entre con su cuenta Claude.",
+    "aiu_step2": "2. Copie el código de la última página y canjéelo aquí.",
+    "aiu_openSignIn": "Abrir página de inicio de sesión",
+    "aiu_copyLink": "Copiar enlace",
+    "aiu_codeLabel": "Código",
+    "aiu_redeem": "Canjear",
+    "aiu_signInDone": "Sesión iniciada — los datos llegan con la próxima consulta.",
+    "aiu_signInFailed": "Error al iniciar sesión",
+    "aiu_instanceNotRunning": "La instancia no está en marcha — iníciela para entrar.",
+    "aiu_storedTitle": "Credenciales de IA guardadas",
+    "aiu_storedHint": "Todas las entradas del almacén central con categoría IA. Active lo que quiera supervisar; nuevas claves en Ajustes → Credenciales.",
+    "aiu_noCredentials": "Aún no hay credenciales de IA guardadas — añádalas en los ajustes de administración.",
+    "aiu_unsupported": "Consulta de uso no disponible",
+    "aiu_provider": "Proveedor",
+    "aiu_warnAt": "Avisar desde %"
+}

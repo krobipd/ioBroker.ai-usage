@@ -1,0 +1,23 @@
+{
+    "aiu_claudeTitle": "Assinatura Claude",
+    "aiu_claudeSubtitle": "Limites de uso da sua assinatura Claude — inicie sessão uma vez com a sua conta Claude.",
+    "aiu_signedIn": "Sessão iniciada",
+    "aiu_signInAgain": "Iniciar sessão novamente",
+    "aiu_saveFirst": "Guarde primeiro as definições — o link de início de sessão aparecerá aqui.",
+    "aiu_waitingForLink": "A aguardar o link de início de sessão da instância …",
+    "aiu_step1": "1. Abra a página de início de sessão e entre com a sua conta Claude.",
+    "aiu_step2": "2. Copie o código da última página e resgate-o aqui.",
+    "aiu_openSignIn": "Abrir página de início de sessão",
+    "aiu_copyLink": "Copiar link",
+    "aiu_codeLabel": "Código",
+    "aiu_redeem": "Resgatar",
+    "aiu_signInDone": "Sessão iniciada — os dados chegam na próxima consulta.",
+    "aiu_signInFailed": "Falha no início de sessão",
+    "aiu_instanceNotRunning": "A instância não está em execução — inicie-a para entrar.",
+    "aiu_storedTitle": "Credenciais de IA guardadas",
+    "aiu_storedHint": "Todas as entradas do armazenamento central com categoria IA. Ative o que deseja monitorizar; novas chaves em Definições → Credenciais.",
+    "aiu_noCredentials": "Ainda não há credenciais de IA guardadas — adicione-as nas definições do administrador.",
+    "aiu_unsupported": "Consulta de uso indisponível",
+    "aiu_provider": "Fornecedor",
+    "aiu_warnAt": "Avisar a partir de %"
+}

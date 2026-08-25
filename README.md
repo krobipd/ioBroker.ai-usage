@@ -27,15 +27,21 @@ dashboards, history and automations ("send a message at 90 % of the weekly limit
 
 - Node.js >= 22
 - ioBroker js-controller >= 7.2.2
-- **ioBroker Admin >= 8.0.0** — the adapter uses the admin's central credential storage
+- **ioBroker Admin >= 8.0.1** — the adapter uses the admin's central credential storage
 
 ---
 
 ## Configuration
 
+The instance settings show your stored AI credentials (admin central storage, category AI) as
+simple on/off switches — switch on what you want to monitor. The Claude subscription has its own
+card with a guided sign-in: open the sign-in page, log in with your Claude account, paste the code,
+done. New API keys are added once under Settings → Credentials and are shared with the admin AI
+assistant.
+
 | Option | Description | Default |
 |--------|-------------|---------|
-| **Accounts** | One row per AI account: name, provider, credential from the central storage, warn threshold, active flag | — |
+| **Warn at %** | Per account: one notification when a limit window crosses this utilisation | 80 |
 | **Poll interval** | How often each account is queried (seconds) | 300 |
 | **Notifications** | One notification on threshold crossing or broken credentials | on |
 
@@ -77,6 +83,11 @@ and the adapter log. Authentication errors raise one notification with the reaso
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Changed: Completely new settings page — your stored AI credentials appear as simple on/off switches instead of a table, and new keys are picked up straight from the admin credential storage
+- Fixed: The Claude subscription sign-in works reliably now — a guided card with live status, and the sign-in link stays valid until it is used instead of regenerating while you type
+
 ### 0.1.0 (2026-08-25)
 
 - New: First release — reads usage limits, credits and costs of your Claude, OpenAI, Anthropic, OpenRouter and DeepSeek accounts into datapoints, with one warning at your chosen threshold
