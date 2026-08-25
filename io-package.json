@@ -129,5 +129,69 @@
       },
       "native": {}
     }
+  ],
+  "notifications": [
+    {
+      "scope": "ai-usage",
+      "name": {
+        "en": "AI Usage",
+        "de": "AI Usage",
+        "ru": "AI Usage",
+        "pt": "AI Usage",
+        "nl": "AI Usage",
+        "fr": "AI Usage",
+        "it": "AI Usage",
+        "es": "AI Usage",
+        "pl": "AI Usage",
+        "uk": "AI Usage",
+        "zh-cn": "AI Usage"
+      },
+      "description": {
+        "en": "AI Usage adapter",
+        "de": "AI-Usage-Adapter",
+        "ru": "Адаптер AI Usage",
+        "pt": "Adaptador AI Usage",
+        "nl": "AI Usage-adapter",
+        "fr": "Adaptateur AI Usage",
+        "it": "Adattatore AI Usage",
+        "es": "Adaptador AI Usage",
+        "pl": "Adapter AI Usage",
+        "uk": "Адаптер AI Usage",
+        "zh-cn": "AI Usage 适配器"
+      },
+      "categories": [
+        {
+          "category": "userActionRequired",
+          "name": {
+            "en": "Action required",
+            "de": "Aktion erforderlich",
+            "ru": "Требуется действие",
+            "pt": "Ação necessária",
+            "nl": "Actie vereist",
+            "fr": "Action requise",
+            "it": "Azione richiesta",
+            "es": "Acción requerida",
+            "pl": "Wymagane działanie",
+            "uk": "Потрібна дія",
+            "zh-cn": "需要操作"
+          },
+          "description": {
+            "en": "An AI account crossed its warn threshold or its credentials stopped working.",
+            "de": "Ein KI-Konto hat seine Warnschwelle überschritten oder die Zugangsdaten funktionieren nicht mehr.",
+            "ru": "Аккаунт ИИ превысил порог предупреждения или его учётные данные перестали работать.",
+            "pt": "Uma conta de IA ultrapassou o limite de aviso ou as credenciais deixaram de funcionar.",
+            "nl": "Een AI-account heeft de waarschuwingsdrempel overschreden of de inloggegevens werken niet meer.",
+            "fr": "Un compte IA a dépassé son seuil d'alerte ou ses identifiants ne fonctionnent plus.",
+            "it": "Un account IA ha superato la soglia di avviso o le credenziali non funzionano più.",
+            "es": "Una cuenta de IA superó su umbral de aviso o sus credenciales dejaron de funcionar.",
+            "pl": "Konto AI przekroczyło próg ostrzegawczy lub jego dane dostępowe przestały działać.",
+            "uk": "Акаунт ШІ перевищив поріг попередження або його облікові дані перестали працювати.",
+            "zh-cn": "某个 AI 账户超过了警告阈值，或其凭据已失效。"
+          },
+          "regularity": "once",
+          "severity": "alert"
+        }
+      ]
+    }
   ]
 }
