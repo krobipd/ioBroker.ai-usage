@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Theme-fixed colors on an own background — never currentColor (renders black as <img>). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2733"/>
+      <stop offset="1" stop-color="#2b3d52"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="url(#bg)"/>
+  <!-- Gauge arc: track + filled usage portion -->
+  <path d="M 28 88 A 40 40 0 1 1 100 88" fill="none" stroke="#3d5570" stroke-width="10" stroke-linecap="round"/>
+  <path d="M 28 88 A 40 40 0 0 1 42 34" fill="none" stroke="#4fc3f7" stroke-width="10" stroke-linecap="round"/>
+  <path d="M 42 34 A 40 40 0 0 1 92 40" fill="none" stroke="#ffb74d" stroke-width="10" stroke-linecap="round"/>
+  <!-- Needle -->
+  <line x1="64" y1="86" x2="88" y2="50" stroke="#eceff1" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="64" cy="86" r="7" fill="#eceff1"/>
+  <!-- Spark: the AI -->
+  <path d="M 64 100 l 4 8 l 8 4 l -8 4 l -4 8 l -4 -8 l -8 -4 l 8 -4 z" fill="#4fc3f7" transform="translate(0,-4) scale(0.9)" transform-origin="64 112"/>
+</svg>

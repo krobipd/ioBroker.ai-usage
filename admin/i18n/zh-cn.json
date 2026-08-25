@@ -1,0 +1,21 @@
+{
+  "accountsHeader": "AI 账户",
+  "accountsInfo": "每个 AI 账户一行。凭据保存在管理界面的中央凭据存储中（设置 → 凭据）——选择框旁的 ➕ 按钮可直接在此创建。Claude 订阅使用自己的引导式登录（见文档）。",
+  "label_accounts": "账户",
+  "col_name": "名称",
+  "col_provider": "提供商",
+  "col_credential": "凭据",
+  "col_warnThreshold": "警告阈值 %",
+  "col_enabled": "启用",
+  "settingsHeader": "设置",
+  "label_pollInterval": "轮询间隔（秒）",
+  "help_pollInterval": "查询每个账户的频率。低于 300 秒可能被提供商限流——Claude 会将整个账户锁定约一天。",
+  "label_notifications": "通知",
+  "help_notifications": "当账户超过警告阈值或凭据失效时发送一次通知。",
+  "supportHeader": "支持开发",
+  "aboutInfo": "本适配器免费且开源。如果对你有用，欢迎支持开发。",
+  "donateKofi": "在 Ko-fi 上支持",
+  "donatePaypal": "通过 PayPal 捐赠",
+  "OpenRouter": "OpenRouter",
+  "DeepSeek": "DeepSeek"
+}

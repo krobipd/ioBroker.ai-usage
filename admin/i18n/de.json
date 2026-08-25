@@ -1,0 +1,21 @@
+{
+  "accountsHeader": "KI-Konten",
+  "accountsInfo": "Eine Zeile je KI-Konto. Zugangsdaten liegen im zentralen Zugangsdaten-Speicher des Admin (Einstellungen → Zugangsdaten) — der ➕-Knopf neben der Auswahl legt sie direkt hier an. Das Claude-Abo nutzt stattdessen eine eigene geführte Anmeldung (siehe Dokumentation).",
+  "label_accounts": "Konten",
+  "col_name": "Name",
+  "col_provider": "Anbieter",
+  "col_credential": "Zugangsdaten",
+  "col_warnThreshold": "Warnen ab %",
+  "col_enabled": "Aktiv",
+  "settingsHeader": "Einstellungen",
+  "label_pollInterval": "Abfrage-Intervall (s)",
+  "help_pollInterval": "Wie oft jedes Konto abgefragt wird. Unter 300 s droht Drosselung durch den Anbieter — Claude sperrt das ganze Konto für etwa einen Tag.",
+  "label_notifications": "Benachrichtigungen",
+  "help_notifications": "Eine Benachrichtigung, wenn ein Konto seine Warnschwelle überschreitet oder die Zugangsdaten nicht mehr funktionieren.",
+  "supportHeader": "Entwicklung unterstützen",
+  "aboutInfo": "Dieser Adapter ist kostenlos und quelloffen. Wenn er dir nützt, freue ich mich über Unterstützung.",
+  "donateKofi": "Auf Ko-fi unterstützen",
+  "donatePaypal": "Über PayPal spenden",
+  "OpenRouter": "OpenRouter",
+  "DeepSeek": "DeepSeek"
+}

@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+*.swp
+*.swo
+
+# ioBroker repochecker
+.commitinfo
+
+# ioBroker
+admin/i18n/flat.txt
+
+# Build & Test
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+
+# Claude Code local files (not published)
+.claude/settings.local.json
+.claude/dev-history.md
+CLAUDE.local.md
+
+# dev-server (local ioBroker test instance)
+.dev-server/

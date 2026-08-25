@@ -1,0 +1,120 @@
+{
+  "common": {
+    "name": "ai-usage",
+    "version": "0.0.1",
+    "news": {
+      "0.0.1": {
+        "en": "Initial development version",
+        "de": "Erste Entwicklungsversion",
+        "ru": "Первая версия для разработки",
+        "pt": "Primeira versão de desenvolvimento",
+        "nl": "Eerste ontwikkelversie",
+        "fr": "Première version de développement",
+        "it": "Prima versione di sviluppo",
+        "es": "Primera versión de desarrollo",
+        "pl": "Pierwsza wersja rozwojowa",
+        "uk": "Перша версія для розробки",
+        "zh-cn": "首个开发版本"
+      }
+    },
+    "titleLang": {
+      "en": "AI Usage",
+      "de": "AI Usage",
+      "ru": "AI Usage",
+      "pt": "AI Usage",
+      "nl": "AI Usage",
+      "fr": "AI Usage",
+      "it": "AI Usage",
+      "es": "AI Usage",
+      "pl": "AI Usage",
+      "uk": "AI Usage",
+      "zh-cn": "AI Usage"
+    },
+    "desc": {
+      "en": "Monitors usage, limits and costs of AI accounts (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "de": "Überwacht Verbrauch, Limits und Kosten von KI-Konten (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "ru": "Отслеживает использование, лимиты и расходы аккаунтов ИИ (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "pt": "Monitora uso, limites e custos de contas de IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "nl": "Bewaakt verbruik, limieten en kosten van AI-accounts (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "fr": "Surveille l'utilisation, les limites et les coûts des comptes IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "it": "Monitora utilizzo, limiti e costi degli account IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "es": "Supervisa el uso, los límites y los costes de las cuentas de IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "pl": "Monitoruje zużycie, limity i koszty kont AI (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "uk": "Відстежує використання, ліміти та витрати акаунтів ШІ (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+      "zh-cn": "监控 AI 账户的使用量、限额和费用（Claude、OpenAI、OpenRouter、DeepSeek、GitHub Copilot）"
+    },
+    "authors": ["krobi <krobi@power-dreams.com>"],
+    "licenseInformation": {
+      "license": "MIT",
+      "type": "free"
+    },
+    "platform": "Javascript/Node.js",
+    "icon": "ai-usage.svg",
+    "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.ai-usage/main/admin/ai-usage.svg",
+    "readme": "https://github.com/krobipd/ioBroker.ai-usage/blob/main/README.md",
+    "enabled": true,
+    "tier": 3,
+    "loglevel": "info",
+    "mode": "daemon",
+    "type": "infrastructure",
+    "compact": true,
+    "connectionType": "cloud",
+    "dataSource": "poll",
+    "adminUI": {
+      "config": "json"
+    },
+    "supportedMessages": {
+      "stopInstance": true
+    },
+    "dependencies": [{ "js-controller": ">=7.2.2" }],
+    "globalDependencies": [{ "admin": ">=8.4.15" }]
+  },
+  "encryptedNative": [],
+  "protectedNative": [],
+  "native": {
+    "accounts": [],
+    "pollInterval": 300,
+    "notifications": true
+  },
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": { "name": "Adapter Information" },
+      "native": {}
+    },
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "name": "At least one account reachable",
+        "type": "boolean",
+        "role": "indicator.connected",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "total",
+      "type": "folder",
+      "common": {
+        "name": {
+          "en": "Totals across all accounts",
+          "de": "Gesamtwerte über alle Konten",
+          "ru": "Итоги по всем аккаунтам",
+          "pt": "Totais de todas as contas",
+          "nl": "Totalen over alle accounts",
+          "fr": "Totaux de tous les comptes",
+          "it": "Totali di tutti gli account",
+          "es": "Totales de todas las cuentas",
+          "pl": "Sumy dla wszystkich kont",
+          "uk": "Підсумки за всіма акаунтами",
+          "zh-cn": "所有账户的总计"
+        }
+      },
+      "native": {}
+    }
+  ]
+}

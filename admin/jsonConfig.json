@@ -1,0 +1,161 @@
+{
+  "type": "panel",
+  "i18n": true,
+  "items": {
+    "_accountsHeader": {
+      "type": "header",
+      "text": "accountsHeader",
+      "size": 5
+    },
+    "_accountsInfo": {
+      "type": "staticText",
+      "text": "accountsInfo",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12,
+      "style": { "fontSize": 14, "marginBottom": 8 }
+    },
+    "accounts": {
+      "type": "table",
+      "label": "label_accounts",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12,
+      "uniqueColumns": ["name"],
+      "items": [
+        {
+          "type": "text",
+          "attr": "name",
+          "title": "col_name",
+          "width": "20%",
+          "filter": false,
+          "sort": false,
+          "default": ""
+        },
+        {
+          "type": "select",
+          "attr": "provider",
+          "title": "col_provider",
+          "width": "20%",
+          "filter": false,
+          "sort": false,
+          "noTranslation": true,
+          "default": "claude-sub",
+          "options": [
+            { "label": "Claude subscription", "value": "claude-sub" },
+            { "label": "OpenRouter", "value": "openrouter" },
+            { "label": "DeepSeek", "value": "deepseek" },
+            { "label": "OpenAI API", "value": "openai" },
+            { "label": "Anthropic API", "value": "anthropic-api" },
+            { "label": "GitHub Copilot", "value": "copilot" }
+          ]
+        },
+        {
+          "type": "credential",
+          "attr": "credentialId",
+          "title": "col_credential",
+          "width": "30%",
+          "filter": false,
+          "sort": false,
+          "default": ""
+        },
+        {
+          "type": "number",
+          "attr": "warnThreshold",
+          "title": "col_warnThreshold",
+          "width": "15%",
+          "filter": false,
+          "sort": false,
+          "min": 10,
+          "max": 100,
+          "default": 80
+        },
+        {
+          "type": "checkbox",
+          "attr": "enabled",
+          "title": "col_enabled",
+          "width": "15%",
+          "filter": false,
+          "sort": false,
+          "default": true
+        }
+      ]
+    },
+    "_settingsHeader": {
+      "newLine": true,
+      "type": "header",
+      "text": "settingsHeader",
+      "size": 5
+    },
+    "pollInterval": {
+      "type": "number",
+      "label": "label_pollInterval",
+      "help": "help_pollInterval",
+      "min": 60,
+      "max": 3600,
+      "default": 300,
+      "xs": 12,
+      "sm": 6,
+      "md": 3,
+      "lg": 3,
+      "xl": 3
+    },
+    "notifications": {
+      "type": "checkbox",
+      "label": "label_notifications",
+      "help": "help_notifications",
+      "default": true,
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 4
+    },
+    "_supportHeader": {
+      "newLine": true,
+      "type": "header",
+      "text": "supportHeader",
+      "size": 5
+    },
+    "_aboutInfo": {
+      "type": "staticText",
+      "text": "aboutInfo",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12,
+      "style": { "fontSize": 14, "marginBottom": 16 }
+    },
+    "_kofiLink": {
+      "type": "staticLink",
+      "href": "https://ko-fi.com/krobipd",
+      "label": "donateKofi",
+      "button": true,
+      "variant": "outlined",
+      "color": "primary",
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 4
+    },
+    "_paypalLink": {
+      "type": "staticLink",
+      "href": "https://paypal.me/krobipd",
+      "label": "donatePaypal",
+      "button": true,
+      "variant": "outlined",
+      "color": "primary",
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 4
+    }
+  }
+}
