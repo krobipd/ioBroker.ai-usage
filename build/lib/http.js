@@ -18,7 +18,8 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var http_exports = {};
 __export(http_exports, {
-  getJson: () => getJson
+  getJson: () => getJson,
+  postJson: () => postJson
 });
 module.exports = __toCommonJS(http_exports);
 var import_provider = require("./provider");
@@ -45,8 +46,36 @@ async function getJson(url, headers) {
     throw new import_provider.FetchError("network", "invalid JSON response");
   }
 }
+async function postJson(url, body) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
+  } catch (e) {
+    throw new import_provider.FetchError("network", e instanceof Error ? e.message : String(e));
+  }
+  if (response.status === 401 || response.status === 403 || response.status === 400) {
+    throw new import_provider.FetchError("auth", `HTTP ${response.status}`);
+  }
+  if (response.status === 429) {
+    throw new import_provider.FetchError("rate-limit", "HTTP 429");
+  }
+  if (!response.ok) {
+    throw new import_provider.FetchError("network", `HTTP ${response.status}`);
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new import_provider.FetchError("network", "invalid JSON response");
+  }
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  getJson
+  getJson,
+  postJson
 });
 //# sourceMappingURL=http.js.map

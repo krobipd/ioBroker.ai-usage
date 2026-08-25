@@ -17,5 +17,13 @@
   "donateKofi": "Support on Ko-fi",
   "donatePaypal": "Donate via PayPal",
   "OpenRouter": "OpenRouter",
-  "DeepSeek": "DeepSeek"
+  "DeepSeek": "DeepSeek",
+  "claudeHeader": "Claude subscription sign-in",
+  "claudeInfo": "For a Claude subscription row: enter its name, open the generated link, sign in at Anthropic and allow access, then paste the code shown there and redeem it. The adapter refreshes the sign-in by itself afterwards.",
+  "label_claudeAccount": "Account name (from the table)",
+  "help_claudeAccount": "Exactly as written in the accounts table",
+  "label_claudeUrl": "Sign-in link",
+  "label_claudeCode": "Code from the Anthropic page",
+  "help_claudeCode": "Shown after allowing access",
+  "btn_claudeRedeem": "Redeem code"
 }

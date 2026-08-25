@@ -17,5 +17,13 @@
   "donateKofi": "Підтримати на Ko-fi",
   "donatePaypal": "Пожертвувати через PayPal",
   "OpenRouter": "OpenRouter",
-  "DeepSeek": "DeepSeek"
+  "DeepSeek": "DeepSeek",
+  "claudeHeader": "Вхід у підписку Claude",
+  "claudeInfo": "Для рядка підписки Claude: введіть назву, відкрийте створене посилання, увійдіть в Anthropic і дозвольте доступ, потім вставте показаний код і активуйте його. Після цього адаптер оновлює вхід самостійно.",
+  "label_claudeAccount": "Назва акаунта (з таблиці)",
+  "help_claudeAccount": "Точно як у таблиці акаунтів",
+  "label_claudeUrl": "Посилання для входу",
+  "label_claudeCode": "Код зі сторінки Anthropic",
+  "help_claudeCode": "Показується після дозволу",
+  "btn_claudeRedeem": "Активувати код"
 }

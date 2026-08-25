@@ -17,5 +17,13 @@
   "donateKofi": "Auf Ko-fi unterstützen",
   "donatePaypal": "Über PayPal spenden",
   "OpenRouter": "OpenRouter",
-  "DeepSeek": "DeepSeek"
+  "DeepSeek": "DeepSeek",
+  "claudeHeader": "Claude-Abo-Anmeldung",
+  "claudeInfo": "Für eine Claude-Abo-Zeile: Namen eintragen, den erzeugten Link öffnen, bei Anthropic anmelden und Zugriff erlauben, dann den dort angezeigten Code einfügen und einlösen. Danach erneuert der Adapter die Anmeldung selbstständig.",
+  "label_claudeAccount": "Konto-Name (aus der Tabelle)",
+  "help_claudeAccount": "Genau wie in der Konten-Tabelle geschrieben",
+  "label_claudeUrl": "Anmelde-Link",
+  "label_claudeCode": "Code von der Anthropic-Seite",
+  "help_claudeCode": "Wird nach dem Erlauben angezeigt",
+  "btn_claudeRedeem": "Code einlösen"
 }

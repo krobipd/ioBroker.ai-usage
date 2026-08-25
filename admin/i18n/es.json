@@ -17,5 +17,13 @@
   "donateKofi": "Apoyar en Ko-fi",
   "donatePaypal": "Donar por PayPal",
   "OpenRouter": "OpenRouter",
-  "DeepSeek": "DeepSeek"
+  "DeepSeek": "DeepSeek",
+  "claudeHeader": "Inicio de sesión de la suscripción Claude",
+  "claudeInfo": "Para una fila de suscripción Claude: escriba su nombre, abra el enlace generado, inicie sesión en Anthropic y permita el acceso, luego pegue el código mostrado y canjéelo. Después el adaptador renueva la sesión por sí mismo.",
+  "label_claudeAccount": "Nombre de cuenta (de la tabla)",
+  "help_claudeAccount": "Exactamente como en la tabla de cuentas",
+  "label_claudeUrl": "Enlace de inicio de sesión",
+  "label_claudeCode": "Código de la página de Anthropic",
+  "help_claudeCode": "Se muestra tras permitir el acceso",
+  "btn_claudeRedeem": "Canjear código"
 }

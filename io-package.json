@@ -43,7 +43,9 @@
       "uk": "Відстежує використання, ліміти та витрати акаунтів ШІ (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
       "zh-cn": "监控 AI 账户的使用量、限额和费用（Claude、OpenAI、OpenRouter、DeepSeek、GitHub Copilot）"
     },
-    "authors": ["krobi <krobi@power-dreams.com>"],
+    "authors": [
+      "krobi <krobi@power-dreams.com>"
+    ],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -66,8 +68,17 @@
     "supportedMessages": {
       "stopInstance": true
     },
-    "dependencies": [{ "js-controller": ">=7.2.2" }],
-    "globalDependencies": [{ "admin": ">=8.4.15" }]
+    "messagebox": true,
+    "dependencies": [
+      {
+        "js-controller": ">=7.2.2"
+      }
+    ],
+    "globalDependencies": [
+      {
+        "admin": ">=8.4.15"
+      }
+    ]
   },
   "encryptedNative": [],
   "protectedNative": [],
@@ -80,7 +91,9 @@
     {
       "_id": "info",
       "type": "channel",
-      "common": { "name": "Adapter Information" },
+      "common": {
+        "name": "Adapter Information"
+      },
       "native": {}
     },
     {

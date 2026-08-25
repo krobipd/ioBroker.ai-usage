@@ -33,19 +33,137 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var utils = __toESM(require("@iobroker/adapter-core"));
 var import_adapter_core = require("@iobroker/adapter-core");
+var import_promises = require("node:fs/promises");
+var import_node_path = require("node:path");
+var import_http = require("./lib/http");
 var import_poll_engine = require("./lib/poll-engine");
 var import_pure_helpers = require("./lib/pure-helpers");
+var import_claude_auth = require("./lib/providers/claude-auth");
+var import_claude_sub = require("./lib/providers/claude-sub");
 var import_deepseek = require("./lib/providers/deepseek");
 var import_openrouter = require("./lib/providers/openrouter");
 class AiUsageAdapter extends utils.Adapter {
   engine = null;
+  /** Pending Claude sign-in attempts, keyed by account id (PKCE lives only in memory). */
+  pendingClaudeAuth = /* @__PURE__ */ new Map();
   /**
    * @param options the adapter options
    */
   constructor(options = {}) {
     super({ ...options, name: "ai-usage" });
     this.on("ready", this.onReady.bind(this));
+    this.on("message", this.onMessage.bind(this));
     this.on("unload", this.onUnload.bind(this));
+  }
+  /**
+   * Handle admin messages — the guided Claude subscription sign-in.
+   *
+   * @param obj the message
+   */
+  async onMessage(obj) {
+    var _a;
+    try {
+      switch (obj.command) {
+        case "claudeAuthStart": {
+          const accountId = this.claudeAccountIdFrom(obj.message);
+          if (!accountId) {
+            this.respond(obj, "\u2192 Enter the exact name of a Claude subscription row from the table above");
+            return;
+          }
+          const pkce = (0, import_claude_auth.generatePkce)();
+          this.pendingClaudeAuth.set(accountId, pkce);
+          this.respond(obj, (0, import_claude_auth.buildAuthorizeUrl)(pkce));
+          return;
+        }
+        case "claudeAuthCode": {
+          const accountId = this.claudeAccountIdFrom(obj.message);
+          const code = typeof ((_a = obj.message) == null ? void 0 : _a.code) === "string" ? obj.message.code : "";
+          const pkce = accountId ? this.pendingClaudeAuth.get(accountId) : void 0;
+          if (!accountId || !pkce) {
+            this.respond(obj, { error: "Generate the sign-in link first (step 1)" });
+            return;
+          }
+          if (!code.trim()) {
+            this.respond(obj, { error: "Paste the code from the Anthropic page first" });
+            return;
+          }
+          try {
+            const tokens = await (0, import_claude_auth.exchangeCode)(code, pkce, import_http.postJson, Date.now());
+            await this.claudeTokenStore(accountId).save(tokens);
+            this.pendingClaudeAuth.delete(accountId);
+            this.respond(obj, { result: "Signed in \u2014 restart the instance (or save the settings) to start polling" });
+          } catch (e) {
+            this.respond(obj, { error: `Sign-in failed: ${e instanceof Error ? e.message : String(e)}` });
+          }
+          return;
+        }
+        default:
+          this.respond(obj, { error: `Unknown command: ${obj.command}` });
+      }
+    } catch (e) {
+      this.log.error(`onMessage failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.respond(obj, { error: "internal error \u2014 see log" });
+    }
+  }
+  /**
+   * Send a message response, when the caller expects one.
+   *
+   * @param obj the request message
+   * @param response the response payload
+   */
+  respond(obj, response) {
+    if (obj.callback) {
+      this.sendTo(obj.from, obj.command, response, obj.callback);
+    }
+  }
+  /**
+   * Resolve the account id for a Claude sign-in message: the given name must match
+   * a claude-sub row of the accounts table.
+   *
+   * @param message the message payload ({ account })
+   * @returns the id-safe account id, or undefined
+   */
+  claudeAccountIdFrom(message) {
+    const name = typeof (message == null ? void 0 : message.account) === "string" ? message.account : "";
+    const id = (0, import_pure_helpers.sanitizeId)(name);
+    if (!id) {
+      return void 0;
+    }
+    const accounts = (0, import_pure_helpers.parseAccounts)(this.config.accounts);
+    return accounts.some((account) => account.id === id && account.provider === "claude-sub") ? id : void 0;
+  }
+  /**
+   * The persistent token storage for one Claude account: an encrypted JSON file in
+   * the instance data directory (a `native` write would restart the instance).
+   *
+   * @param accountId the id-safe account id
+   * @returns the store
+   */
+  claudeTokenStore(accountId) {
+    const dir = utils.getAbsoluteInstanceDataDir(this);
+    const file = (0, import_node_path.join)(dir, `claude-tokens-${accountId}.json`);
+    return {
+      load: async () => {
+        try {
+          const encrypted = await (0, import_promises.readFile)(file, "utf8");
+          const parsed = JSON.parse(this.decrypt(encrypted));
+          if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
+            return null;
+          }
+          return {
+            accessToken: parsed.accessToken,
+            refreshToken: parsed.refreshToken,
+            expiresAt: Number(parsed.expiresAt) || 0
+          };
+        } catch {
+          return null;
+        }
+      },
+      save: async (tokens) => {
+        await (0, import_promises.mkdir)(dir, { recursive: true });
+        await (0, import_promises.writeFile)(file, this.encrypt(JSON.stringify(tokens)), "utf8");
+      }
+    };
   }
   /** Validate the configuration, clean up stale account trees and start the engine. */
   async onReady() {
@@ -107,6 +225,8 @@ class AiUsageAdapter extends utils.Adapter {
    */
   async makeProvider(account) {
     switch (account.provider) {
+      case "claude-sub":
+        return (0, import_claude_sub.claudeSubProvider)(this.claudeTokenStore(account.id), void 0, import_http.postJson);
       case "openrouter": {
         const key = await this.resolveKey(account);
         return key ? (0, import_openrouter.openRouterProvider)(key) : void 0;

@@ -1,8 +1,19 @@
 import * as utils from "@iobroker/adapter-core";
 import { Credentials } from "@iobroker/adapter-core";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { postJson } from "./lib/http";
 import { PollEngine } from "./lib/poll-engine";
-import { clampPollInterval, parseAccounts, validAccountIds, type AccountConfig } from "./lib/pure-helpers";
+import { clampPollInterval, parseAccounts, sanitizeId, validAccountIds, type AccountConfig } from "./lib/pure-helpers";
 import type { UsageProvider } from "./lib/provider";
+import {
+  buildAuthorizeUrl,
+  exchangeCode,
+  generatePkce,
+  type PkcePair,
+  type TokenSet,
+} from "./lib/providers/claude-auth";
+import { claudeSubProvider, type TokenStore } from "./lib/providers/claude-sub";
 import { deepSeekProvider } from "./lib/providers/deepseek";
 import { openRouterProvider } from "./lib/providers/openrouter";
 
@@ -19,6 +30,8 @@ type TimerHandle =
  */
 export class AiUsageAdapter extends utils.Adapter {
   private engine: PollEngine | null = null;
+  /** Pending Claude sign-in attempts, keyed by account id (PKCE lives only in memory). */
+  private readonly pendingClaudeAuth = new Map<string, PkcePair>();
 
   /**
    * @param options the adapter options
@@ -26,7 +39,125 @@ export class AiUsageAdapter extends utils.Adapter {
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ai-usage" });
     this.on("ready", this.onReady.bind(this));
+    this.on("message", this.onMessage.bind(this));
     this.on("unload", this.onUnload.bind(this));
+  }
+
+  /**
+   * Handle admin messages — the guided Claude subscription sign-in.
+   *
+   * @param obj the message
+   */
+  private async onMessage(obj: ioBroker.Message): Promise<void> {
+    try {
+      switch (obj.command) {
+        case "claudeAuthStart": {
+          const accountId = this.claudeAccountIdFrom(obj.message);
+          if (!accountId) {
+            // Plain string — this feeds a textSendTo display in the admin.
+            this.respond(obj, "→ Enter the exact name of a Claude subscription row from the table above");
+            return;
+          }
+          const pkce = generatePkce();
+          this.pendingClaudeAuth.set(accountId, pkce);
+          this.respond(obj, buildAuthorizeUrl(pkce));
+          return;
+        }
+        case "claudeAuthCode": {
+          const accountId = this.claudeAccountIdFrom(obj.message);
+          const code =
+            typeof (obj.message as { code?: unknown })?.code === "string" ? (obj.message as { code: string }).code : "";
+          const pkce = accountId ? this.pendingClaudeAuth.get(accountId) : undefined;
+          if (!accountId || !pkce) {
+            this.respond(obj, { error: "Generate the sign-in link first (step 1)" });
+            return;
+          }
+          if (!code.trim()) {
+            this.respond(obj, { error: "Paste the code from the Anthropic page first" });
+            return;
+          }
+          try {
+            const tokens = await exchangeCode(code, pkce, postJson, Date.now());
+            await this.claudeTokenStore(accountId).save(tokens);
+            this.pendingClaudeAuth.delete(accountId);
+            this.respond(obj, { result: "Signed in — restart the instance (or save the settings) to start polling" });
+          } catch (e) {
+            this.respond(obj, { error: `Sign-in failed: ${e instanceof Error ? e.message : String(e)}` });
+          }
+          return;
+        }
+        default:
+          // Always answer, or the caller's callback would dangle until timeout.
+          this.respond(obj, { error: `Unknown command: ${obj.command}` });
+      }
+    } catch (e) {
+      this.log.error(`onMessage failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.respond(obj, { error: "internal error — see log" });
+    }
+  }
+
+  /**
+   * Send a message response, when the caller expects one.
+   *
+   * @param obj the request message
+   * @param response the response payload
+   */
+  private respond(obj: ioBroker.Message, response: unknown): void {
+    if (obj.callback) {
+      this.sendTo(obj.from, obj.command, response, obj.callback);
+    }
+  }
+
+  /**
+   * Resolve the account id for a Claude sign-in message: the given name must match
+   * a claude-sub row of the accounts table.
+   *
+   * @param message the message payload ({ account })
+   * @returns the id-safe account id, or undefined
+   */
+  private claudeAccountIdFrom(message: unknown): string | undefined {
+    const name =
+      typeof (message as { account?: unknown })?.account === "string" ? (message as { account: string }).account : "";
+    const id = sanitizeId(name);
+    if (!id) {
+      return undefined;
+    }
+    const accounts = parseAccounts(this.config.accounts);
+    return accounts.some(account => account.id === id && account.provider === "claude-sub") ? id : undefined;
+  }
+
+  /**
+   * The persistent token storage for one Claude account: an encrypted JSON file in
+   * the instance data directory (a `native` write would restart the instance).
+   *
+   * @param accountId the id-safe account id
+   * @returns the store
+   */
+  private claudeTokenStore(accountId: string): TokenStore {
+    const dir = utils.getAbsoluteInstanceDataDir(this);
+    const file = join(dir, `claude-tokens-${accountId}.json`);
+    return {
+      load: async (): Promise<TokenSet | null> => {
+        try {
+          const encrypted = await readFile(file, "utf8");
+          const parsed = JSON.parse(this.decrypt(encrypted)) as Partial<TokenSet>;
+          if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
+            return null;
+          }
+          return {
+            accessToken: parsed.accessToken,
+            refreshToken: parsed.refreshToken,
+            expiresAt: Number(parsed.expiresAt) || 0,
+          };
+        } catch {
+          return null; // never signed in (or unreadable) — the provider reports auth-required
+        }
+      },
+      save: async (tokens: TokenSet): Promise<void> => {
+        await mkdir(dir, { recursive: true });
+        await writeFile(file, this.encrypt(JSON.stringify(tokens)), "utf8");
+      },
+    };
   }
 
   /** Validate the configuration, clean up stale account trees and start the engine. */
@@ -91,6 +222,8 @@ export class AiUsageAdapter extends utils.Adapter {
    */
   private async makeProvider(account: AccountConfig): Promise<UsageProvider | undefined> {
     switch (account.provider) {
+      case "claude-sub":
+        return claudeSubProvider(this.claudeTokenStore(account.id), undefined, postJson);
       case "openrouter": {
         const key = await this.resolveKey(account);
         return key ? openRouterProvider(key) : undefined;
@@ -100,7 +233,7 @@ export class AiUsageAdapter extends utils.Adapter {
         return key ? deepSeekProvider(key) : undefined;
       }
       default:
-        // claude-sub / openai / anthropic-api / copilot land in the next build phases.
+        // openai / anthropic-api / copilot land in the next build phases.
         return undefined;
     }
   }

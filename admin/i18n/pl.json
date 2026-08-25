@@ -17,5 +17,13 @@
   "donateKofi": "Wesprzyj na Ko-fi",
   "donatePaypal": "Przekaż przez PayPal",
   "OpenRouter": "OpenRouter",
-  "DeepSeek": "DeepSeek"
+  "DeepSeek": "DeepSeek",
+  "claudeHeader": "Logowanie subskrypcji Claude",
+  "claudeInfo": "Dla wiersza subskrypcji Claude: wpisz nazwę, otwórz wygenerowany link, zaloguj się w Anthropic i zezwól na dostęp, następnie wklej wyświetlony kod i zrealizuj go. Potem adapter odnawia logowanie samodzielnie.",
+  "label_claudeAccount": "Nazwa konta (z tabeli)",
+  "help_claudeAccount": "Dokładnie jak w tabeli kont",
+  "label_claudeUrl": "Link logowania",
+  "label_claudeCode": "Kod ze strony Anthropic",
+  "help_claudeCode": "Wyświetlany po zezwoleniu",
+  "btn_claudeRedeem": "Zrealizuj kod"
 }

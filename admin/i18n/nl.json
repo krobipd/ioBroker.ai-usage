@@ -17,5 +17,13 @@
   "donateKofi": "Steun via Ko-fi",
   "donatePaypal": "Doneer via PayPal",
   "OpenRouter": "OpenRouter",
-  "DeepSeek": "DeepSeek"
+  "DeepSeek": "DeepSeek",
+  "claudeHeader": "Claude-abonnement aanmelden",
+  "claudeInfo": "Voor een Claude-abonnementsrij: naam invullen, de gegenereerde link openen, bij Anthropic aanmelden en toegang toestaan, daarna de getoonde code plakken en inwisselen. Daarna vernieuwt de adapter de aanmelding zelf.",
+  "label_claudeAccount": "Accountnaam (uit de tabel)",
+  "help_claudeAccount": "Precies zoals in de accounttabel",
+  "label_claudeUrl": "Aanmeldlink",
+  "label_claudeCode": "Code van de Anthropic-pagina",
+  "help_claudeCode": "Wordt getoond na het toestaan",
+  "btn_claudeRedeem": "Code inwisselen"
 }

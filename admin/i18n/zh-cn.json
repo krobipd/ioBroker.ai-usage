@@ -17,5 +17,13 @@
   "donateKofi": "在 Ko-fi 上支持",
   "donatePaypal": "通过 PayPal 捐赠",
   "OpenRouter": "OpenRouter",
-  "DeepSeek": "DeepSeek"
+  "DeepSeek": "DeepSeek",
+  "claudeHeader": "Claude 订阅登录",
+  "claudeInfo": "对于 Claude 订阅行：输入其名称，打开生成的链接，在 Anthropic 登录并允许访问，然后粘贴显示的代码并兑换。之后适配器会自行续期登录。",
+  "label_claudeAccount": "账户名称（来自表格）",
+  "help_claudeAccount": "与账户表格中完全一致",
+  "label_claudeUrl": "登录链接",
+  "label_claudeCode": "Anthropic 页面上的代码",
+  "help_claudeCode": "允许访问后显示",
+  "btn_claudeRedeem": "兑换代码"
 }

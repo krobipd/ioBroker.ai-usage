@@ -85,6 +85,70 @@
         }
       ]
     },
+    "_claudeHeader": {
+      "newLine": true,
+      "type": "header",
+      "text": "claudeHeader",
+      "size": 5
+    },
+    "_claudeInfo": {
+      "type": "staticText",
+      "text": "claudeInfo",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12,
+      "style": { "fontSize": 14, "marginBottom": 8 }
+    },
+    "_claudeAccount": {
+      "type": "text",
+      "label": "label_claudeAccount",
+      "help": "help_claudeAccount",
+      "doNotSave": true,
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 3
+    },
+    "_claudeUrl": {
+      "type": "textSendTo",
+      "command": "claudeAuthStart",
+      "jsonData": "{\"account\": \"${data._claudeAccount}\"}",
+      "alsoDependsOn": ["_claudeAccount"],
+      "label": "label_claudeUrl",
+      "copyToClipboard": true,
+      "xs": 12,
+      "sm": 12,
+      "md": 8,
+      "lg": 8,
+      "xl": 9
+    },
+    "_claudeCode": {
+      "type": "text",
+      "label": "label_claudeCode",
+      "help": "help_claudeCode",
+      "doNotSave": true,
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 3
+    },
+    "_claudeRedeem": {
+      "type": "sendTo",
+      "command": "claudeAuthCode",
+      "jsonData": "{\"account\": \"${data._claudeAccount}\", \"code\": \"${data._claudeCode}\"}",
+      "label": "btn_claudeRedeem",
+      "variant": "contained",
+      "useNative": false,
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 3
+    },
     "_settingsHeader": {
       "newLine": true,
       "type": "header",
