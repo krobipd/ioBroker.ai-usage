@@ -28,7 +28,7 @@ module.exports = __toCommonJS(pure_helpers_exports);
 function sanitizeId(name) {
   return name.trim().replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_{2,}/g, "_").replace(/^_+|_+$/g, "");
 }
-const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api", "copilot"];
+const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api"];
 function parseAccounts(raw) {
   if (!Array.isArray(raw)) {
     return [];

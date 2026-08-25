@@ -15,7 +15,10 @@
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "style": { "fontSize": 14, "marginBottom": 8 }
+      "style": {
+        "fontSize": 14,
+        "marginBottom": 8
+      }
     },
     "accounts": {
       "type": "table",
@@ -25,7 +28,9 @@
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "uniqueColumns": ["name"],
+      "uniqueColumns": [
+        "name"
+      ],
       "items": [
         {
           "type": "text",
@@ -46,12 +51,26 @@
           "noTranslation": true,
           "default": "claude-sub",
           "options": [
-            { "label": "Claude subscription", "value": "claude-sub" },
-            { "label": "OpenRouter", "value": "openrouter" },
-            { "label": "DeepSeek", "value": "deepseek" },
-            { "label": "OpenAI API", "value": "openai" },
-            { "label": "Anthropic API", "value": "anthropic-api" },
-            { "label": "GitHub Copilot", "value": "copilot" }
+            {
+              "label": "Claude subscription",
+              "value": "claude-sub"
+            },
+            {
+              "label": "OpenRouter",
+              "value": "openrouter"
+            },
+            {
+              "label": "DeepSeek",
+              "value": "deepseek"
+            },
+            {
+              "label": "OpenAI API",
+              "value": "openai"
+            },
+            {
+              "label": "Anthropic API",
+              "value": "anthropic-api"
+            }
           ]
         },
         {
@@ -99,7 +118,10 @@
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "style": { "fontSize": 14, "marginBottom": 8 }
+      "style": {
+        "fontSize": 14,
+        "marginBottom": 8
+      }
     },
     "_claudeAccount": {
       "type": "text",
@@ -116,7 +138,9 @@
       "type": "textSendTo",
       "command": "claudeAuthStart",
       "jsonData": "{\"account\": \"${data._claudeAccount}\"}",
-      "alsoDependsOn": ["_claudeAccount"],
+      "alsoDependsOn": [
+        "_claudeAccount"
+      ],
       "label": "label_claudeUrl",
       "copyToClipboard": true,
       "xs": 12,
@@ -193,7 +217,10 @@
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "style": { "fontSize": 14, "marginBottom": 16 }
+      "style": {
+        "fontSize": 14,
+        "marginBottom": 16
+      }
     },
     "_kofiLink": {
       "type": "staticLink",

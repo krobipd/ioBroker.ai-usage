@@ -27,7 +27,7 @@ export function sanitizeId(name: string): string {
 }
 
 /** The provider kinds the adapter knows. */
-export const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api", "copilot"];
+export const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api"];
 
 /**
  * Parse and validate the admin accounts table. Rows without a usable name or with an

@@ -1,7 +1,7 @@
 /** The provider kinds the adapter speaks. */
-export type ProviderKind = "claude-sub" | "openrouter" | "deepseek" | "openai" | "anthropic-api" | "copilot";
+export type ProviderKind = "claude-sub" | "openrouter" | "deepseek" | "openai" | "anthropic-api";
 
-/** One limit window (session, week, per-model, month) — the same shape for every provider. */
+/** One limit window (session, week, per-model) — the same shape for every provider. */
 export interface LimitWindow {
   /** Window name; becomes the object id segment (session, week, a model name, month). */
   name: string;
@@ -62,7 +62,7 @@ export interface TokenInfo {
  * actually delivered is present; the tree builder creates nothing for absent parts.
  */
 export interface UsageSnapshot {
-  /** Limit windows (subscription accounts, Copilot month). */
+  /** Limit windows (subscription accounts). */
   limits?: LimitWindow[];
   /** Granted budget. */
   credits?: CreditInfo;

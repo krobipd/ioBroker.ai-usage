@@ -1,6 +1,4 @@
-import { FetchError } from "../provider";
 import { anthropicApiProvider, parseAnthropicReports } from "./anthropic-api";
-import { copilotProvider, parseCopilotUsage } from "./copilot";
 import { openAiProvider, parseOpenAiReports } from "./openai";
 import { isToday, monthStartIso, monthStartUnix, projectMonth } from "./report-utils";
 
@@ -106,39 +104,5 @@ describe("Anthropic reports", () => {
     await provider.fetch();
     expect(seen[0]["x-api-key"]).toBe("sk-ant-admin");
     expect(seen[0]["anthropic-version"]).toBe("2023-06-01");
-  });
-});
-
-describe("Copilot usage", () => {
-  test("sums gross/discount requests and billed overage from the usage items", () => {
-    // Official response shape: usageItems with gross/discount/net per SKU.
-    const snapshot = parseCopilotUsage({
-      timePeriod: { year: 2026, month: 8 },
-      user: "krobipd",
-      usageItems: [
-        { product: "copilot", sku: "premium", grossQuantity: 120, discountQuantity: 120, netQuantity: 0, netAmount: 0 },
-        { product: "copilot", sku: "premium", grossQuantity: 45, discountQuantity: 0, netQuantity: 45, netAmount: 1.8 },
-      ],
-    });
-    expect(snapshot.credits).toEqual({ used: 165, granted: 120, currency: "requests", pieces: true });
-    expect(snapshot.costs).toEqual({ month: 1.8, currency: "USD" });
-  });
-
-  test("no billed overage yields no costs block", () => {
-    const snapshot = parseCopilotUsage({ usageItems: [{ grossQuantity: 10, discountQuantity: 10, netAmount: 0 }] });
-    expect(snapshot.costs).toBeUndefined();
-  });
-
-  test("a malformed body is a network error; the provider sends the GitHub headers", async () => {
-    expect(() => parseCopilotUsage({})).toThrow(FetchError);
-    const calls: { url: string; headers: Record<string, string> }[] = [];
-    const provider = copilotProvider("krobipd", "ghp_x", (url, headers) => {
-      calls.push({ url, headers });
-      return Promise.resolve({ usageItems: [] });
-    });
-    await provider.fetch();
-    expect(calls[0].url).toBe("https://api.github.com/users/krobipd/settings/billing/ai_credit/usage");
-    expect(calls[0].headers.Authorization).toBe("Bearer ghp_x");
-    expect(calls[0].headers["X-GitHub-Api-Version"]).toBe("2026-03-10");
   });
 });

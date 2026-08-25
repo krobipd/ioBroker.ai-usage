@@ -45,10 +45,10 @@ describe("mapSnapshot", () => {
   });
 
   test("piece-credits carry no currency unit", () => {
-    const { objects } = mapSnapshot("copilot", "Copilot", "copilot", {
+    const { objects } = mapSnapshot("pieces", "Pieces", "deepseek", {
       credits: { used: 165, limit: 300, remaining: 135, percent: 55, currency: "requests", pieces: true },
     });
-    expect(objects.find(o => o.id === "copilot.credits.used")?.common.unit).toBe("");
+    expect(objects.find(o => o.id === "pieces.credits.used")?.common.unit).toBe("");
   });
 
   test("tokens with per-model breakdown create the models channel", () => {

@@ -1,7 +1,7 @@
 {
   "name": "iobroker.ai-usage",
   "version": "0.0.1",
-  "description": "ioBroker adapter monitoring usage, limits and costs of AI accounts (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
+  "description": "ioBroker adapter monitoring usage, limits and costs of AI accounts (Claude, OpenAI, OpenRouter, DeepSeek)",
   "author": {
     "name": "krobi",
     "email": "krobi@power-dreams.com"
@@ -24,7 +24,6 @@
     "openai",
     "openrouter",
     "deepseek",
-    "copilot",
     "monitoring"
   ],
   "repository": {

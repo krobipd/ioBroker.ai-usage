@@ -15,7 +15,6 @@ import {
 } from "./lib/providers/claude-auth";
 import { anthropicApiProvider } from "./lib/providers/anthropic-api";
 import { claudeSubProvider, type TokenStore } from "./lib/providers/claude-sub";
-import { copilotProvider } from "./lib/providers/copilot";
 import { deepSeekProvider } from "./lib/providers/deepseek";
 import { openAiProvider } from "./lib/providers/openai";
 import { openRouterProvider } from "./lib/providers/openrouter";
@@ -27,8 +26,8 @@ type TimerHandle =
 
 /**
  * AI Usage adapter — polls the usage/limit/cost sources of configured AI accounts
- * (Claude subscription, OpenRouter, DeepSeek, OpenAI API, Anthropic API, GitHub
- * Copilot) and mirrors them into read-only states. Orchestration lives in the
+ * (Claude subscription, OpenRouter, DeepSeek, OpenAI API, Anthropic API) and
+ * mirrors them into read-only states. Orchestration lives in the
  * fully unit-tested {@link PollEngine}; this class only wires ioBroker IO to it.
  */
 export class AiUsageAdapter extends utils.Adapter {
@@ -249,43 +248,8 @@ export class AiUsageAdapter extends utils.Adapter {
         const key = await this.resolveKey(account);
         return key ? anthropicApiProvider(key) : undefined;
       }
-      case "copilot": {
-        const login = await this.resolveLogin(account);
-        return login ? copilotProvider(login.user, login.token) : undefined;
-      }
       default:
         return undefined;
-    }
-  }
-
-  /**
-   * Read and decrypt a login/password credential (Copilot: user name + access token).
-   *
-   * @param account the account whose credential to resolve
-   * @returns user + token, or undefined (with a log line) when it cannot be read
-   */
-  private async resolveLogin(account: AccountConfig): Promise<{ user: string; token: string } | undefined> {
-    if (!account.credentialId) {
-      this.log.warn(`${account.name}: no credential selected — pick one in the instance settings`);
-      return undefined;
-    }
-    try {
-      const credential = await Credentials.getCredentials(this, account.credentialId);
-      const values = credential.values as { login?: unknown; password?: unknown };
-      const user = typeof values.login === "string" && values.login ? values.login : undefined;
-      const token = typeof values.password === "string" && values.password ? values.password : undefined;
-      if (!user || !token) {
-        this.log.warn(
-          `${account.name}: credential ${account.credentialId} needs the login & password form (user name + access token)`,
-        );
-        return undefined;
-      }
-      return { user, token };
-    } catch (e) {
-      this.log.warn(
-        `${account.name}: cannot read credential ${account.credentialId} (${e instanceof Error ? e.message : String(e)})`,
-      );
-      return undefined;
     }
   }
 

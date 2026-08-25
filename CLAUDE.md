@@ -6,7 +6,8 @@
 ## Projekt
 
 **ioBroker AI Usage** — Verbrauchs-/Limit-/Kosten-Monitor für KI-Konten (Claude-Abo, OpenRouter,
-DeepSeek, OpenAI-API, Anthropic-API, GitHub Copilot). Reiner Beobachter: liest nur, ruft keine KI
+DeepSeek, OpenAI-API, Anthropic-API — krobi 2026-08-25: NUR was der ioBroker-Admin nativ kann;
+Copilot wieder ausgebaut, weil er ein von Hand erzeugtes GitHub-Token bräuchte). Reiner Beobachter: liest nur, ruft keine KI
 auf (Abgrenzung zu ai-toolbox/ai-assistant), schreibt nie zum Anbieter.
 
 - **Version:** io-package.json ist die Wahrheit (nicht hier pinnen)
@@ -26,7 +27,7 @@ src/lib/provider.ts            → UsageProvider-Vertrag + UsageSnapshot + Fetch
 src/lib/http.ts                → getJson/postJson (natives fetch, Status→Fehlerklasse)
 src/lib/providers/claude-auth.ts   → OAuth-Konstanten/PKCE/Tausch/Auffrischung (HA-Vorbild-verifiziert)
 src/lib/providers/claude-sub.ts    → Abo-Abfrage: limits[]-Auswertung, Extra-Guthaben beide Schemata
-src/lib/providers/openrouter|deepseek|openai|anthropic-api|copilot.ts → je Anbieter fetch+parse (pur)
+src/lib/providers/openrouter|deepseek|openai|anthropic-api.ts → je Anbieter fetch+parse (pur)
 src/lib/providers/report-utils.ts  → Monatsstart/heute/Hochrechnung für die Report-Anbieter
 src/lib/snapshot-tree.ts       → Snapshot → Objekt-Definitionen + Werte (capability-driven)
 src/lib/totals.ts              → total.* aus den Snapshots im Speicher
@@ -50,8 +51,8 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
    das NUTZERKONTO ~24 h (trifft auch Claude Code). Standard 300 s. Letzte Werte bleiben stehen.
 4. **Nur Gelieferte Datenpunkte anlegen** (capability-driven wie die Geräte-Adapter); gleiche Sache
    = gleicher Pfad über alle Anbieter (`limits.*`/`credits.*`/`costs.*`/`tokens.*`).
-5. **total.costs summiert nur echtes Geld gleicher Währung** — Copilot-Guthaben sind Stück
-   (pieces:true) und bleiben draußen.
+5. **total.costs summiert nur echtes Geld gleicher Währung** — Stück-Guthaben (pieces:true)
+   und Fremdwährungen bleiben draußen.
 6. **Admin-Seitenlayout adapter-individuell** (krobi): aktuell EIN Panel; die Claude-Anmeldung
    bekommt bei Bedarf einen eigenen Reiter — Seitenzahl ist kein Fleet-Standard.
 
@@ -65,5 +66,5 @@ test/integration.js            → standard: @iobroker/testing integration (CI)
 test/standards/                → iobroker-adapter-checks (Repo-Standards)
 ```
 
-**Test-Oberfläche krobi:** Claude-Abo (Max) + GitHub vorhanden; übrige Anbieter ggf. ohne
-Live-Konto → Changelog „sagen, nicht behaupten".
+**Test-Oberfläche krobi:** Claude-Abo (Max) vorhanden; übrige Anbieter ggf. ohne Live-Konto →
+Changelog „sagen, nicht behaupten".

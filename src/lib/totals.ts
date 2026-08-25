@@ -38,8 +38,8 @@ const TOTAL_CURRENCY = "USD";
 
 /**
  * Compute the adapter-wide totals from the in-memory account statuses. Money sums
- * include only real-money costs in {@link TOTAL_CURRENCY}; piece-credits (Copilot)
- * and foreign currencies are excluded by design.
+ * include only real-money costs in {@link TOTAL_CURRENCY}; piece-counters and
+ * foreign currencies are excluded by design.
  *
  * @param statuses each account's status
  * @returns the totals

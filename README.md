@@ -7,7 +7,7 @@
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
 Monitors your AI accounts in ioBroker: usage windows, limits, credits and costs of
-Claude, OpenAI, OpenRouter, DeepSeek and GitHub Copilot as clean datapoints — for
+Claude, OpenAI, OpenRouter and DeepSeek as clean datapoints — for
 dashboards, history and automations ("send a message at 90 % of the weekly limit").
 
 ---

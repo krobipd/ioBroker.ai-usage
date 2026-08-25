@@ -31,17 +31,17 @@
       "zh-cn": "AI Usage"
     },
     "desc": {
-      "en": "Monitors usage, limits and costs of AI accounts (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "de": "Überwacht Verbrauch, Limits und Kosten von KI-Konten (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "ru": "Отслеживает использование, лимиты и расходы аккаунтов ИИ (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "pt": "Monitora uso, limites e custos de contas de IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "nl": "Bewaakt verbruik, limieten en kosten van AI-accounts (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "fr": "Surveille l'utilisation, les limites et les coûts des comptes IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "it": "Monitora utilizzo, limiti e costi degli account IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "es": "Supervisa el uso, los límites y los costes de las cuentas de IA (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "pl": "Monitoruje zużycie, limity i koszty kont AI (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "uk": "Відстежує використання, ліміти та витрати акаунтів ШІ (Claude, OpenAI, OpenRouter, DeepSeek, GitHub Copilot)",
-      "zh-cn": "监控 AI 账户的使用量、限额和费用（Claude、OpenAI、OpenRouter、DeepSeek、GitHub Copilot）"
+      "en": "Monitors usage, limits and costs of AI accounts (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "de": "Überwacht Verbrauch, Limits und Kosten von KI-Konten (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "ru": "Отслеживает использование, лимиты и расходы аккаунтов ИИ (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "pt": "Monitora uso, limites e custos de contas de IA (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "nl": "Bewaakt verbruik, limieten en kosten van AI-accounts (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "fr": "Surveille l'utilisation, les limites et les coûts des comptes IA (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "it": "Monitora utilizzo, limiti e costi degli account IA (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "es": "Supervisa el uso, los límites y los costes de las cuentas de IA (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "pl": "Monitoruje zużycie, limity i koszty kont AI (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "uk": "Відстежує використання, ліміти та витрати акаунтів ШІ (Claude, OpenAI, OpenRouter, DeepSeek)",
+      "zh-cn": "监控 AI 账户的使用量、限额和费用（Claude、OpenAI、OpenRouter、DeepSeek）"
     },
     "keywords": [
       "ai",
@@ -52,7 +52,6 @@
       "openai",
       "openrouter",
       "deepseek",
-      "copilot",
       "monitoring"
     ],
     "authors": [

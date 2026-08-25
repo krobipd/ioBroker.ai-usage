@@ -41,7 +41,6 @@ var import_pure_helpers = require("./lib/pure-helpers");
 var import_claude_auth = require("./lib/providers/claude-auth");
 var import_anthropic_api = require("./lib/providers/anthropic-api");
 var import_claude_sub = require("./lib/providers/claude-sub");
-var import_copilot = require("./lib/providers/copilot");
 var import_deepseek = require("./lib/providers/deepseek");
 var import_openai = require("./lib/providers/openai");
 var import_openrouter = require("./lib/providers/openrouter");
@@ -249,42 +248,8 @@ class AiUsageAdapter extends utils.Adapter {
         const key = await this.resolveKey(account);
         return key ? (0, import_anthropic_api.anthropicApiProvider)(key) : void 0;
       }
-      case "copilot": {
-        const login = await this.resolveLogin(account);
-        return login ? (0, import_copilot.copilotProvider)(login.user, login.token) : void 0;
-      }
       default:
         return void 0;
-    }
-  }
-  /**
-   * Read and decrypt a login/password credential (Copilot: user name + access token).
-   *
-   * @param account the account whose credential to resolve
-   * @returns user + token, or undefined (with a log line) when it cannot be read
-   */
-  async resolveLogin(account) {
-    if (!account.credentialId) {
-      this.log.warn(`${account.name}: no credential selected \u2014 pick one in the instance settings`);
-      return void 0;
-    }
-    try {
-      const credential = await import_adapter_core.Credentials.getCredentials(this, account.credentialId);
-      const values = credential.values;
-      const user = typeof values.login === "string" && values.login ? values.login : void 0;
-      const token = typeof values.password === "string" && values.password ? values.password : void 0;
-      if (!user || !token) {
-        this.log.warn(
-          `${account.name}: credential ${account.credentialId} needs the login & password form (user name + access token)`
-        );
-        return void 0;
-      }
-      return { user, token };
-    } catch (e) {
-      this.log.warn(
-        `${account.name}: cannot read credential ${account.credentialId} (${e instanceof Error ? e.message : String(e)})`
-      );
-      return void 0;
     }
   }
   /**

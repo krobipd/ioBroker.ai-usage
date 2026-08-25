@@ -7,7 +7,7 @@ declare global {
       accounts: {
         /** Display name; becomes the object id (sanitized). */
         name: string;
-        /** Provider kind (claude-sub, openrouter, deepseek, openai, anthropic-api, copilot). */
+        /** Provider kind (claude-sub, openrouter, deepseek, openai, anthropic-api). */
         provider: string;
         /** Id of the central credential (system.credentials.*); empty for claude-sub. */
         credentialId: string;
