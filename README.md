@@ -77,11 +77,17 @@ and the adapter log. Authentication errors raise one notification with the reaso
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.1.0 (2026-08-25)
+
+- New: First release — reads usage limits, credits and costs of your Claude, OpenAI, Anthropic, OpenRouter and DeepSeek accounts into datapoints, with one warning at your chosen threshold
+
 ### 0.0.1 (2026-08-25)
 
 - Initial development version
 
 ---
+
+[Older changelogs can be found there](CHANGELOG_OLD.md)
 
 ## Support
 

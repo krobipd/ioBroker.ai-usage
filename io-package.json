@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "news": {
+      "0.1.0": {
+        "en": "First release: usage limits, credits and costs of your Claude, OpenAI, Anthropic, OpenRouter and DeepSeek accounts as datapoints, with a warning at your chosen threshold",
+        "de": "Erste Version: Auslastungs-Limits, Guthaben und Kosten Ihrer Claude-, OpenAI-, Anthropic-, OpenRouter- und DeepSeek-Konten als Datenpunkte, mit Warnung an Ihrer Schwelle",
+        "ru": "Первый выпуск: лимиты, кредиты и расходы аккаунтов Claude, OpenAI, Anthropic, OpenRouter и DeepSeek как точки данных, с предупреждением на заданном пороге",
+        "pt": "Primeira versão: limites de uso, créditos e custos das contas Claude, OpenAI, Anthropic, OpenRouter e DeepSeek como pontos de dados, com aviso no limite escolhido",
+        "nl": "Eerste release: gebruikslimieten, tegoeden en kosten van uw Claude-, OpenAI-, Anthropic-, OpenRouter- en DeepSeek-accounts als datapunten, met waarschuwing bij uw drempel",
+        "fr": "Première version : limites d'utilisation, crédits et coûts de vos comptes Claude, OpenAI, Anthropic, OpenRouter et DeepSeek comme points de données, avec alerte au seuil choisi",
+        "it": "Prima versione: limiti di utilizzo, crediti e costi degli account Claude, OpenAI, Anthropic, OpenRouter e DeepSeek come punti dati, con avviso alla soglia scelta",
+        "es": "Primera versión: límites de uso, créditos y costes de sus cuentas Claude, OpenAI, Anthropic, OpenRouter y DeepSeek como puntos de datos, con aviso en el umbral elegido",
+        "pl": "Pierwsze wydanie: limity użycia, środki i koszty kont Claude, OpenAI, Anthropic, OpenRouter i DeepSeek jako punkty danych, z ostrzeżeniem przy wybranym progu",
+        "uk": "Перший випуск: ліміти використання, кредити та витрати акаунтів Claude, OpenAI, Anthropic, OpenRouter і DeepSeek як точки даних, з попередженням на обраному порозі",
+        "zh-cn": "首个版本：将 Claude、OpenAI、Anthropic、OpenRouter 和 DeepSeek 账户的使用限额、余额与费用作为数据点，并在达到所选阈值时发出警告"
+      },
       "0.0.1": {
         "en": "Initial development version",
         "de": "Erste Entwicklungsversion",
@@ -14,7 +27,7 @@
         "es": "Primera versión de desarrollo",
         "pl": "Pierwsza wersja rozwojowa",
         "uk": "Перша версія для розробки",
-        "zh-cn": "首个开发版本"
+        "zh-cn": "初始开发版本"
       }
     },
     "titleLang": {
