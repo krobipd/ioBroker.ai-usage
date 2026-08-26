@@ -58,10 +58,14 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
    und Fremdwährungen bleiben draußen.
 6. **Konfiguration = React-Komponente statt jsonConfig-Tabelle** (krobi 2026-08-25: „die Tabelle
    ist ultra kompliziert … schau dir mal homeconnect an"): `src-admin/` (Module-Federation,
-   GUI-API-Gen-2, Blaupause homeconnect) rendert die gesamte Konten-Wahl — Claude-Abo-Karte mit
-   geführter Anmeldung + die zentral gespeicherten KI-Zugänge als An/Aus-Liste (Anbieter wird aus
-   Vorlagen-Name/Anzeige-Name geraten, sonst einmalige Auswahl; Gemini = ausgegraut, kein
-   Abfrageweg). Die Komponente besitzt NUR das native-Feld `accounts` — Backend-Modell unverändert.
+   GUI-API-Gen-2, Blaupause homeconnect) rendert EINE einheitliche An/Aus-Liste aller KI-Konten
+   (krobi 2026-08-26: keine Sonderstellung für Claude): das Claude-Abo ist eine normale Zeile,
+   alphabetisch einsortiert — nur sein Anmelde-Bereich klappt bei aktivem Schalter darunter auf
+   (der Speicher kennt für ein Abo keinen Schlüssel). Anbieter wird aus Vorlagen-/Anzeige-Name
+   geraten; einzig OpenRouter hat keine Admin-Vorlage → bei nicht zuordenbaren „Key"-Einträgen
+   einmalige Anbieter-Auswahl. Gemini = sichtbar-ausgegraut MIT Grund (Google liefert für den
+   einfachen Schlüssel keine Verbrauchsdaten — nur über Cloud-Projekt-Abrechnung). Die Komponente
+   besitzt NUR das native-Feld `accounts` — Backend-Modell unverändert.
 7. **Der Adapter besitzt den Claude-Anmelde-Fluss** (homeconnect-Muster): er erzeugt das
    PKCE-Geheimnis EINMAL, veröffentlicht den Link als Datenpunkt `auth.<Konto>.signInUrl`
    (+ `signedIn`), die Karte zeigt ihn nur live an; Code-Einlösung per Nachricht gegen das stabile

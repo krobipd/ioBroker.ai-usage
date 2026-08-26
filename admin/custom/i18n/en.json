@@ -1,6 +1,5 @@
 {
     "aiu_claudeTitle": "Claude subscription",
-    "aiu_claudeSubtitle": "Usage limits of your Claude plan — sign in once with your Claude account.",
     "aiu_signedIn": "Signed in",
     "aiu_signInAgain": "Sign in again",
     "aiu_saveFirst": "Save the settings first — the sign-in link will appear here.",
@@ -14,10 +13,11 @@
     "aiu_signInDone": "Signed in — usage data arrives with the next poll.",
     "aiu_signInFailed": "Sign-in failed",
     "aiu_instanceNotRunning": "The instance is not running — start it to sign in.",
-    "aiu_storedTitle": "Stored AI credentials",
-    "aiu_storedHint": "All entries of the central credential storage with category AI. Switch on what to monitor; add new keys under Settings → Credentials.",
+    "aiu_storedTitle": "AI accounts",
+    "aiu_storedHint": "Your centrally stored AI credentials plus the Claude subscription — switch on what to monitor. New keys are added under Settings → Credentials.",
     "aiu_noCredentials": "No AI credentials stored yet — add them in the admin settings under Credentials.",
     "aiu_unsupported": "No usage query available",
     "aiu_provider": "Provider",
-    "aiu_warnAt": "Warn at %"
+    "aiu_warnAt": "Warn at %",
+    "aiu_claudeCaption": "Subscription — signs in with your Claude account instead of a key"
 }

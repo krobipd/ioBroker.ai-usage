@@ -1,6 +1,5 @@
 {
     "aiu_claudeTitle": "Claude 订阅",
-    "aiu_claudeSubtitle": "您的 Claude 订阅使用限额——使用您的 Claude 账户登录一次即可。",
     "aiu_signedIn": "已登录",
     "aiu_signInAgain": "重新登录",
     "aiu_saveFirst": "请先保存设置——登录链接随后会显示在这里。",
@@ -14,10 +13,11 @@
     "aiu_signInDone": "已登录——数据将随下次查询到达。",
     "aiu_signInFailed": "登录失败",
     "aiu_instanceNotRunning": "实例未运行——请启动后再登录。",
-    "aiu_storedTitle": "已保存的 AI 凭据",
-    "aiu_storedHint": "中央凭据存储中类别为 AI 的所有条目。开启要监控的项目；新密钥请在 设置 → 凭据 中添加。",
+    "aiu_storedTitle": "AI 账户",
+    "aiu_storedHint": "您集中保存的 AI 凭据以及 Claude 订阅——开启要监控的项目。新密钥请在 设置 → 凭据 中添加。",
     "aiu_noCredentials": "尚未保存任何 AI 凭据——请在管理设置中添加。",
     "aiu_unsupported": "无可用的用量查询",
     "aiu_provider": "提供商",
-    "aiu_warnAt": "警告阈值 %"
+    "aiu_warnAt": "警告阈值 %",
+    "aiu_claudeCaption": "订阅——使用您的 Claude 账户登录，无需密钥"
 }

@@ -1,6 +1,5 @@
 {
     "aiu_claudeTitle": "Abbonamento Claude",
-    "aiu_claudeSubtitle": "Limiti di utilizzo del tuo abbonamento Claude — accedi una volta con il tuo account Claude.",
     "aiu_signedIn": "Accesso effettuato",
     "aiu_signInAgain": "Accedi di nuovo",
     "aiu_saveFirst": "Salva prima le impostazioni — il link di accesso apparirà qui.",
@@ -14,10 +13,11 @@
     "aiu_signInDone": "Accesso effettuato — i dati arrivano con la prossima interrogazione.",
     "aiu_signInFailed": "Accesso non riuscito",
     "aiu_instanceNotRunning": "L'istanza non è in esecuzione — avviala per accedere.",
-    "aiu_storedTitle": "Credenziali IA salvate",
-    "aiu_storedHint": "Tutte le voci dell'archivio centrale con categoria IA. Attiva ciò che vuoi monitorare; nuove chiavi in Impostazioni → Credenziali.",
+    "aiu_storedTitle": "Account IA",
+    "aiu_storedHint": "Le tue credenziali IA salvate centralmente più l'abbonamento Claude — attiva ciò che vuoi monitorare. Nuove chiavi in Impostazioni → Credenziali.",
     "aiu_noCredentials": "Nessuna credenziale IA salvata — aggiungile nelle impostazioni di amministrazione.",
     "aiu_unsupported": "Nessuna interrogazione dei consumi disponibile",
     "aiu_provider": "Fornitore",
-    "aiu_warnAt": "Avvisa da %"
+    "aiu_warnAt": "Avvisa da %",
+    "aiu_claudeCaption": "Abbonamento — accede con il tuo account Claude invece di una chiave"
 }

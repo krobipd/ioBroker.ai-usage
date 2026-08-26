@@ -1,6 +1,5 @@
 {
     "aiu_claudeTitle": "Claude-Abo",
-    "aiu_claudeSubtitle": "Auslastungs-Limits Ihres Claude-Abos — einmalig mit Ihrem Claude-Konto anmelden.",
     "aiu_signedIn": "Angemeldet",
     "aiu_signInAgain": "Neu anmelden",
     "aiu_saveFirst": "Zuerst die Einstellungen speichern — der Anmelde-Link erscheint dann hier.",
@@ -14,10 +13,11 @@
     "aiu_signInDone": "Angemeldet — die Verbrauchsdaten kommen mit der nächsten Abfrage.",
     "aiu_signInFailed": "Anmeldung fehlgeschlagen",
     "aiu_instanceNotRunning": "Die Instanz läuft nicht — zum Anmelden bitte starten.",
-    "aiu_storedTitle": "Gespeicherte KI-Zugangsdaten",
-    "aiu_storedHint": "Alle Einträge des zentralen Zugangsdaten-Speichers mit Kategorie KI. Einschalten, was überwacht werden soll; neue Schlüssel unter Einstellungen → Zugangsdaten anlegen.",
+    "aiu_storedTitle": "KI-Konten",
+    "aiu_storedHint": "Ihre zentral gespeicherten KI-Zugangsdaten plus das Claude-Abo — einschalten, was überwacht werden soll. Neue Schlüssel unter Einstellungen → Zugangsdaten.",
     "aiu_noCredentials": "Noch keine KI-Zugangsdaten gespeichert — im Admin unter Einstellungen → Zugangsdaten anlegen.",
     "aiu_unsupported": "Keine Verbrauchsabfrage verfügbar",
     "aiu_provider": "Anbieter",
-    "aiu_warnAt": "Warnen ab %"
+    "aiu_warnAt": "Warnen ab %",
+    "aiu_claudeCaption": "Abo — meldet sich mit Ihrem Claude-Konto an statt mit einem Schlüssel"
 }

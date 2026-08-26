@@ -1,6 +1,5 @@
 {
     "aiu_claudeTitle": "Subskrypcja Claude",
-    "aiu_claudeSubtitle": "Limity użycia Twojej subskrypcji Claude — zaloguj się raz swoim kontem Claude.",
     "aiu_signedIn": "Zalogowano",
     "aiu_signInAgain": "Zaloguj ponownie",
     "aiu_saveFirst": "Najpierw zapisz ustawienia — link logowania pojawi się tutaj.",
@@ -14,10 +13,11 @@
     "aiu_signInDone": "Zalogowano — dane przyjdą przy następnym odpytaniu.",
     "aiu_signInFailed": "Logowanie nie powiodło się",
     "aiu_instanceNotRunning": "Instancja nie działa — uruchom ją, aby się zalogować.",
-    "aiu_storedTitle": "Zapisane dane dostępu AI",
-    "aiu_storedHint": "Wszystkie wpisy centralnego magazynu z kategorią AI. Włącz, co ma być monitorowane; nowe klucze w Ustawienia → Dane dostępu.",
+    "aiu_storedTitle": "Konta AI",
+    "aiu_storedHint": "Twoje centralnie zapisane dane dostępu AI plus subskrypcja Claude — włącz, co ma być monitorowane. Nowe klucze w Ustawienia → Dane dostępu.",
     "aiu_noCredentials": "Brak zapisanych danych dostępu AI — dodaj je w ustawieniach administratora.",
     "aiu_unsupported": "Zapytanie o zużycie niedostępne",
     "aiu_provider": "Dostawca",
-    "aiu_warnAt": "Ostrzegaj od %"
+    "aiu_warnAt": "Ostrzegaj od %",
+    "aiu_claudeCaption": "Subskrypcja — loguje się kontem Claude zamiast klucza"
 }

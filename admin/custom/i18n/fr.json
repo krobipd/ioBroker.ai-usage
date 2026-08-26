@@ -1,6 +1,5 @@
 {
     "aiu_claudeTitle": "Abonnement Claude",
-    "aiu_claudeSubtitle": "Limites d'utilisation de votre abonnement Claude — connectez-vous une seule fois avec votre compte Claude.",
     "aiu_signedIn": "Connecté",
     "aiu_signInAgain": "Se reconnecter",
     "aiu_saveFirst": "Enregistrez d'abord les réglages — le lien de connexion apparaîtra ici.",
@@ -14,10 +13,11 @@
     "aiu_signInDone": "Connecté — les données arrivent à la prochaine interrogation.",
     "aiu_signInFailed": "Échec de la connexion",
     "aiu_instanceNotRunning": "L'instance ne tourne pas — démarrez-la pour vous connecter.",
-    "aiu_storedTitle": "Identifiants IA enregistrés",
-    "aiu_storedHint": "Toutes les entrées du stockage central de catégorie IA. Activez ce qui doit être surveillé ; nouvelles clés via Réglages → Identifiants.",
+    "aiu_storedTitle": "Comptes IA",
+    "aiu_storedHint": "Vos identifiants IA enregistrés au niveau central plus l'abonnement Claude — activez ce qui doit être surveillé. Nouvelles clés via Réglages → Identifiants.",
     "aiu_noCredentials": "Aucun identifiant IA enregistré — ajoutez-les dans les réglages d'administration.",
     "aiu_unsupported": "Aucune interrogation d'utilisation disponible",
     "aiu_provider": "Fournisseur",
-    "aiu_warnAt": "Avertir à partir de %"
+    "aiu_warnAt": "Avertir à partir de %",
+    "aiu_claudeCaption": "Abonnement — se connecte avec votre compte Claude au lieu d'une clé"
 }

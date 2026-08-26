@@ -301,34 +301,42 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     );
   }
 
-  private renderClaudeCard(): React.JSX.Element {
+  /**
+   * The Claude subscription as a NORMAL list row (no special placement) — the
+   * sign-in area only expands below it while it is switched on.
+   */
+  private renderClaudeRow(): React.JSX.Element {
     const enabled = this.claudeEnabled();
     const row = this.accounts().find(r => r.provider === "claude-sub");
     return (
-      <Card
-        variant="outlined"
-        sx={{ mb: 2 }}
-      >
-        <CardContent>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <SmartToyIcon color="primary" />
-            <Typography variant="h6">{I18n.t("aiu_claudeTitle")}</Typography>
-            <Switch
-              checked={enabled}
-              onChange={e => this.toggleClaude(e.target.checked)}
-              sx={{ ml: 1 }}
+      <Box key="claude-sub">
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}>
+          <Avatar sx={{ width: 28, height: 28, bgcolor: "transparent" }}>
+            <SmartToyIcon
+              fontSize="small"
+              color="primary"
             />
-            {enabled && row ? this.renderThreshold("", row) : null}
+          </Avatar>
+          <Box sx={{ minWidth: 160 }}>
+            <Typography>{I18n.t("aiu_claudeTitle")}</Typography>
+            <Typography
+              variant="caption"
+              sx={{ opacity: 0.7 }}
+            >
+              {I18n.t("aiu_claudeCaption")}
+            </Typography>
           </Box>
-          <Typography
-            variant="body2"
-            sx={{ opacity: 0.8, mb: enabled ? 1.5 : 0 }}
-          >
-            {I18n.t("aiu_claudeSubtitle")}
-          </Typography>
-          {enabled ? this.renderClaudeAuth() : null}
-        </CardContent>
-      </Card>
+          {enabled && row ? this.renderThreshold("", row) : null}
+          <Switch
+            checked={enabled}
+            onChange={e => this.toggleClaude(e.target.checked)}
+            sx={{ ml: enabled ? 0 : "auto" }}
+          />
+        </Box>
+        {enabled ? (
+          <Box sx={{ pl: 6, py: 1.5, borderBottom: 1, borderColor: "divider" }}>{this.renderClaudeAuth()}</Box>
+        ) : null}
+      </Box>
     );
   }
 
@@ -462,12 +470,17 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   }
 
   renderItem(): React.JSX.Element {
+    const rows: { name: string; element: React.JSX.Element }[] = this.state.credentials.map(credential => ({
+      name: credential.name,
+      element: this.renderCredentialRow(credential),
+    }));
+    rows.push({ name: I18n.t("aiu_claudeTitle"), element: this.renderClaudeRow() });
+    rows.sort((a, b) => a.name.localeCompare(b.name));
     return (
       <Box
         data-testid="aiu-config"
         sx={{ maxWidth: 720 }}
       >
-        {this.renderClaudeCard()}
         <Card variant="outlined">
           <CardContent>
             <Typography
@@ -482,13 +495,15 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
             >
               {I18n.t("aiu_storedHint")}
             </Typography>
-            {!this.state.credentialsLoaded ? (
-              <CircularProgress size={24} />
-            ) : this.state.credentials.length === 0 ? (
-              <Alert severity="info">{I18n.t("aiu_noCredentials")}</Alert>
-            ) : (
-              this.state.credentials.map(credential => this.renderCredentialRow(credential))
-            )}
+            {!this.state.credentialsLoaded ? <CircularProgress size={24} /> : rows.map(r => r.element)}
+            {this.state.credentialsLoaded && this.state.credentials.length === 0 ? (
+              <Alert
+                severity="info"
+                sx={{ mt: 1 }}
+              >
+                {I18n.t("aiu_noCredentials")}
+              </Alert>
+            ) : null}
           </CardContent>
         </Card>
       </Box>
