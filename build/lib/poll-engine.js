@@ -248,16 +248,19 @@ class PollEngine {
   /**
    * Write the two status states.
    *
-   * `unreach` says whether the AI SERVICE answered at all — a rejected sign-in or a
-   * throttle both mean it is up, so those leave the marker off and only fill the
-   * error text. Both are written on change only: an indicator rewritten every cycle
-   * floods the history and hides the real transition.
+   * `unreach` drives the connection icon the admin draws next to the account, so it
+   * has to mean what a user reads into that icon: green while the account delivers.
+   * A throttle keeps the last values and the service is fine, so it stays green and
+   * only fills the error text; a dead sign-in, a broken service or no connection at
+   * all turn it off. Both states are written on change only — an indicator rewritten
+   * every cycle floods the history and hides the real transition.
    *
    * @param runtime the account's runtime
    */
   writeAccountStatus(runtime) {
     const { config } = runtime;
-    this.setIfChanged(runtime, `${config.id}.info.unreach`, !runtime.serviceOnline);
+    const delivering = runtime.state === "ok" || runtime.state === "rate-limited";
+    this.setIfChanged(runtime, `${config.id}.info.unreach`, !delivering);
     this.setIfChanged(runtime, `${config.id}.info.error`, runtime.error);
   }
   /**
@@ -296,7 +299,16 @@ class PollEngine {
   async createAccountSkeleton(runtime) {
     const { config } = runtime;
     const defs = [
-      { id: config.id, type: "device", common: { name: `${config.name} (${config.provider})` } },
+      {
+        id: config.id,
+        type: "device",
+        common: {
+          name: `${config.name} (${config.provider})`,
+          // The admin's object tree draws its connection icon from this link and
+          // from nothing else — govee, beszel, homewizard and nut2 all do the same.
+          statusStates: { offlineId: "info.unreach" }
+        }
+      },
       { id: `${config.id}.info`, type: "channel", common: { name: "Info" } },
       {
         // The two slots ioBroker itself provides for this — measured against

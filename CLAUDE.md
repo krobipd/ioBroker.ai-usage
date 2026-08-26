@@ -99,7 +99,16 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     Dienst hat GEANTWORTET (er ist online, er sagt nur nein), `service` = er meldet eigenen Defekt
     (sofort offline, er hat es uns ja gesagt), `network` = nie erreicht (erst nach 3 Versuchen,
     sonst flattert die Anzeige).
-12. **ZWEI Status-Datenpunkte je Konto, an ioBrokers eigenen Plätzen** (krobi 2026-08-26, nachdem
+12. **Das Verbindungs-Symbol im Objektbaum kommt AUSSCHLIESSLICH aus `common.statusStates`**
+    am Geräte-Objekt (`{ offlineId: "info.unreach" }`, relative Id wird zu `<gerät>.<id>`
+    ergänzt) — verifiziert in `adapter-react-v5/src/Components/ObjectBrowser/renderLeaf.tsx`.
+    Weder eine Rolle noch der Typ-Erkenner erzeugen es. govee, beszel, homewizard und nut2
+    setzen es alle; ai-usage war der einzige ohne, deshalb blieb der Konto-Knoten symbollos
+    (krobi-Fund 2026-08-26, drei Anläufe — ich habe am Typ-Erkenner statt an den eigenen
+    Adaptern gemessen). `info.unreach` bedeutet deshalb „liefert NICHT": eine Drosselung hält
+    die Werte gültig und bleibt grün, abgelehnte Anmeldung/Dienst-Defekt/keine Verbindung nicht.
+    Ein Test pinnt die Verknüpfung (nut2-Vorbild).
+13. **ZWEI Status-Datenpunkte je Konto, an ioBrokers eigenen Plätzen** (krobi 2026-08-26, nachdem
     ich sechs angelegt hatte, von denen zwei etwas sagten): `info.unreach` (Ja/Nein) ist das
     Offline-Kennzeichen, das der Typ-Erkenner kennt — `indicator.reachable` ist dort ausdrücklich
     VERALTET, deshalb sah man von den alten Datenpunkten nirgends ein Symbol. `info.error` trägt

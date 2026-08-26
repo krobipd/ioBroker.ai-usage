@@ -1,4 +1,5 @@
 import { PollEngine, type EngineDeps } from "./poll-engine";
+import type { ObjectDef } from "./snapshot-tree";
 import type { AccountConfig } from "./pure-helpers";
 import { FetchError, type UsageProvider, type UsageSnapshot } from "./provider";
 
@@ -26,6 +27,8 @@ interface Harness {
   deps: EngineDeps;
   states: Map<string, boolean | number | string>;
   objects: string[];
+  /** The full definition per upserted id — for assertions on `common`. */
+  upserted: Map<string, ObjectDef>;
   notifications: string[];
   /** Fire every scheduled one-shot immediately queued and each interval once. */
   tick(): Promise<void>;
@@ -35,6 +38,7 @@ interface Harness {
 function makeHarness(): Harness {
   const states = new Map<string, boolean | number | string>();
   const objects: string[] = [];
+  const upserted = new Map<string, ObjectDef>();
   const notifications: string[] = [];
   const pending: (() => void)[] = [];
   const intervals: (() => void)[] = [];
@@ -42,6 +46,7 @@ function makeHarness(): Harness {
   const deps: EngineDeps = {
     upsertObject: def => {
       objects.push(def.id);
+      upserted.set(def.id, def);
       return Promise.resolve();
     },
     setState: (id, value) => void states.set(id, value),
@@ -62,6 +67,7 @@ function makeHarness(): Harness {
     deps,
     states,
     objects,
+    upserted,
     notifications,
     clock,
     tick: async () => {
@@ -127,7 +133,7 @@ describe("PollEngine", () => {
     expect(h.states.get("total.warningsActive")).toBe(1);
   });
 
-  test("auth failure: one notification, service stays marked reachable, recovery resets it", async () => {
+  test("auth failure: one notification, account marked offline, recovery resets it", async () => {
     const h = makeHarness();
     const authFail = (): never => {
       throw new FetchError("auth", "401");
@@ -136,8 +142,8 @@ describe("PollEngine", () => {
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
-    // the service answered with 401 — it is up, so the offline marker stays off
-    expect(h.states.get("a.info.unreach")).toBe(false);
+    // no data is arriving, so the account reads as offline; the text says why
+    expect(h.states.get("a.info.unreach")).toBe(true);
     expect(String(h.states.get("a.info.error"))).toContain("Sign-in rejected");
     expect(h.notifications).toHaveLength(1);
     await h.tick(); // still broken — no second notification
@@ -188,6 +194,16 @@ describe("PollEngine", () => {
     await h.tick(); // fail 3
     expect(h.states.get("router.info.unreach")).toBe(true);
     expect(h.states.get("info.connection")).toBe(false);
+  });
+
+  test("the device links its offline state, so the admin draws the connection icon", async () => {
+    // Without common.statusStates the object tree shows no icon at all — that link
+    // is the ONLY thing the object browser reads for it (krobi 2026-08-26).
+    const h = makeHarness();
+    const provider = scriptedProvider([{ limits: [{ name: "week", label: "Week", percent: 10 }] }]);
+    const engine = new PollEngine([account({ id: "c", name: "Claude" })], new Map([["c", provider]]), 300, h.deps);
+    await engine.start();
+    expect(h.upserted.get("c")?.common.statusStates).toEqual({ offlineId: "info.unreach" });
   });
 
   test("an account without a provider is skipped with a warning", async () => {
@@ -248,7 +264,7 @@ describe("PollEngine", () => {
     expect(h.notifications).toEqual(["Claude: Week (all models) at 91 % (threshold 80 %)"]);
   });
 
-  test("a rejected sign-in leaves the AI service marked online — it answered", async () => {
+  test("a rejected sign-in marks the account offline but names the sign-in as the cause", async () => {
     const h = makeHarness();
     const provider = scriptedProvider([
       { limits: [{ name: "week", label: "Week", percent: 10 }] },
@@ -260,8 +276,8 @@ describe("PollEngine", () => {
     await engine.start();
     await h.tick();
     await h.tick();
-    // the service answered with 401 — it is up, only our access is broken
-    expect(h.states.get("a.info.unreach")).toBe(false);
+    // no data arrives, so the account reads as offline — the text names the cause
+    expect(h.states.get("a.info.unreach")).toBe(true);
     expect(String(h.states.get("a.info.error"))).toContain("Sign-in rejected");
   });
 

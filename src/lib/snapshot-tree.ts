@@ -17,6 +17,14 @@ export interface ObjectDef {
     unit?: string;
     min?: number;
     max?: number;
+    /**
+     * Links a device to the state that says whether it is up. THIS is what puts the
+     * connection icon next to the device in the admin's object tree — the object
+     * browser reads `common.statusStates` and nothing else (verified in
+     * adapter-react-v5 `renderLeaf.tsx`). A relative id is expanded to
+     * `<device>.<id>`. `offlineId` is inverted: true means offline.
+     */
+    statusStates?: { onlineId?: string; offlineId?: string; errorId?: string };
   };
 }
 

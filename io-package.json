@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "news": {
+      "0.6.0": {
+        "en": "Every account now carries the connection icon in the object tree — green while it delivers, struck through when it does not, like any other ioBroker device",
+        "de": "Jedes Konto trägt jetzt das Verbindungs-Symbol im Objektbaum — grün solange es liefert, durchgestrichen wenn nicht, wie bei jedem anderen ioBroker-Gerät",
+        "ru": "Каждый аккаунт теперь показывает значок соединения в дереве объектов — зелёный, пока данные идут, перечёркнутый, когда нет, как у любого устройства ioBroker",
+        "pt": "Cada conta mostra agora o ícone de ligação na árvore de objetos — verde enquanto entrega dados, cortado quando não, como qualquer dispositivo ioBroker",
+        "nl": "Elk account toont nu het verbindingspictogram in de objectboom — groen zolang er data komt, doorgestreept als dat niet zo is, net als elk ioBroker-apparaat",
+        "fr": "Chaque compte affiche désormais l'icône de connexion dans l'arbre des objets — verte tant qu'il fournit des données, barrée sinon, comme tout appareil ioBroker",
+        "it": "Ogni account mostra ora l'icona di connessione nell'albero degli oggetti — verde finché fornisce dati, barrata quando no, come qualsiasi dispositivo ioBroker",
+        "es": "Cada cuenta muestra ahora el icono de conexión en el árbol de objetos — verde mientras entrega datos, tachado cuando no, como cualquier dispositivo de ioBroker",
+        "pl": "Każde konto pokazuje teraz ikonę połączenia w drzewie obiektów — zieloną, dopóki dostarcza dane, przekreśloną gdy nie, jak każde urządzenie ioBroker",
+        "uk": "Кожен акаунт тепер має піктограму з’єднання в дереві об’єктів — зелену, поки дані надходять, перекреслену, коли ні, як у будь-якого пристрою ioBroker",
+        "zh-cn": "每个账户现在都会在对象树中显示连接图标——有数据时为绿色，无数据时带斜杠，与其他 ioBroker 设备一致"
+      },
       "0.5.0": {
         "en": "Two status datapoints per account instead of six: an offline marker ioBroker actually shows plus the reason in plain text; the retired ones are removed automatically",
         "de": "Zwei Status-Datenpunkte je Konto statt sechs: ein Offline-Kennzeichen, das ioBroker wirklich anzeigt, plus den Grund im Klartext; die alten werden automatisch entfernt",

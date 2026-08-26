@@ -111,7 +111,7 @@ ai-usage.0.
 ├── claude / chatgpt / gemini  — one node per subscription
 │   ├── warning                — this account is above its warn threshold (bool)
 │   ├── limitReached           — a plan-wide window of this account is full (bool)
-│   ├── info.unreach           — the AI service is not reachable (bool, ioBroker's offline marker)
+│   ├── info.unreach           — account is not delivering (bool) — drives the connection icon
 │   ├── info.error             — why there is no data, in plain text; empty while all is well
 │   ├── info.lastUpdate        — time of the last successful read
 │   ├── limits.<window>.*      — percent + reset time (session, week, per model, …)
@@ -127,21 +127,19 @@ Only what an account's source actually delivers is created.
 
 ### Is it online?
 
-**`info.unreach`** is the online/offline marker — the same one ioBroker uses for every device,
-so the account shows up as offline wherever your visualisation or script looks for it. It goes
-on only when the AI service itself did not answer: a fault reported by the service switches it
-on immediately, an unreachable host after three attempts in a row, so a single hiccup does not
-make it flap.
+Each account carries the connection icon you know from every other device: **green while it
+delivers, struck through when it does not**. The account is linked to its own status state, so
+the icon shows up in the object tree without you configuring anything.
 
-**`info.error`** says what is wrong, in a sentence you can read:
+**`info.unreach`** is that marker. **`info.error`** says what is wrong, in a sentence you can read:
 
-| Situation | `info.unreach` | `info.error` |
-|-----------|----------------|--------------|
-| Everything works | off | empty |
-| Sign-in or key rejected | **off** — the service answered, only your access is broken | `Sign-in rejected — …` |
-| Throttled by the provider | **off** — the service answered; last values are kept | `Throttled by the provider — retrying in 10 min …` |
-| The service reports a fault | **on** | `The AI service reports a fault — HTTP 503` |
-| Not reachable at all | **on** | `Not reachable after 3 attempts — …` |
+| Situation | Icon | `info.error` |
+|-----------|------|--------------|
+| Everything works | connected | empty |
+| Throttled by the provider | **connected** — the last values stay valid while the adapter waits | `Throttled by the provider — retrying in 10 min …` |
+| Sign-in or key rejected | disconnected | `Sign-in rejected — …` |
+| The service reports a fault | disconnected, immediately | `The AI service reports a fault — HTTP 503` |
+| Not reachable at all | disconnected after three attempts in a row, so a hiccup does not make it flap | `Not reachable after 3 attempts — …` |
 
 ### Which limit raises the warning
 
@@ -182,9 +180,13 @@ removed automatically, and an existing Claude sign-in is carried over.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.6.0 (2026-08-26)
+
+- New: Each account now shows the connection icon in the object tree — green while it delivers, struck through when it does not, exactly like every other ioBroker device
+
 ### 0.5.0 (2026-08-26)
 
-- Changed: Each account now has two status datapoints instead of six — an offline marker ioBroker actually shows, and the reason in plain text. The retired ones are deleted on start
+- Changed: Each account now has two status datapoints instead of six — an offline marker and the reason in plain text. The retired ones are deleted on start
 - New: The settings page shows every switched-on account as online, limited or offline at a glance, with the full reason in plain text when you hover the badge
 - Changed: The names of the total and per-account limit datapoints now say "plan-wide", matching what they have actually counted since 0.4.0
 
@@ -207,10 +209,6 @@ removed automatically, and an existing Claude sign-in is carried over.
 
 - Changed: Completely new settings page — your stored AI credentials appear as simple on/off switches instead of a table, and new keys are picked up straight from the admin credential storage
 - Fixed: The Claude subscription sign-in works reliably now — a guided card with live status, and the sign-in link stays valid until it is used instead of regenerating while you type
-
-### 0.1.0 (2026-08-25)
-
-- New: First release — reads usage limits, credits and costs of your Claude, OpenAI, Anthropic, OpenRouter and DeepSeek accounts into datapoints, with one warning at your chosen threshold
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
