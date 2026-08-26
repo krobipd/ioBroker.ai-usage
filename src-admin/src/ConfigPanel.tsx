@@ -99,10 +99,12 @@ export function guessProvider(suffix: string, name: string): ProviderKind | null
 }
 
 /**
- * The whole instance configuration as one guided card set: the Claude
- * subscription with its sign-in flow on top, then every credential of the
- * admin's central storage (category "AI") as a simple on/off switch. Owns the
- * `accounts` native field; the backend model is unchanged.
+ * The whole instance configuration as ONE list of AI accounts: every credential
+ * of the admin's central storage (category "AI") plus the Claude subscription,
+ * each an ordinary row with an on/off switch. The subscription gets no special
+ * placement — only its sign-in area expands below its row while it is switched
+ * on, because a subscription has no key in the storage. Owns the `accounts`
+ * native field; the backend model is unchanged.
  */
 export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, PanelState> {
   private urlId = "";

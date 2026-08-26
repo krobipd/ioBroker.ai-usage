@@ -33,11 +33,11 @@ dashboards, history and automations ("send a message at 90 % of the weekly limit
 
 ## Configuration
 
-The instance settings show your stored AI credentials (admin central storage, category AI) as
-simple on/off switches — switch on what you want to monitor. The Claude subscription has its own
-card with a guided sign-in: open the sign-in page, log in with your Claude account, paste the code,
-done. New API keys are added once under Settings → Credentials and are shared with the admin AI
-assistant.
+The instance settings show one list of AI accounts: your stored AI credentials (admin central
+storage, category AI) plus the Claude subscription, each with a simple on/off switch — switch on
+what you want to monitor. Switching on the Claude subscription expands a guided sign-in below its
+row: open the sign-in page, log in with your Claude account, paste the code, done. New API keys are
+added once under Settings → Credentials and are shared with the admin AI assistant.
 
 | Option | Description | Default |
 |--------|-------------|---------|
