@@ -1,6 +1,6 @@
-import { FetchError } from "../provider";
-import { buildAuthorizeUrl, exchangeCode, generatePkce, refreshTokens, type TokenSet } from "./claude-auth";
-import { claudeSubProvider, parseClaudeUsage, type TokenStore } from "./claude-sub";
+import { FetchError, type TokenSet, type TokenStore } from "../provider";
+import { buildAuthorizeUrl, exchangeCode, generatePkce, refreshTokens } from "./claude-auth";
+import { claudeSubProvider, parseClaudeUsage } from "./claude-sub";
 
 describe("claude-auth", () => {
   test("the authorize URL carries client id, PKCE challenge and state", () => {
@@ -113,6 +113,7 @@ describe("claudeSubProvider", () => {
         store.saved.push(tokens);
         return Promise.resolve();
       },
+      clear: () => Promise.resolve(),
     };
     return store;
   }

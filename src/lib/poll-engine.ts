@@ -121,6 +121,22 @@ export class PollEngine {
   }
 
   /**
+   * Poll one account immediately, by id. Used after a successful sign-in: waiting
+   * up to a full interval there reads as "the sign-in did not work".
+   *
+   * @param accountId the account's object id
+   */
+  public async pollNow(accountId: string): Promise<void> {
+    const runtime = this.runtimes.find(entry => entry.config.id === accountId);
+    if (runtime) {
+      // A fresh sign-in clears a previous auth failure and any backoff.
+      runtime.authNotified = false;
+      runtime.skipUntil = 0;
+      await this.pollAccount(runtime);
+    }
+  }
+
+  /**
    * Poll one account now (also used by the staggered first run).
    *
    * @param runtime the account's runtime

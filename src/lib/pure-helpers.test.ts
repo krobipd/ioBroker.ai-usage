@@ -1,10 +1,31 @@
-import { clampPollInterval, parseAccounts, sanitizeId, validAccountIds } from "./pure-helpers";
+import { accountId, clampPollInterval, parseAccounts, sanitizeId, validAccountIds } from "./pure-helpers";
 
 describe("sanitizeId", () => {
   test("keeps safe characters and collapses the rest to single underscores", () => {
     expect(sanitizeId("Claude Max")).toBe("Claude_Max");
     expect(sanitizeId("  weird.name!! ")).toBe("weird_name");
     expect(sanitizeId("a__b")).toBe("a_b");
+  });
+});
+
+describe("accountId", () => {
+  test("a subscription always owns its fixed id, no matter what the row is called", () => {
+    expect(accountId("claude-sub", "")).toBe("claude");
+    expect(accountId("chatgpt-sub", "")).toBe("chatgpt");
+    expect(accountId("gemini-sub", "")).toBe("gemini");
+  });
+
+  test("a key-based account always carries the -api suffix, derived from the credential", () => {
+    expect(accountId("anthropic-api", "system.credentials.anthropic")).toBe("anthropic-api");
+    expect(accountId("openai", "system.credentials.chatgpt")).toBe("chatgpt-api");
+  });
+
+  test("the ChatGPT subscription and a stored chatgpt key never collide", () => {
+    expect(accountId("chatgpt-sub", "")).not.toBe(accountId("openai", "system.credentials.chatgpt"));
+  });
+
+  test("a key-based row without a credential yields no id", () => {
+    expect(accountId("openrouter", "")).toBe("");
   });
 });
 
@@ -15,10 +36,10 @@ describe("parseAccounts", () => {
       { name: "Router", provider: "openrouter", credentialId: "system.credentials.or", enabled: true },
     ]);
     expect(accounts).toEqual([
-      { name: "Claude Max", id: "Claude_Max", provider: "claude-sub", credentialId: "", warnThreshold: 90 },
+      { name: "Claude Max", id: "claude", provider: "claude-sub", credentialId: "", warnThreshold: 90 },
       {
         name: "Router",
-        id: "Router",
+        id: "or-api",
         provider: "openrouter",
         credentialId: "system.credentials.or",
         warnThreshold: 80,
@@ -26,18 +47,25 @@ describe("parseAccounts", () => {
     ]);
   });
 
-  test("skips disabled rows, unknown providers, empty names, reserved ids and duplicates", () => {
+  test("skips disabled rows, unknown providers, credential-less key rows and duplicates", () => {
     const accounts = parseAccounts([
-      { name: "Off", provider: "openrouter", enabled: false },
-      { name: "What", provider: "gemini", enabled: true },
-      { name: "   ", provider: "openrouter", enabled: true },
-      { name: "info", provider: "openrouter", enabled: true },
-      { name: "total", provider: "openrouter", enabled: true },
-      { name: "Twice", provider: "openrouter", enabled: true },
-      { name: "Twice", provider: "deepseek", enabled: true },
+      { name: "Off", provider: "openrouter", credentialId: "system.credentials.off", enabled: false },
+      { name: "What", provider: "not-a-provider", credentialId: "system.credentials.x", enabled: true },
+      { name: "No credential", provider: "openrouter", credentialId: "", enabled: true },
+      { name: "Twice", provider: "openrouter", credentialId: "system.credentials.twice", enabled: true },
+      { name: "Twice again", provider: "deepseek", credentialId: "system.credentials.twice", enabled: true },
     ]);
-    expect(accounts.map(a => a.id)).toEqual(["Twice"]);
+    expect(accounts.map(a => a.id)).toEqual(["twice-api"]);
     expect(accounts[0].provider).toBe("openrouter");
+  });
+
+  test("two subscriptions of different kinds live side by side", () => {
+    const accounts = parseAccounts([
+      { name: "Claude", provider: "claude-sub", credentialId: "", enabled: true },
+      { name: "ChatGPT", provider: "chatgpt-sub", credentialId: "", enabled: true },
+      { name: "Gemini", provider: "gemini-sub", credentialId: "", enabled: true },
+    ]);
+    expect(accounts.map(a => a.id)).toEqual(["claude", "chatgpt", "gemini"]);
   });
 
   test("tolerates a malformed table (API boundary)", () => {
@@ -47,7 +75,9 @@ describe("parseAccounts", () => {
   });
 
   test("clamps an out-of-range warn threshold to the default", () => {
-    const [account] = parseAccounts([{ name: "A", provider: "deepseek", warnThreshold: 400, enabled: true }]);
+    const [account] = parseAccounts([
+      { name: "A", provider: "deepseek", credentialId: "system.credentials.a", warnThreshold: 400, enabled: true },
+    ]);
     expect(account.warnThreshold).toBe(80);
   });
 });
@@ -63,17 +93,16 @@ describe("clampPollInterval", () => {
 });
 
 describe("validAccountIds", () => {
-  test("includes disabled rows (paused, not deleted) and skips reserved/empty/duplicate ids", () => {
+  test("includes disabled rows (paused, not deleted) and skips unusable/duplicate ones", () => {
     expect(
       validAccountIds([
         { name: "Claude Max", provider: "claude-sub", enabled: true },
-        { name: "Paused", provider: "openrouter", enabled: false },
-        { name: "info" },
-        { name: "  " },
-        { name: "Claude Max" },
+        { name: "Paused", provider: "openrouter", credentialId: "system.credentials.paused", enabled: false },
+        { name: "No credential", provider: "openrouter", credentialId: "" },
+        { name: "Claude again", provider: "claude-sub" },
         null,
       ]),
-    ).toEqual(["Claude_Max", "Paused"]);
+    ).toEqual(["claude", "paused-api"]);
     expect(validAccountIds(undefined)).toEqual([]);
   });
 });

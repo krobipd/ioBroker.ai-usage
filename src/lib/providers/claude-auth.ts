@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { FetchError } from "../provider";
+import { FetchError, type TokenSet } from "../provider";
 
 /**
  * Claude subscription OAuth — the flow Claude Code and the HA reference integration
@@ -26,16 +26,6 @@ export interface PkcePair {
   challenge: string;
   /** The CSRF state. */
   state: string;
-}
-
-/** The token set the flow yields. */
-export interface TokenSet {
-  /** Bearer token for the usage/profile calls. */
-  accessToken: string;
-  /** Long-lived token to obtain fresh access tokens. */
-  refreshToken: string;
-  /** When the access token expires (ms since epoch). */
-  expiresAt: number;
 }
 
 /** The JSON-POST seam (tests inject a fake). */

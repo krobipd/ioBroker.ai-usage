@@ -38,16 +38,25 @@ var import_node_path = require("node:path");
 var import_http = require("./lib/http");
 var import_poll_engine = require("./lib/poll-engine");
 var import_pure_helpers = require("./lib/pure-helpers");
+var import_sign_in = require("./lib/sign-in");
 var import_claude_auth = require("./lib/providers/claude-auth");
-var import_anthropic_api = require("./lib/providers/anthropic-api");
 var import_claude_sub = require("./lib/providers/claude-sub");
+var import_chatgpt_auth = require("./lib/providers/chatgpt-auth");
+var import_chatgpt_sub = require("./lib/providers/chatgpt-sub");
+var import_gemini_auth = require("./lib/providers/gemini-auth");
+var import_gemini_sub = require("./lib/providers/gemini-sub");
+var import_anthropic_api = require("./lib/providers/anthropic-api");
 var import_deepseek = require("./lib/providers/deepseek");
 var import_openai = require("./lib/providers/openai");
 var import_openrouter = require("./lib/providers/openrouter");
 class AiUsageAdapter extends utils.Adapter {
   engine = null;
-  /** Pending Claude sign-in attempts, keyed by account id (PKCE lives only in memory). */
-  pendingClaudeAuth = /* @__PURE__ */ new Map();
+  /** Running sign-in attempts, keyed by provider kind. */
+  attempts = /* @__PURE__ */ new Map();
+  /** Last failure reason per provider, shown in the admin row. */
+  signInErrors = /* @__PURE__ */ new Map();
+  /** Device-code pollers, so they can be stopped on unload. */
+  devicePollers = /* @__PURE__ */ new Map();
   /**
    * @param options the adapter options
    */
@@ -57,48 +66,28 @@ class AiUsageAdapter extends utils.Adapter {
     this.on("message", this.onMessage.bind(this));
     this.on("unload", this.onUnload.bind(this));
   }
+  // ---------------------------------------------------------------- sign-in
   /**
-   * Handle admin messages — the guided Claude subscription sign-in.
+   * Handle admin messages: the three sign-in flows plus their status.
    *
    * @param obj the message
    */
   async onMessage(obj) {
-    var _a;
     try {
+      const provider = this.providerFrom(obj.message);
       switch (obj.command) {
-        case "claudeAuthStart": {
-          const accountId = this.claudeAccountIdFrom(obj.message);
-          if (!accountId) {
-            this.respond(obj, { error: "Save the settings with a Claude subscription account first" });
-            return;
-          }
-          const url = await this.publishClaudeSignInUrl(accountId);
-          this.respond(obj, { url });
+        case "signInStart":
+          this.respond(obj, provider ? await this.startSignIn(provider) : { error: "unknown provider" });
           return;
-        }
-        case "claudeAuthCode": {
-          const accountId = this.claudeAccountIdFrom(obj.message);
-          const code = typeof ((_a = obj.message) == null ? void 0 : _a.code) === "string" ? obj.message.code : "";
-          const pkce = accountId ? this.pendingClaudeAuth.get(accountId) : void 0;
-          if (!accountId || !pkce) {
-            this.respond(obj, { error: "Save the settings with a Claude subscription account first" });
-            return;
-          }
-          if (!code.trim()) {
-            this.respond(obj, { error: "Paste the code from the Anthropic page first" });
-            return;
-          }
-          try {
-            const tokens = await (0, import_claude_auth.exchangeCode)(code, pkce, import_http.postJson, Date.now());
-            await this.claudeTokenStore(accountId).save(tokens);
-            this.pendingClaudeAuth.delete(accountId);
-            await this.setClaudeAuthStates(accountId, "", true);
-            this.respond(obj, { result: "ok" });
-          } catch (e) {
-            this.respond(obj, { error: `Sign-in failed: ${e instanceof Error ? e.message : String(e)}` });
-          }
+        case "signInSubmit":
+          this.respond(obj, provider ? await this.submitSignIn(provider, obj.message) : { error: "unknown provider" });
           return;
-        }
+        case "signInStatus":
+          this.respond(obj, provider ? await this.signInState(provider) : { error: "unknown provider" });
+          return;
+        case "signOut":
+          this.respond(obj, provider ? await this.signOut(provider) : { error: "unknown provider" });
+          return;
         default:
           this.respond(obj, { error: `Unknown command: ${obj.command}` });
       }
@@ -119,140 +108,213 @@ class AiUsageAdapter extends utils.Adapter {
     }
   }
   /**
-   * Resolve the account id for a Claude sign-in message: the given name must match
-   * a claude-sub row of the accounts table.
+   * The provider kind named in a message, if it is a subscription we know.
    *
-   * @param message the message payload ({ account })
-   * @returns the id-safe account id, or undefined
+   * @param message the message payload ({ provider })
+   * @returns the provider kind, or undefined
    */
-  claudeAccountIdFrom(message) {
-    const name = typeof (message == null ? void 0 : message.account) === "string" ? message.account : "";
-    const id = (0, import_pure_helpers.sanitizeId)(name);
-    if (!id) {
-      return void 0;
-    }
-    const accounts = (0, import_pure_helpers.parseAccounts)(this.config.accounts);
-    return accounts.some((account) => account.id === id && account.provider === "claude-sub") ? id : void 0;
+  providerFrom(message) {
+    const value = typeof (message == null ? void 0 : message.provider) === "string" ? message.provider : "";
+    return import_sign_in.SIGN_IN_FLOWS[value] ? value : void 0;
   }
   /**
-   * Create the `auth.<id>` states of one Claude account and publish a FRESH
-   * sign-in link (the adapter owns the secret; the link stays valid until it is
-   * regenerated or redeemed — the admin card only displays it).
+   * Begin a sign-in: build the link (Claude/Google) or fetch a device code (ChatGPT).
    *
-   * @param accountId the id-safe account id
-   * @returns the sign-in URL
+   * @param provider the subscription kind
+   * @returns what the admin panel has to show
    */
-  async publishClaudeSignInUrl(accountId) {
-    const pkce = (0, import_claude_auth.generatePkce)();
-    this.pendingClaudeAuth.set(accountId, pkce);
-    const url = (0, import_claude_auth.buildAuthorizeUrl)(pkce);
-    await this.setClaudeAuthStates(accountId, url, false);
-    return url;
-  }
-  /**
-   * Create (once) and write the two `auth.<id>` states of one Claude account.
-   *
-   * @param accountId the id-safe account id
-   * @param url the current sign-in URL ("" when signed in)
-   * @param signedIn whether a usable sign-in exists
-   */
-  async setClaudeAuthStates(accountId, url, signedIn) {
-    await this.extendObject("auth", {
-      type: "folder",
-      common: { name: { en: "Sign-in", de: "Anmeldung" } },
-      native: {}
-    });
-    await this.extendObject(`auth.${accountId}`, {
-      type: "channel",
-      common: { name: accountId },
-      native: {}
-    });
-    await this.extendObject(`auth.${accountId}.signInUrl`, {
-      type: "state",
-      common: {
-        name: { en: "Sign-in link", de: "Anmelde-Link" },
-        type: "string",
-        role: "url",
-        read: true,
-        write: false,
-        def: ""
-      },
-      native: {}
-    });
-    await this.extendObject(`auth.${accountId}.signedIn`, {
-      type: "state",
-      common: {
-        name: { en: "Signed in", de: "Angemeldet" },
-        type: "boolean",
-        role: "indicator",
-        read: true,
-        write: false,
-        def: false
-      },
-      native: {}
-    });
-    await this.setState(`auth.${accountId}.signInUrl`, { val: url, ack: true });
-    await this.setState(`auth.${accountId}.signedIn`, { val: signedIn, ack: true });
-  }
-  /**
-   * Prepare the guided sign-in of every Claude subscription account: publish the
-   * live status, and for accounts without a usable sign-in a stable sign-in link.
-   *
-   * @param accounts the validated account configs
-   */
-  async prepareClaudeAuth(accounts) {
-    const claudeAccounts = accounts.filter((a) => a.provider === "claude-sub");
+  async startSignIn(provider) {
+    this.signInErrors.delete(provider);
+    this.stopDevicePoller(provider);
+    const flow = import_sign_in.SIGN_IN_FLOWS[provider];
+    const now = Date.now();
     try {
-      const wanted = new Set(claudeAccounts.map((a) => a.id));
-      const objects = await this.getAdapterObjectsAsync();
-      const stale = /* @__PURE__ */ new Set();
-      for (const id of Object.keys(objects)) {
-        const relative = id.substring(this.namespace.length + 1);
-        const [root, child] = relative.split(".");
-        if (root === "auth" && child && !wanted.has(child)) {
-          stale.add(child);
-        }
+      if (flow === "paste-code") {
+        const pkce = (0, import_claude_auth.generatePkce)();
+        const url = (0, import_claude_auth.buildAuthorizeUrl)(pkce);
+        this.attempts.set(provider, { flow, pkce, url, expiresAt: now + 15 * 6e4 });
+        return { status: "awaiting-paste", url, flow };
       }
-      for (const child of stale) {
-        await this.delObjectAsync(`auth.${child}`, { recursive: true });
+      if (flow === "paste-url") {
+        const pkce = (0, import_gemini_auth.generateGeminiPkce)();
+        const url = (0, import_gemini_auth.buildGeminiAuthorizeUrl)(pkce);
+        this.attempts.set(provider, { flow, pkce, url, expiresAt: now + 15 * 6e4 });
+        return { status: "awaiting-paste", url, flow };
       }
-    } catch {
+      const start = await (0, import_chatgpt_auth.startDeviceCode)(import_http.postJson, now);
+      this.attempts.set(provider, { flow: "device-code", start });
+      this.armDevicePoller(provider, start);
+      return {
+        status: "awaiting-device",
+        userCode: start.userCode,
+        verificationUrl: "https://auth.openai.com/codex/device",
+        expiresAt: start.expiresAt
+      };
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.signInErrors.set(provider, reason);
+      return { status: "failed", reason };
     }
-    for (const account of claudeAccounts) {
+  }
+  /**
+   * Finish a paste-based sign-in (Claude code, Google address).
+   *
+   * @param provider the subscription kind
+   * @param message the message payload ({ value })
+   * @returns the resulting state
+   */
+  async submitSignIn(provider, message) {
+    const attempt = this.attempts.get(provider);
+    const value = typeof (message == null ? void 0 : message.value) === "string" ? message.value.trim() : "";
+    if (!attempt || attempt.flow === "device-code") {
+      return { status: "failed", reason: "start the sign-in first" };
+    }
+    if (!value) {
+      return { status: "failed", reason: "nothing pasted" };
+    }
+    try {
+      const now = Date.now();
+      const tokens = attempt.flow === "paste-code" ? await (0, import_claude_auth.exchangeCode)(value, attempt.pkce, import_http.postJson, now) : await (0, import_gemini_auth.exchangeGeminiCode)((0, import_gemini_auth.extractGeminiCode)(value, attempt.pkce.state), attempt.pkce, import_http.postForm, now);
+      await this.finishSignIn(provider, tokens);
+      return { status: "signed-in" };
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.signInErrors.set(provider, reason);
+      return { status: "failed", reason };
+    }
+  }
+  /**
+   * Store fresh tokens, mark the account signed in and poll it right away — waiting
+   * up to a full interval after a successful sign-in reads as "it did not work".
+   *
+   * @param provider the subscription kind
+   * @param tokens the token set
+   */
+  async finishSignIn(provider, tokens) {
+    var _a;
+    await this.tokenStore(provider).save(tokens);
+    this.attempts.delete(provider);
+    this.signInErrors.delete(provider);
+    this.stopDevicePoller(provider);
+    const id = import_pure_helpers.SUBSCRIPTION_IDS[provider];
+    if (id) {
+      await this.setSignedInState(id, true);
+      await ((_a = this.engine) == null ? void 0 : _a.pollNow(id));
+    }
+    this.log.info(`${provider}: signed in`);
+  }
+  /**
+   * Poll the device-code endpoint until the user confirmed, the window closed or
+   * the adapter stops. The handle lives in memory only — a restart mid-flow just
+   * means the user starts again, which is cheaper than persisting a 15-minute secret.
+   *
+   * @param provider the subscription kind
+   * @param start the device-code handle
+   */
+  armDevicePoller(provider, start) {
+    const tick = async () => {
       try {
-        const tokens = await this.claudeTokenStore(account.id).load();
-        if (tokens) {
-          await this.setClaudeAuthStates(account.id, "", true);
-        } else {
-          await this.publishClaudeSignInUrl(account.id);
+        if ((0, import_sign_in.attemptExpired)(start.expiresAt, Date.now())) {
+          this.stopDevicePoller(provider);
+          this.attempts.delete(provider);
+          this.signInErrors.set(provider, "the code expired \u2014 start the sign-in again");
+          return;
+        }
+        const result = await (0, import_chatgpt_auth.pollDeviceCode)(start, import_http.postJson);
+        if (result.status === "ready") {
+          this.stopDevicePoller(provider);
+          const tokens = await (0, import_chatgpt_auth.exchangeDeviceCode)(result.code, result.codeVerifier, import_http.postForm, Date.now());
+          await this.finishSignIn(provider, tokens);
         }
       } catch (e) {
-        this.log.warn(`${account.name}: cannot prepare sign-in (${e instanceof Error ? e.message : String(e)})`);
+        this.stopDevicePoller(provider);
+        this.attempts.delete(provider);
+        this.signInErrors.set(provider, e instanceof Error ? e.message : String(e));
       }
-    }
+    };
+    this.devicePollers.set(provider, {
+      kind: "interval",
+      handle: this.setInterval(() => void tick(), Math.max(start.intervalSec, 1) * 1e3)
+    });
   }
   /**
-   * The persistent token storage for one Claude account: an encrypted JSON file in
-   * the instance data directory (a `native` write would restart the instance).
+   * Stop a running device-code poller.
    *
-   * @param accountId the id-safe account id
+   * @param provider the subscription kind
+   */
+  stopDevicePoller(provider) {
+    const handle = this.devicePollers.get(provider);
+    if ((handle == null ? void 0 : handle.kind) === "interval") {
+      this.clearInterval(handle.handle);
+    }
+    this.devicePollers.delete(provider);
+  }
+  /**
+   * The current sign-in state of one subscription, for the admin row.
+   *
+   * @param provider the subscription kind
+   * @returns the state
+   */
+  async signInState(provider) {
+    const failure = this.signInErrors.get(provider);
+    const attempt = this.attempts.get(provider);
+    if ((attempt == null ? void 0 : attempt.flow) === "device-code") {
+      return {
+        status: "awaiting-device",
+        userCode: attempt.start.userCode,
+        verificationUrl: "https://auth.openai.com/codex/device",
+        expiresAt: attempt.start.expiresAt
+      };
+    }
+    if (attempt) {
+      return { status: "awaiting-paste", url: attempt.url, flow: attempt.flow };
+    }
+    if (failure) {
+      return { status: "failed", reason: failure };
+    }
+    return await this.tokenStore(provider).load() ? { status: "signed-in" } : { status: "signed-out" };
+  }
+  /**
+   * Forget the tokens of one subscription.
+   *
+   * @param provider the subscription kind
+   * @returns the resulting state
+   */
+  async signOut(provider) {
+    await this.tokenStore(provider).clear();
+    this.attempts.delete(provider);
+    this.signInErrors.delete(provider);
+    this.stopDevicePoller(provider);
+    const id = import_pure_helpers.SUBSCRIPTION_IDS[provider];
+    if (id) {
+      await this.setSignedInState(id, false);
+    }
+    return { status: "signed-out" };
+  }
+  // ------------------------------------------------------------ token files
+  /**
+   * Where one subscription's tokens live: an encrypted file in the instance data
+   * directory, named after the PROVIDER. Keying by provider (not by account name)
+   * keeps a sign-in alive when an account is renamed — the previous scheme lost it.
+   *
+   * @param provider the subscription kind
    * @returns the store
    */
-  claudeTokenStore(accountId) {
+  tokenStore(provider) {
     const dir = utils.getAbsoluteInstanceDataDir(this);
-    const file = (0, import_node_path.join)(dir, `claude-tokens-${accountId}.json`);
+    const file = (0, import_node_path.join)(dir, `tokens-${provider}.json`);
     return {
       load: async () => {
         try {
-          const encrypted = await (0, import_promises.readFile)(file, "utf8");
-          const parsed = JSON.parse(this.decrypt(encrypted));
+          const parsed = JSON.parse(this.decrypt(await (0, import_promises.readFile)(file, "utf8")));
           if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
             return null;
           }
           return {
             accessToken: parsed.accessToken,
             refreshToken: parsed.refreshToken,
-            expiresAt: Number(parsed.expiresAt) || 0
+            expiresAt: Number(parsed.expiresAt) || 0,
+            accountRef: typeof parsed.accountRef === "string" ? parsed.accountRef : void 0
           };
         } catch {
           return null;
@@ -261,16 +323,43 @@ class AiUsageAdapter extends utils.Adapter {
       save: async (tokens) => {
         await (0, import_promises.mkdir)(dir, { recursive: true });
         await (0, import_promises.writeFile)(file, this.encrypt(JSON.stringify(tokens)), "utf8");
+      },
+      clear: async () => {
+        await (0, import_promises.unlink)(file).catch(() => {
+        });
       }
     };
   }
-  /** Validate the configuration, clean up stale account trees and start the engine. */
+  /**
+   * Carry a sign-in from the pre-0.3.0 layout over: tokens used to be stored per
+   * ACCOUNT NAME (`claude-tokens-<name>.json`). Without this the rename to fixed
+   * account ids would silently sign the user out.
+   */
+  async migrateTokenFiles() {
+    const dir = utils.getAbsoluteInstanceDataDir(this);
+    const target = (0, import_node_path.join)(dir, "tokens-claude-sub.json");
+    try {
+      await (0, import_promises.readFile)(target, "utf8");
+      return;
+    } catch {
+    }
+    for (const legacy of ["claude-tokens-Claude.json", "claude-tokens-claude.json"]) {
+      try {
+        await (0, import_promises.rename)((0, import_node_path.join)(dir, legacy), target);
+        this.log.info("Carried the existing Claude sign-in over to the new layout");
+        return;
+      } catch {
+      }
+    }
+  }
+  // ------------------------------------------------------------- life cycle
+  /** Validate the configuration, clean up stale objects and start the engine. */
   async onReady() {
     try {
       const accounts = (0, import_pure_helpers.parseAccounts)(this.config.accounts);
       const interval = (0, import_pure_helpers.clampPollInterval)(this.config.pollInterval);
-      await this.cleanupStaleAccounts();
-      await this.prepareClaudeAuth(accounts);
+      await this.migrateTokenFiles();
+      await this.cleanupStaleObjects();
       if (accounts.length === 0) {
         this.log.info("No AI accounts configured \u2014 add accounts in the instance settings");
         await this.setState("info.connection", { val: false, ack: true });
@@ -313,15 +402,14 @@ class AiUsageAdapter extends utils.Adapter {
         ) : void 0
       });
       await this.engine.start();
+      await this.publishSignedInStates(accounts);
       this.log.info(`Monitoring ${providers.size} of ${accounts.length} AI account(s), polling every ${interval} s`);
     } catch (e) {
       this.log.error(`Startup failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   /**
-   * Build the provider for one account, resolving its credential from the central
-   * storage. Accounts whose provider is not implemented yet, or whose credential
-   * cannot be read, are skipped (the engine logs the skip).
+   * Build the provider for one account.
    *
    * @param account the validated account config
    * @returns the provider, or undefined to skip the account
@@ -329,7 +417,11 @@ class AiUsageAdapter extends utils.Adapter {
   async makeProvider(account) {
     switch (account.provider) {
       case "claude-sub":
-        return (0, import_claude_sub.claudeSubProvider)(this.claudeTokenStore(account.id), void 0, import_http.postJson);
+        return (0, import_claude_sub.claudeSubProvider)(this.tokenStore(account.provider), void 0, import_http.postJson);
+      case "chatgpt-sub":
+        return (0, import_chatgpt_sub.chatgptSubProvider)(this.tokenStore(account.provider), void 0, import_http.postJson);
+      case "gemini-sub":
+        return (0, import_gemini_sub.geminiSubProvider)(this.tokenStore(account.provider), import_http.postJson, import_http.postForm);
       case "openrouter": {
         const key = await this.resolveKey(account);
         return key ? (0, import_openrouter.openRouterProvider)(key) : void 0;
@@ -377,32 +469,69 @@ class AiUsageAdapter extends utils.Adapter {
     }
   }
   /**
-   * Delete the object trees of accounts that are no longer in the table. Disabled
-   * rows keep their tree (they are only paused); an EMPTY table deletes nothing —
-   * the guard against wiping everything through an accidental clear.
+   * Create and write `<account>.info.signedIn` for every subscription in the table.
+   *
+   * @param accounts the configured accounts
    */
-  async cleanupStaleAccounts() {
+  async publishSignedInStates(accounts) {
+    for (const account of accounts) {
+      if (!import_sign_in.SIGN_IN_FLOWS[account.provider]) {
+        continue;
+      }
+      const tokens = await this.tokenStore(account.provider).load();
+      await this.setSignedInState(account.id, !!tokens);
+    }
+  }
+  /**
+   * Write the sign-in indicator INSIDE the account node — the pre-0.3.0 layout kept
+   * a second `auth.<name>` branch, which showed every subscription twice in the tree.
+   *
+   * @param accountId the account's object id
+   * @param signedIn whether a usable sign-in exists
+   */
+  async setSignedInState(accountId, signedIn) {
+    await this.extendObject(`${accountId}.info.signedIn`, {
+      type: "state",
+      common: {
+        name: { en: "Signed in", de: "Angemeldet" },
+        type: "boolean",
+        role: "indicator",
+        read: true,
+        write: false,
+        def: false
+      },
+      native: {}
+    });
+    await this.setState(`${accountId}.info.signedIn`, { val: signedIn, ack: true });
+  }
+  /**
+   * Delete object trees that no longer belong to a configured account, plus the
+   * `auth` branch of the pre-0.3.0 layout. An EMPTY table deletes nothing — the
+   * guard against wiping everything through an accidental clear.
+   */
+  async cleanupStaleObjects() {
     const keepIds = (0, import_pure_helpers.validAccountIds)(this.config.accounts);
     if (keepIds.length === 0) {
       return;
     }
-    const keep = /* @__PURE__ */ new Set([...keepIds, "info", "total", "auth"]);
+    const keep = /* @__PURE__ */ new Set([...keepIds, "info", "total"]);
     try {
       const objects = await this.getAdapterObjectsAsync();
       const roots = /* @__PURE__ */ new Set();
       for (const id of Object.keys(objects)) {
-        const relative = id.substring(this.namespace.length + 1);
-        const root = relative.split(".")[0];
+        const root = id.substring(this.namespace.length + 1).split(".")[0];
         if (root && !keep.has(root)) {
           roots.add(root);
         }
       }
       for (const root of roots) {
-        this.log.info(`Removing objects of no longer configured account "${root}"`);
+        this.log.info(
+          root === "auth" ? "Removing the old sign-in branch \u2014 the sign-in state now lives inside each account" : `Removing objects of no longer configured account "${root}"`
+        );
         await this.delObjectAsync(root, { recursive: true });
       }
     } catch (e) {
-      this.log.warn(`Cleanup of stale accounts failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.warn(`Cleanup of stale objects failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   /**
@@ -414,6 +543,9 @@ class AiUsageAdapter extends utils.Adapter {
   onUnload(callback) {
     var _a;
     try {
+      for (const provider of [...this.devicePollers.keys()]) {
+        this.stopDevicePoller(provider);
+      }
       (_a = this.engine) == null ? void 0 : _a.stop();
       this.engine = null;
       void this.setState("info.connection", { val: false, ack: true });

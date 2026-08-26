@@ -88,6 +88,20 @@ class PollEngine {
     return this.runtimes.map((runtime) => runtime.config.id);
   }
   /**
+   * Poll one account immediately, by id. Used after a successful sign-in: waiting
+   * up to a full interval there reads as "the sign-in did not work".
+   *
+   * @param accountId the account's object id
+   */
+  async pollNow(accountId) {
+    const runtime = this.runtimes.find((entry) => entry.config.id === accountId);
+    if (runtime) {
+      runtime.authNotified = false;
+      runtime.skipUntil = 0;
+      await this.pollAccount(runtime);
+    }
+  }
+  /**
    * Poll one account now (also used by the staggered first run).
    *
    * @param runtime the account's runtime

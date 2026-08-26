@@ -72,3 +72,47 @@ export async function postJson(url: string, body: Record<string, unknown>): Prom
     throw new FetchError("network", "invalid JSON response");
   }
 }
+
+/**
+ * POST a form-encoded body and return the parsed JSON answer.
+ *
+ * OAuth code redemption uses form encoding while token refresh often uses JSON —
+ * ChatGPT/Codex needs BOTH, so the two shapes are separate helpers rather than one
+ * guessing wrapper.
+ *
+ * @param url the request URL
+ * @param form the form fields
+ * @param headers extra headers
+ * @returns the parsed JSON body
+ */
+export async function postForm(
+  url: string,
+  form: Record<string, string>,
+  headers: Record<string, string> = {},
+): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
+      body: new URLSearchParams(form).toString(),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (e) {
+    throw new FetchError("network", e instanceof Error ? e.message : String(e));
+  }
+  if (response.status === 400 || response.status === 401 || response.status === 403) {
+    throw new FetchError("auth", `HTTP ${response.status}`);
+  }
+  if (response.status === 429) {
+    throw new FetchError("rate-limit", "HTTP 429");
+  }
+  if (!response.ok) {
+    throw new FetchError("network", `HTTP ${response.status}`);
+  }
+  try {
+    return await response.json();
+  } catch (e) {
+    throw new FetchError("network", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}

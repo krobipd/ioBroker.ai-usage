@@ -27,10 +27,47 @@ export function sanitizeId(name: string): string {
 }
 
 /** The provider kinds the adapter knows. */
-export const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api"];
+export const PROVIDER_KINDS = [
+  "claude-sub",
+  "chatgpt-sub",
+  "gemini-sub",
+  "openrouter",
+  "deepseek",
+  "openai",
+  "anthropic-api",
+];
+
+/** The subscription kinds: signed in with the user's account, no key involved. */
+export const SUBSCRIPTION_KINDS = ["claude-sub", "chatgpt-sub", "gemini-sub"];
+
+/** Fixed object id per subscription — adapter-owned, never derived from a display name. */
+export const SUBSCRIPTION_IDS: Record<string, string> = {
+  "claude-sub": "claude",
+  "chatgpt-sub": "chatgpt",
+  "gemini-sub": "gemini",
+};
 
 /** Top-level object roots the adapter owns — no account may use them as id. */
-export const RESERVED_ROOT_IDS = ["info", "total", "auth"];
+export const RESERVED_ROOT_IDS = ["info", "total"];
+
+/**
+ * The object id of one account. Deterministic and stable: a subscription always owns
+ * its provider id, a key-based account always carries the "-api" suffix. Neither
+ * depends on a display name, so an id never moves when the user renames something
+ * or adds an unrelated credential later.
+ *
+ * @param provider the provider kind
+ * @param credentialId the central credential id (key-based accounts)
+ * @returns the id-safe object id, or "" when it cannot be formed
+ */
+export function accountId(provider: string, credentialId: string): string {
+  const fixed = SUBSCRIPTION_IDS[provider];
+  if (fixed) {
+    return fixed;
+  }
+  const suffix = sanitizeId(credentialId.replace(/^system\.credentials\./, ""));
+  return suffix ? `${suffix}-api` : "";
+}
 
 /**
  * Parse and validate the admin accounts table. Rows without a usable name or with an
@@ -54,9 +91,10 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
     if (row.enabled === false) {
       continue;
     }
-    const name = typeof row.name === "string" ? row.name.trim() : "";
-    const id = sanitizeId(name);
     const provider = typeof row.provider === "string" ? row.provider : "";
+    const credentialId = typeof row.credentialId === "string" ? row.credentialId : "";
+    const id = accountId(provider, credentialId);
+    const name = (typeof row.name === "string" ? row.name.trim() : "") || id;
     if (!id || RESERVED_ROOT_IDS.includes(id) || !PROVIDER_KINDS.includes(provider) || seen.has(id)) {
       continue;
     }
@@ -66,7 +104,7 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
       name,
       id,
       provider,
-      credentialId: typeof row.credentialId === "string" ? row.credentialId : "",
+      credentialId,
       warnThreshold: Number.isFinite(threshold) && threshold >= 10 && threshold <= 100 ? threshold : 80,
     });
   }
@@ -91,7 +129,10 @@ export function validAccountIds(raw: unknown): string[] {
       continue;
     }
     const row = entry as Record<string, unknown>;
-    const id = sanitizeId(typeof row.name === "string" ? row.name : "");
+    const id = accountId(
+      typeof row.provider === "string" ? row.provider : "",
+      typeof row.credentialId === "string" ? row.credentialId : "",
+    );
     if (id && !RESERVED_ROOT_IDS.includes(id) && !ids.includes(id)) {
       ids.push(id);
     }

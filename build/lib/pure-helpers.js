@@ -20,6 +20,9 @@ var pure_helpers_exports = {};
 __export(pure_helpers_exports, {
   PROVIDER_KINDS: () => PROVIDER_KINDS,
   RESERVED_ROOT_IDS: () => RESERVED_ROOT_IDS,
+  SUBSCRIPTION_IDS: () => SUBSCRIPTION_IDS,
+  SUBSCRIPTION_KINDS: () => SUBSCRIPTION_KINDS,
+  accountId: () => accountId,
   clampPollInterval: () => clampPollInterval,
   parseAccounts: () => parseAccounts,
   sanitizeId: () => sanitizeId,
@@ -29,8 +32,30 @@ module.exports = __toCommonJS(pure_helpers_exports);
 function sanitizeId(name) {
   return name.trim().replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_{2,}/g, "_").replace(/^_+|_+$/g, "");
 }
-const PROVIDER_KINDS = ["claude-sub", "openrouter", "deepseek", "openai", "anthropic-api"];
-const RESERVED_ROOT_IDS = ["info", "total", "auth"];
+const PROVIDER_KINDS = [
+  "claude-sub",
+  "chatgpt-sub",
+  "gemini-sub",
+  "openrouter",
+  "deepseek",
+  "openai",
+  "anthropic-api"
+];
+const SUBSCRIPTION_KINDS = ["claude-sub", "chatgpt-sub", "gemini-sub"];
+const SUBSCRIPTION_IDS = {
+  "claude-sub": "claude",
+  "chatgpt-sub": "chatgpt",
+  "gemini-sub": "gemini"
+};
+const RESERVED_ROOT_IDS = ["info", "total"];
+function accountId(provider, credentialId) {
+  const fixed = SUBSCRIPTION_IDS[provider];
+  if (fixed) {
+    return fixed;
+  }
+  const suffix = sanitizeId(credentialId.replace(/^system\.credentials\./, ""));
+  return suffix ? `${suffix}-api` : "";
+}
 function parseAccounts(raw) {
   if (!Array.isArray(raw)) {
     return [];
@@ -45,9 +70,10 @@ function parseAccounts(raw) {
     if (row.enabled === false) {
       continue;
     }
-    const name = typeof row.name === "string" ? row.name.trim() : "";
-    const id = sanitizeId(name);
     const provider = typeof row.provider === "string" ? row.provider : "";
+    const credentialId = typeof row.credentialId === "string" ? row.credentialId : "";
+    const id = accountId(provider, credentialId);
+    const name = (typeof row.name === "string" ? row.name.trim() : "") || id;
     if (!id || RESERVED_ROOT_IDS.includes(id) || !PROVIDER_KINDS.includes(provider) || seen.has(id)) {
       continue;
     }
@@ -57,7 +83,7 @@ function parseAccounts(raw) {
       name,
       id,
       provider,
-      credentialId: typeof row.credentialId === "string" ? row.credentialId : "",
+      credentialId,
       warnThreshold: Number.isFinite(threshold) && threshold >= 10 && threshold <= 100 ? threshold : 80
     });
   }
@@ -73,7 +99,10 @@ function validAccountIds(raw) {
       continue;
     }
     const row = entry;
-    const id = sanitizeId(typeof row.name === "string" ? row.name : "");
+    const id = accountId(
+      typeof row.provider === "string" ? row.provider : "",
+      typeof row.credentialId === "string" ? row.credentialId : ""
+    );
     if (id && !RESERVED_ROOT_IDS.includes(id) && !ids.includes(id)) {
       ids.push(id);
     }
@@ -91,6 +120,9 @@ function clampPollInterval(raw) {
 0 && (module.exports = {
   PROVIDER_KINDS,
   RESERVED_ROOT_IDS,
+  SUBSCRIPTION_IDS,
+  SUBSCRIPTION_KINDS,
+  accountId,
   clampPollInterval,
   parseAccounts,
   sanitizeId,

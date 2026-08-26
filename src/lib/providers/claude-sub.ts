@@ -1,7 +1,14 @@
 import { getJson, type JsonFetch } from "../http";
-import { FetchError, type LimitWindow, type UsageProvider, type UsageSnapshot } from "../provider";
+import {
+  FetchError,
+  type LimitWindow,
+  type TokenSet,
+  type TokenStore,
+  type UsageProvider,
+  type UsageSnapshot,
+} from "../provider";
 import { sanitizeId } from "../pure-helpers";
-import { CLAUDE_OAUTH, refreshTokens, type JsonPost, type TokenSet } from "./claude-auth";
+import { CLAUDE_OAUTH, refreshTokens, type JsonPost } from "./claude-auth";
 
 /**
  * Parse a Claude subscription `GET /api/oauth/usage` response into a snapshot.
@@ -133,14 +140,6 @@ function applyExtraUsage(raw: Record<string, unknown>, snapshot: UsageSnapshot):
       snapshot.costs = { month: used, currency: "USD" };
     }
   }
-}
-
-/** Persistent token storage — the adapter keeps the tokens in its data directory. */
-export interface TokenStore {
-  /** Read the stored token set, or null when never signed in. */
-  load(): Promise<TokenSet | null>;
-  /** Persist a token set. */
-  save(tokens: TokenSet): Promise<void>;
 }
 
 /**

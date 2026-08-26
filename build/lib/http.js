@@ -19,6 +19,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var http_exports = {};
 __export(http_exports, {
   getJson: () => getJson,
+  postForm: () => postForm,
   postJson: () => postJson
 });
 module.exports = __toCommonJS(http_exports);
@@ -73,9 +74,37 @@ async function postJson(url, body) {
     throw new import_provider.FetchError("network", "invalid JSON response");
   }
 }
+async function postForm(url, form, headers = {}) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
+      body: new URLSearchParams(form).toString(),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
+  } catch (e) {
+    throw new import_provider.FetchError("network", e instanceof Error ? e.message : String(e));
+  }
+  if (response.status === 400 || response.status === 401 || response.status === 403) {
+    throw new import_provider.FetchError("auth", `HTTP ${response.status}`);
+  }
+  if (response.status === 429) {
+    throw new import_provider.FetchError("rate-limit", "HTTP 429");
+  }
+  if (!response.ok) {
+    throw new import_provider.FetchError("network", `HTTP ${response.status}`);
+  }
+  try {
+    return await response.json();
+  } catch (e) {
+    throw new import_provider.FetchError("network", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   getJson,
+  postForm,
   postJson
 });
 //# sourceMappingURL=http.js.map

@@ -1,5 +1,19 @@
 /** The provider kinds the adapter speaks. */
-export type ProviderKind = "claude-sub" | "openrouter" | "deepseek" | "openai" | "anthropic-api";
+export type ProviderKind =
+  "claude-sub" | "chatgpt-sub" | "gemini-sub" | "openrouter" | "deepseek" | "openai" | "anthropic-api";
+
+/**
+ * How a subscription account is signed in. Each provider dictates its own flow —
+ * the admin panel renders the matching instructions, the adapter drives the rest.
+ *
+ * - `paste-code`: the user opens a link, signs in and pastes the code shown there (Claude).
+ * - `device-code`: the adapter shows a short code the user types on the provider's page,
+ *   then polls until the user confirmed (ChatGPT/Codex).
+ * - `paste-url`: the user opens a link, signs in and lands on a browser error page whose
+ *   ADDRESS carries the code — the whole address is pasted back (Gemini, the only redirect
+ *   Google accepts for the usable client; measured 2026-08-26).
+ */
+export type SignInFlow = "paste-code" | "device-code" | "paste-url";
 
 /** One limit window (session, week, per-model) — the same shape for every provider. */
 export interface LimitWindow {
@@ -98,4 +112,26 @@ export interface UsageProvider {
   readonly kind: ProviderKind;
   /** Fetch the current snapshot; throws {@link FetchError} on failure. */
   fetch(): Promise<UsageSnapshot>;
+}
+
+/** Persisted OAuth tokens of one subscription account. */
+export interface TokenSet {
+  /** The bearer token used for the usage call. */
+  accessToken: string;
+  /** The token used to obtain a fresh access token. */
+  refreshToken: string;
+  /** Absolute expiry of {@link accessToken} in ms since epoch. */
+  expiresAt: number;
+  /** Provider-specific extra the usage call needs (e.g. ChatGPT account id). */
+  accountRef?: string;
+}
+
+/** Where a subscription's tokens live. Keyed by PROVIDER, never by account name. */
+export interface TokenStore {
+  /** Read the stored tokens, or null when never signed in. */
+  load(): Promise<TokenSet | null>;
+  /** Persist tokens (encrypted by the adapter). */
+  save(tokens: TokenSet): Promise<void>;
+  /** Forget the tokens (sign out / unusable refresh token). */
+  clear(): Promise<void>;
 }

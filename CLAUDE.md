@@ -5,9 +5,9 @@
 
 ## Projekt
 
-**ioBroker AI Usage** — Verbrauchs-/Limit-/Kosten-Monitor für KI-Konten (Claude-Abo, OpenRouter,
-DeepSeek, OpenAI-API, Anthropic-API — krobi 2026-08-25: NUR was der ioBroker-Admin nativ kann;
-Copilot wieder ausgebaut, weil er ein von Hand erzeugtes GitHub-Token bräuchte). Reiner Beobachter: liest nur, ruft keine KI
+**ioBroker AI Usage** — Verbrauchs-/Limit-/Kosten-Monitor für KI-Konten. DREI Abos mit eigener
+Anmeldung (Claude, ChatGPT, Google/Gemini) + vier Schlüssel-Konten aus dem zentralen Admin-Speicher
+(OpenRouter, DeepSeek, OpenAI-Organisation, Anthropic-Organisation). Reiner Beobachter: liest nur, ruft keine KI
 auf (Abgrenzung zu ai-toolbox/ai-assistant), schreibt nie zum Anbieter.
 
 - **Version:** io-package.json ist die Wahrheit (nicht hier pinnen)
@@ -27,7 +27,13 @@ src/lib/provider.ts            → UsageProvider-Vertrag + UsageSnapshot + Fetch
 src/lib/http.ts                → getJson/postJson (natives fetch, Status→Fehlerklasse)
 src/lib/providers/claude-auth.ts   → OAuth-Konstanten/PKCE/Tausch/Auffrischung (HA-Vorbild-verifiziert)
 src/lib/providers/claude-sub.ts    → Abo-Abfrage: limits[]-Auswertung, Extra-Guthaben beide Schemata
+src/lib/providers/chatgpt-auth.ts   → Geräte-Code-Anmeldung (Start/Poll/Einlösen/Erneuern)
+src/lib/providers/chatgpt-sub.ts   → /wham/usage: 5-h- + Wochen-Fenster, Guthaben
+src/lib/providers/gemini-auth.ts   → Google-Anmeldung (PKCE, Adresszeile auswerten, Erneuern)
+src/lib/providers/gemini-sub.ts    → loadCodeAssist (Projekt) + retrieveUserQuota (Kontingente)
 src/lib/providers/openrouter|deepseek|openai|anthropic-api.ts → je Anbieter fetch+parse (pur)
+src/lib/sign-in.ts             → welcher Anmelde-Fluss je Anbieter + Zeilen-Zustände
+src/lib/jwt.ts                 → Ablaufzeit + ChatGPT-Konto-Kennung aus dem Token lesen
 src/lib/providers/report-utils.ts  → Monatsstart/heute/Hochrechnung für die Report-Anbieter
 src/lib/snapshot-tree.ts       → Snapshot → Objekt-Definitionen + Werte (capability-driven)
 src/lib/totals.ts              → total.* aus den Snapshots im Speicher
@@ -44,34 +50,37 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
 
 ## Design-Entscheidungen
 
-1. **Admin-8-only** (krobi 2026-08-25): Zugänge über den zentralen Zugangsdaten-Speicher des Admin
-   (`system.credentials.*`, jsonConfig-Komponente `credential`, Lese-Helfer in adapter-core) —
-   keine eigenen encryptedNative-Schlüsselfelder. `globalDependencies admin >= 8.0.1` (Speicher seit Admin 7.9.0; ⚠️ die 8.4.x-Nummern der Formular-Doku sind jsonConfig-PAKET-Versionen, keine Admin-Versionen).
-2. **Claude-Abo = eigener geführter Anmelde-Fluss** (der zentrale Speicher kennt nur statische
-   Schlüssel): Tokens verschlüsselt im Instanz-Datenverzeichnis (native-Schreiben würde restarten).
-   Fluss-Details am QUELLCODE des HA-Vorbilds trickv/hass-claude-usage verifizieren, nicht an Blogs.
-3. **Harte Intervall-Untergrenze 60 s + Backoff bei Drosselung** — die Claude-Abo-Drossel sperrt
-   das NUTZERKONTO ~24 h (trifft auch Claude Code). Standard 300 s. Letzte Werte bleiben stehen.
-4. **Nur Gelieferte Datenpunkte anlegen** (capability-driven wie die Geräte-Adapter); gleiche Sache
-   = gleicher Pfad über alle Anbieter (`limits.*`/`credits.*`/`costs.*`/`tokens.*`).
-5. **total.costs summiert nur echtes Geld gleicher Währung** — Stück-Guthaben (pieces:true)
-   und Fremdwährungen bleiben draußen.
-6. **Konfiguration = React-Komponente statt jsonConfig-Tabelle** (krobi 2026-08-25: „die Tabelle
-   ist ultra kompliziert … schau dir mal homeconnect an"): `src-admin/` (Module-Federation,
-   GUI-API-Gen-2, Blaupause homeconnect) rendert EINE einheitliche An/Aus-Liste aller KI-Konten
-   (krobi 2026-08-26: keine Sonderstellung für Claude): das Claude-Abo ist eine normale Zeile,
-   alphabetisch einsortiert — nur sein Anmelde-Bereich klappt bei aktivem Schalter darunter auf
-   (der Speicher kennt für ein Abo keinen Schlüssel). Anbieter wird aus Vorlagen-/Anzeige-Name
-   geraten; einzig OpenRouter hat keine Admin-Vorlage → bei nicht zuordenbaren „Key"-Einträgen
-   einmalige Anbieter-Auswahl. Gemini = sichtbar-ausgegraut MIT Grund (Google liefert für den
-   einfachen Schlüssel keine Verbrauchsdaten — nur über Cloud-Projekt-Abrechnung). Die Komponente
-   besitzt NUR das native-Feld `accounts` — Backend-Modell unverändert.
-7. **Der Adapter besitzt den Claude-Anmelde-Fluss** (homeconnect-Muster): er erzeugt das
-   PKCE-Geheimnis EINMAL, veröffentlicht den Link als Datenpunkt `auth.<Konto>.signInUrl`
-   (+ `signedIn`), die Karte zeigt ihn nur live an; Code-Einlösung per Nachricht gegen das stabile
-   Geheimnis. Der alte jsonConfig-Weg (textSendTo, das sich bei jeder Feld-Änderung neu erzeugte
-   und den Link entwertete) ist damit strukturell weg — genau daran scheiterte krobis erster
-   Anmelde-Versuch (v0.1.0).
+1. **Admin-8-only** (krobi 2026-08-25): Schlüssel-Konten über den zentralen Zugangsdaten-Speicher
+   (`system.credentials.*`, Lese-Helfer in adapter-core) — keine eigenen Schlüsselfelder.
+   `globalDependencies admin >= 8.0.1`.
+2. **DREI Zugangs-Wege, weil die Anbieter drei verschiedene erzwingen** (Recherche 2026-08-26,
+   Belege in `Ressourcen/ai-usage/`): Claude = Code einfügen · ChatGPT = Geräte-Code eintippen,
+   Adapter pollt selbst · Gemini = Adresszeile der Fehlerseite einfügen (GEMESSEN: Googles
+   Geräte-Fluss ist für beide Zugänge gesperrt, die Anzeige-Seite abgelehnt, nur die
+   localhost-Rückleitung wird angenommen). Der Fluss je Anbieter steht in `lib/sign-in.ts`,
+   die Karte rendert genau die passende Anleitung.
+3. **Zugangs-Daten der Abos gehören dem Adapter allein** — eigene Anmeldung, eigene Datei
+   `tokens-<anbieter>.json` im Instanz-Datenverzeichnis. NIEMALS die Datei des Nutzer-Programms
+   (`~/.codex/auth.json`, `oauth_creds.json`) lesen oder schreiben: die Auffrisch-Token rotieren
+   und sind einmalig — zwei Erneuerer melden sich gegenseitig ab.
+4. **Konto-Kennungen sind fest und deterministisch** (`accountId`): Abos `claude`/`chatgpt`/
+   `gemini`, Schlüssel-Konten `<speichername>-api`. Nie aus dem Anzeigenamen abgeleitet, sonst
+   wandert ein ganzer Objektbaum, wenn der Nutzer umbenennt oder später einen Speicher-Eintrag
+   anlegt. Anmelde-Status liegt IM Konto (`<konto>.info.signedIn`) — der frühere zweite Zweig
+   `auth.<name>` zeigte jedes Abo doppelt (krobi-Fund 2026-08-26).
+5. **Harte Intervall-Untergrenze 60 s + Backoff** — die Claude-Drossel sperrt das NUTZERKONTO
+   ~24 h; für ChatGPT ist keine Kontosperre belegt, aber der Endpunkt ist IP-gedrosselt; für
+   Google gibt es keinen belegten sicheren Takt (einziger Anker: deren eigenes Programm cacht 30 s).
+6. **Nur Geliefertes anlegen** (capability-driven); gleiche Sache = gleicher Pfad über alle
+   Anbieter. Ein Kontingent ohne brauchbaren Wert wird NICHT als 0 % erfunden.
+7. **Gemini: Kennung ist Pflichtteil der Abfrage** — mit der falschen Kennung (User-Agent +
+   `ideType`) antwortet Google trotzdem, liefert aber den stillgelegten Gratis-Satz mit dauerhaft
+   100 %. Ein Zähler, der nie fällt, ist schlimmer als ein Fehler → beide Aufrufe tragen dieselbe
+   Kennung, Wirt-Kette `daily-` vor `prod`.
+8. **total.costs summiert nur echtes Geld gleicher Währung** — Stück-Guthaben und Fremdwährungen
+   bleiben draußen.
+9. **Nach erfolgreicher Anmeldung sofort abfragen** (`engine.pollNow`) — sonst wirkt ein
+   erfolgreicher Login bis zu 5 Minuten lang wie ein Fehlschlag (krobi-Fund 2026-08-26).
 
 ## Tests
 

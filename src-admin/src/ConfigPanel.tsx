@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
   MenuItem,
   Switch,
@@ -16,99 +17,55 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import LoginIcon from "@mui/icons-material/Login";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import LogoutIcon from "@mui/icons-material/Logout";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 
 import { ConfigGeneric, type ConfigGenericProps, type ConfigGenericState } from "@iobroker/json-config";
 import { I18n } from "@iobroker/gui-components";
 
-/** One row of the adapter's `native.accounts` (kept compatible with the backend parser). */
-interface AccountRow {
-  name: string;
-  provider: string;
-  credentialId: string;
-  warnThreshold: number;
-  enabled: boolean;
-}
+import {
+  KEY_PROVIDERS,
+  SUBSCRIPTIONS,
+  offerForCredential,
+  setThreshold,
+  subscriptionRow,
+  toggleCredential,
+  toggleSubscription,
+  type AccountRow,
+  type CredentialEntry,
+} from "./rows";
 
-/** The provider kinds the panel can assign. */
-export type ProviderKind = "openrouter" | "deepseek" | "openai" | "anthropic-api";
-
-/** One entry of the admin's central credential storage (category "AI"). */
-interface CredentialEntry {
-  /** Full object id (system.credentials.<name>). */
-  id: string;
-  /** The id suffix — used as default account name. */
-  suffix: string;
-  /** Display name. */
-  name: string;
-  /** Icon data URL from the storage, if any. */
-  icon?: string;
-  /** Auto-detected provider, null when the user has to pick, "unsupported" for known-but-unusable. */
-  guess: ProviderKind | null | "unsupported";
-}
+/** What the adapter reports about one subscription's sign-in. */
+type SignInState =
+  | { status: "signed-in" }
+  | { status: "signed-out" }
+  | { status: "awaiting-paste"; url: string; flow: "paste-code" | "paste-url" }
+  | { status: "awaiting-device"; userCode: string; verificationUrl: string; expiresAt: number }
+  | { status: "failed"; reason: string };
 
 interface PanelState extends ConfigGenericState {
   credentials: CredentialEntry[];
   credentialsLoaded: boolean;
-  claudeUrl: string;
-  claudeSignedIn: boolean;
-  code: string;
-  busy: boolean;
-  message: { ok: boolean; text: string } | null;
-  /** Provider picked for credentials the auto-detection could not resolve. */
+  /** Sign-in state per subscription provider. */
+  signIn: Record<string, SignInState>;
+  /** What the user typed into a paste field, per provider. */
+  drafts: Record<string, string>;
+  /** Provider chosen manually for a credential whose name gives nothing away. */
   providerChoice: Record<string, string>;
+  busy: string;
 }
 
-/** The fixed row name of the Claude subscription account (id-safe as-is). */
-const CLAUDE_NAME = "Claude";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  openrouter: "OpenRouter",
-  deepseek: "DeepSeek",
-  openai: "OpenAI",
-  "anthropic-api": "Anthropic",
-};
-
 /**
- * Guess the provider of a stored credential from its id and display name (the
- * storage records only the category "AI", not the provider).
+ * The whole instance configuration as ONE list of AI accounts: the three
+ * subscriptions (signed in with the user's own account) and every credential of
+ * the admin's central storage, each an ordinary row with an on/off switch.
  *
- * @param suffix the credential id suffix
- * @param name the display name
- * @returns the provider kind, "unsupported" (Gemini), or null when unknown
- */
-export function guessProvider(suffix: string, name: string): ProviderKind | null | "unsupported" {
-  const hay = `${suffix} ${name}`.toLowerCase();
-  if (hay.includes("gemini")) {
-    return "unsupported";
-  }
-  if (hay.includes("anthropic")) {
-    return "anthropic-api";
-  }
-  if (hay.includes("chatgpt") || hay.includes("openai")) {
-    return "openai";
-  }
-  if (hay.includes("deepseek")) {
-    return "deepseek";
-  }
-  if (hay.includes("openrouter") || hay.includes("router")) {
-    return "openrouter";
-  }
-  return null;
-}
-
-/**
- * The whole instance configuration as ONE list of AI accounts: every credential
- * of the admin's central storage (category "AI") plus the Claude subscription,
- * each an ordinary row with an on/off switch. The subscription gets no special
- * placement — only its sign-in area expands below its row while it is switched
- * on, because a subscription has no key in the storage. Owns the `accounts`
- * native field; the backend model is unchanged.
+ * The panel owns the `accounts` native field and drives the sign-in flows over the
+ * message channel; each provider gets the instructions that actually apply to it,
+ * because the three flows genuinely differ.
  */
 export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, PanelState> {
-  private urlId = "";
-  private connId = "";
+  private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(props: ConfigGenericProps) {
     super(props);
@@ -116,31 +73,37 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       ...this.state,
       credentials: [],
       credentialsLoaded: false,
-      claudeUrl: "",
-      claudeSignedIn: false,
-      code: "",
-      busy: false,
-      message: null,
+      signIn: {},
+      drafts: {},
       providerChoice: {},
+      busy: "",
     };
   }
 
-  private readonly onUrl = (_id: string, state: ioBroker.State | null | undefined): void => {
-    this.setState({ claudeUrl: typeof state?.val === "string" ? state.val : "" });
-  };
-
-  private readonly onConn = (_id: string, state: ioBroker.State | null | undefined): void => {
-    this.setState({ claudeSignedIn: state?.val === true });
-  };
-
   async componentDidMount(): Promise<void> {
     void super.componentDidMount?.();
-    const ctx = this.props.oContext;
-    const ns = `${ctx.adapterName}.${ctx.instance}`;
-    this.urlId = `${ns}.auth.${CLAUDE_NAME}.signInUrl`;
-    this.connId = `${ns}.auth.${CLAUDE_NAME}.signedIn`;
+    await this.loadCredentials();
+    await this.refreshSignIn();
+    // A device-code sign-in finishes in the adapter, not here — poll while the card is open.
+    this.timer = setInterval(() => void this.refreshSignIn(), 4000);
+  }
+
+  componentWillUnmount(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    super.componentWillUnmount?.();
+  }
+
+  /** Read the AI entries of the admin's central credential storage. */
+  private async loadCredentials(): Promise<void> {
     try {
-      const objects = await ctx.socket.getObjectViewSystem("config", "system.credentials.", "system.credentials.香");
+      const objects = await this.props.oContext.socket.getObjectViewSystem(
+        "config",
+        "system.credentials.",
+        "system.credentials.香",
+      );
       const credentials: CredentialEntry[] = (Object.values(objects || {}) as ioBroker.Object[])
         .filter(obj => !!obj && (obj.native as { type?: string })?.type === "ai")
         .map(obj => {
@@ -155,7 +118,6 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
             suffix,
             name,
             icon: typeof obj.common?.icon === "string" ? obj.common.icon : undefined,
-            guess: guessProvider(suffix, name),
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -163,26 +125,65 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     } catch {
       this.setState({ credentialsLoaded: true });
     }
+  }
+
+  /** Ask the adapter for the sign-in state of every switched-on subscription. */
+  private async refreshSignIn(): Promise<void> {
+    if (!this.props.alive) {
+      return;
+    }
+    const signIn: Record<string, SignInState> = {};
+    for (const entry of SUBSCRIPTIONS) {
+      if (!subscriptionRow(this.accounts(), entry.provider)) {
+        continue;
+      }
+      const answer = await this.ask("signInStatus", entry.provider);
+      if (answer) {
+        signIn[entry.provider] = answer;
+      }
+    }
+    this.setState({ signIn });
+  }
+
+  /**
+   * Send one sign-in message to the adapter.
+   *
+   * @param command the message command
+   * @param provider the subscription kind
+   * @param value the pasted value, for signInSubmit
+   * @returns the reported state, or null when the instance did not answer
+   */
+  private async ask(command: string, provider: string, value?: string): Promise<SignInState | null> {
+    const ctx = this.props.oContext;
     try {
-      const [url, conn] = await Promise.all([ctx.socket.getState(this.urlId), ctx.socket.getState(this.connId)]);
-      this.setState({
-        claudeUrl: typeof url?.val === "string" ? url.val : "",
-        claudeSignedIn: conn?.val === true,
-      });
-      await ctx.socket.subscribeState(this.urlId, this.onUrl);
-      await ctx.socket.subscribeState(this.connId, this.onConn);
+      const answer = (await ctx.socket.sendTo(`${ctx.adapterName}.${ctx.instance}`, command, {
+        provider,
+        value,
+      })) as SignInState & { error?: string };
+      if (!answer || answer.error) {
+        return { status: "failed", reason: answer?.error || I18n.t("aiu_noAnswer") };
+      }
+      return answer;
     } catch {
-      // The states appear once the adapter first runs with a Claude account — the hint covers it.
+      return null;
     }
   }
 
-  componentWillUnmount(): void {
-    const socket = this.props.oContext?.socket;
-    if (socket && this.urlId) {
-      socket.unsubscribeState(this.urlId, this.onUrl);
-      socket.unsubscribeState(this.connId, this.onConn);
-    }
-    super.componentWillUnmount?.();
+  /**
+   * Run a sign-in command and show the result in the row.
+   *
+   * @param command the message command
+   * @param provider the subscription kind
+   * @param value the pasted value
+   */
+  private async run(command: string, provider: string, value?: string): Promise<void> {
+    this.setState({ busy: provider });
+    const answer = await this.ask(command, provider, value);
+    this.setState(prev => ({
+      busy: "",
+      signIn: answer ? { ...prev.signIn, [provider]: answer } : prev.signIn,
+      drafts: { ...prev.drafts, [provider]: "" },
+    }));
   }
 
   /** The current accounts rows from the (unsaved) config data. */
@@ -192,7 +193,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   }
 
   /**
-   * Commit a new accounts array into the config data (saved with the form).
+   * Commit rows into the config data (saved with the form).
    *
    * @param rows the new rows
    */
@@ -200,103 +201,26 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     void this.onChange("accounts", rows);
   }
 
-  /** Whether the Claude subscription row exists (enabled). */
-  private claudeEnabled(): boolean {
-    return this.accounts().some(row => row.provider === "claude-sub");
-  }
-
-  private toggleClaude(on: boolean): void {
-    const rows = this.accounts().filter(row => row.provider !== "claude-sub");
-    if (on) {
-      rows.unshift({ name: CLAUDE_NAME, provider: "claude-sub", credentialId: "", warnThreshold: 80, enabled: true });
-    }
-    this.commit(rows);
-  }
-
   /**
-   * Toggle monitoring of one stored credential.
+   * The threshold input of one enabled row (committed on blur).
    *
-   * @param credential the storage entry
-   * @param on the new switch state
-   */
-  private toggleCredential(credential: CredentialEntry, on: boolean): void {
-    const rows = this.accounts().filter(row => row.credentialId !== credential.id);
-    if (on) {
-      const provider =
-        credential.guess && credential.guess !== "unsupported"
-          ? credential.guess
-          : this.state.providerChoice[credential.id];
-      if (!provider) {
-        return;
-      }
-      rows.push({ name: credential.name, provider, credentialId: credential.id, warnThreshold: 80, enabled: true });
-    }
-    this.commit(rows);
-  }
-
-  /**
-   * Update the warn threshold of one row.
-   *
-   * @param credentialId the row key ("" for Claude)
-   * @param value the raw input value
-   */
-  private setThreshold(credentialId: string, value: string): void {
-    const threshold = Math.min(100, Math.max(10, Math.round(Number(value)) || 80));
-    this.commit(
-      this.accounts().map(row =>
-        (credentialId ? row.credentialId === credentialId : row.provider === "claude-sub")
-          ? { ...row, warnThreshold: threshold }
-          : row,
-      ),
-    );
-  }
-
-  /** Redeem the pasted sign-in code via the running instance. */
-  private async redeemCode(): Promise<void> {
-    const ctx = this.props.oContext;
-    this.setState({ busy: true, message: null });
-    try {
-      const response = await ctx.socket.sendTo(`${ctx.adapterName}.${ctx.instance}`, "claudeAuthCode", {
-        account: CLAUDE_NAME,
-        code: this.state.code,
-      });
-      if (response?.result === "ok") {
-        this.setState({ busy: false, code: "", message: { ok: true, text: I18n.t("aiu_signInDone") } });
-      } else {
-        this.setState({ busy: false, message: { ok: false, text: response?.error || I18n.t("aiu_signInFailed") } });
-      }
-    } catch {
-      this.setState({ busy: false, message: { ok: false, text: I18n.t("aiu_instanceNotRunning") } });
-    }
-  }
-
-  /** Ask the instance for a fresh sign-in link (invalidates the previous one). */
-  private async newLink(): Promise<void> {
-    const ctx = this.props.oContext;
-    this.setState({ busy: true, message: null });
-    try {
-      await ctx.socket.sendTo(`${ctx.adapterName}.${ctx.instance}`, "claudeAuthStart", { account: CLAUDE_NAME });
-      this.setState({ busy: false });
-    } catch {
-      this.setState({ busy: false, message: { ok: false, text: I18n.t("aiu_instanceNotRunning") } });
-    }
-  }
-
-  /**
-   * The threshold input of one enabled row (uncontrolled — committed on blur).
-   *
-   * @param credentialId the row key ("" for Claude)
+   * @param key react key
    * @param row the row
+   * @param match how to find the row again
    */
-  private renderThreshold(credentialId: string, row: AccountRow): React.JSX.Element {
+  private renderThreshold(
+    key: string,
+    row: AccountRow,
+    match: { provider?: string; credentialId?: string },
+  ): React.JSX.Element {
     return (
       <TextField
-        key={`${credentialId}-threshold`}
+        key={key}
         size="small"
         type="number"
         label={I18n.t("aiu_warnAt")}
         defaultValue={row.warnThreshold || 80}
-        onBlur={e => this.setThreshold(credentialId, e.target.value)}
+        onBlur={e => this.commit(setThreshold(this.accounts(), match, e.target.value))}
         slotProps={{ htmlInput: { min: 10, max: 100, style: { width: 60 } }, inputLabel: { shrink: true } }}
         sx={{ ml: "auto" }}
       />
@@ -304,205 +228,238 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   }
 
   /**
-   * The Claude subscription as a NORMAL list row (no special placement) — the
-   * sign-in area only expands below it while it is switched on.
+   * The sign-in area of one subscription — the part that differs per provider.
+   *
+   * @param provider the subscription kind
    */
-  private renderClaudeRow(): React.JSX.Element {
-    const enabled = this.claudeEnabled();
-    const row = this.accounts().find(r => r.provider === "claude-sub");
-    return (
-      <Box key="claude-sub">
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}>
-          <Avatar sx={{ width: 28, height: 28, bgcolor: "transparent" }}>
-            <SmartToyIcon
-              fontSize="small"
-              color="primary"
-            />
-          </Avatar>
-          <Box sx={{ minWidth: 160 }}>
-            <Typography>{I18n.t("aiu_claudeTitle")}</Typography>
-            <Typography
-              variant="caption"
-              sx={{ opacity: 0.7 }}
-            >
-              {I18n.t("aiu_claudeCaption")}
-            </Typography>
-          </Box>
-          {enabled && row ? this.renderThreshold("", row) : null}
-          <Switch
-            checked={enabled}
-            onChange={e => this.toggleClaude(e.target.checked)}
-            sx={{ ml: enabled ? 0 : "auto" }}
-          />
-        </Box>
-        {enabled ? (
-          <Box sx={{ pl: 6, py: 1.5, borderBottom: 1, borderColor: "divider" }}>{this.renderClaudeAuth()}</Box>
-        ) : null}
-      </Box>
-    );
-  }
+  private renderSignIn(provider: string): React.JSX.Element {
+    const state = this.state.signIn[provider];
+    const busy = this.state.busy === provider;
 
-  private renderClaudeAuth(): React.JSX.Element {
-    if (this.state.claudeSignedIn) {
+    if (!this.props.alive) {
+      return <Alert severity="warning">{I18n.t("aiu_instanceNotRunning")}</Alert>;
+    }
+    if (this.props.changed) {
+      return <Alert severity="info">{I18n.t("aiu_saveFirst")}</Alert>;
+    }
+    if (!state) {
+      return <CircularProgress size={20} />;
+    }
+
+    if (state.status === "signed-in") {
       return (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <CheckCircleIcon color="success" />
           <Typography sx={{ color: "success.main" }}>{I18n.t("aiu_signedIn")}</Typography>
-          <Button
-            size="small"
-            startIcon={<RefreshIcon />}
-            disabled={this.state.busy}
-            onClick={() => void this.newLink()}
-          >
-            {I18n.t("aiu_signInAgain")}
+          <Button size="small" startIcon={<LogoutIcon />} disabled={busy} onClick={() => void this.run("signOut", provider)}>
+            {I18n.t("aiu_signOut")}
           </Button>
         </Box>
       );
     }
-    if (!this.state.claudeUrl) {
+
+    if (state.status === "awaiting-device") {
       return (
-        <Alert severity="info">{this.props.changed ? I18n.t("aiu_saveFirst") : I18n.t("aiu_waitingForLink")}</Alert>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Typography variant="body2">{I18n.t("aiu_deviceStep1")}</Typography>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+            <Chip label={state.userCode} sx={{ fontSize: 20, fontFamily: "monospace", py: 2.5, px: 1 }} />
+            <Button
+              size="small"
+              startIcon={<ContentCopyIcon />}
+              onClick={() => void navigator.clipboard?.writeText(state.userCode)}
+            >
+              {I18n.t("aiu_copyCode")}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<LoginIcon />}
+              href={state.verificationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {I18n.t("aiu_openPage")}
+            </Button>
+          </Box>
+          <Alert severity="info">{I18n.t("aiu_deviceWaiting")}</Alert>
+        </Box>
       );
     }
+
+    if (state.status === "awaiting-paste") {
+      const isGoogle = state.flow === "paste-url";
+      return (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Typography variant="body2">{I18n.t(isGoogle ? "aiu_googleStep1" : "aiu_claudeStep1")}</Typography>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              startIcon={<LoginIcon />}
+              href={state.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {I18n.t("aiu_openSignIn")}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<ContentCopyIcon />}
+              onClick={() => void navigator.clipboard?.writeText(state.url)}
+            >
+              {I18n.t("aiu_copyLink")}
+            </Button>
+          </Box>
+          {isGoogle ? <Alert severity="warning">{I18n.t("aiu_googleErrorPageHint")}</Alert> : null}
+          <Typography variant="body2">{I18n.t(isGoogle ? "aiu_googleStep2" : "aiu_claudeStep2")}</Typography>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+            <TextField
+              size="small"
+              label={I18n.t(isGoogle ? "aiu_addressLabel" : "aiu_codeLabel")}
+              value={this.state.drafts[provider] ?? ""}
+              onChange={e =>
+                this.setState(prev => ({ drafts: { ...prev.drafts, [provider]: e.target.value } }))
+              }
+              sx={{ minWidth: 340, flexGrow: 1 }}
+            />
+            <Button
+              variant="contained"
+              disabled={busy || !(this.state.drafts[provider] ?? "").trim()}
+              onClick={() => void this.run("signInSubmit", provider, this.state.drafts[provider])}
+            >
+              {busy ? <CircularProgress size={20} /> : I18n.t("aiu_redeem")}
+            </Button>
+          </Box>
+        </Box>
+      );
+    }
+
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-        <Typography variant="body2">{I18n.t("aiu_step1")}</Typography>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <Button
-            variant="contained"
-            startIcon={<LoginIcon />}
-            href={this.state.claudeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {I18n.t("aiu_openSignIn")}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<ContentCopyIcon />}
-            onClick={() => void navigator.clipboard?.writeText(this.state.claudeUrl)}
-          >
-            {I18n.t("aiu_copyLink")}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {state.status === "failed" ? <Alert severity="error">{state.reason}</Alert> : null}
+        <Box>
+          <Button variant="contained" startIcon={<LoginIcon />} disabled={busy} onClick={() => void this.run("signInStart", provider)}>
+            {busy ? <CircularProgress size={20} /> : I18n.t("aiu_startSignIn")}
           </Button>
         </Box>
-        <Typography variant="body2">{I18n.t("aiu_step2")}</Typography>
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-          <TextField
-            size="small"
-            label={I18n.t("aiu_codeLabel")}
-            value={this.state.code}
-            onChange={e => this.setState({ code: e.target.value })}
-            sx={{ minWidth: 320 }}
+      </Box>
+    );
+  }
+
+  /**
+   * One subscription row plus, while switched on, its sign-in area.
+   *
+   * @param entry the subscription descriptor
+   */
+  private renderSubscriptionRow(entry: { provider: string; label: string; captionKey: string }): React.JSX.Element {
+    const row = subscriptionRow(this.accounts(), entry.provider);
+    return (
+      <Box key={entry.provider}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}>
+          <Avatar sx={{ width: 28, height: 28, bgcolor: "transparent" }}>
+            <SmartToyIcon fontSize="small" color="primary" />
+          </Avatar>
+          <Box sx={{ minWidth: 180 }}>
+            <Typography>{entry.label}</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.7 }}>
+              {I18n.t(entry.captionKey)}
+            </Typography>
+          </Box>
+          {row ? this.renderThreshold(`${entry.provider}-t`, row, { provider: entry.provider }) : null}
+          <Switch
+            checked={!!row}
+            onChange={e => this.commit(toggleSubscription(this.accounts(), entry.provider, e.target.checked, entry.label))}
+            sx={{ ml: row ? 0 : "auto" }}
           />
-          <Button
-            variant="contained"
-            disabled={!this.state.code.trim() || this.state.busy || !this.props.alive}
-            onClick={() => void this.redeemCode()}
-          >
-            {this.state.busy ? <CircularProgress size={20} /> : I18n.t("aiu_redeem")}
-          </Button>
         </Box>
-        {!this.props.alive ? <Alert severity="warning">{I18n.t("aiu_instanceNotRunning")}</Alert> : null}
-        {this.state.message ? (
-          <Alert severity={this.state.message.ok ? "success" : "error"}>{this.state.message.text}</Alert>
+        {row ? (
+          <Box sx={{ pl: 6, py: 1.5, borderBottom: 1, borderColor: "divider" }}>{this.renderSignIn(entry.provider)}</Box>
         ) : null}
       </Box>
     );
   }
 
+  /**
+   * One stored-credential row.
+   *
+   * @param credential the storage entry
+   */
   private renderCredentialRow(credential: CredentialEntry): React.JSX.Element {
-    const row = this.accounts().find(r => r.credentialId === credential.id);
-    const unsupported = credential.guess === "unsupported";
-    const needsChoice = credential.guess === null && !row;
-    const provider =
-      row?.provider ||
-      (credential.guess !== "unsupported" && credential.guess) ||
-      this.state.providerChoice[credential.id] ||
-      "";
+    const rows = this.accounts();
+    const row = rows.find(entry => entry.credentialId === credential.id);
+    const offer = offerForCredential(credential.suffix, credential.name);
+    const chosen = row?.provider || offer?.provider || this.state.providerChoice[credential.id] || "";
+    const needsAdminKey =
+      KEY_PROVIDERS.find(entry => entry.provider === chosen)?.needsAdminKey ?? offer?.needsAdminKey ?? false;
+    const unusable = !offer && !this.state.providerChoice[credential.id] && !row;
+
     return (
-      <Box
-        key={credential.id}
-        sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}
-      >
-        <Avatar
-          src={credential.icon}
-          sx={{ width: 28, height: 28, bgcolor: "transparent" }}
-        >
-          <SmartToyIcon fontSize="small" />
-        </Avatar>
-        <Box sx={{ minWidth: 160 }}>
-          <Typography>{credential.name}</Typography>
-          <Typography
-            variant="caption"
-            sx={{ opacity: 0.7 }}
-          >
-            {unsupported ? I18n.t("aiu_unsupported") : PROVIDER_LABELS[provider] || ""}
-          </Typography>
+      <Box key={credential.id} sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1 }}>
+          <Avatar src={credential.icon} sx={{ width: 28, height: 28, bgcolor: "transparent" }}>
+            <SmartToyIcon fontSize="small" />
+          </Avatar>
+          <Box sx={{ minWidth: 180 }}>
+            <Typography>{credential.name}</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.7 }}>
+              {I18n.t("aiu_storedKey")}
+            </Typography>
+          </Box>
+          {unusable ? (
+            <TextField
+              select
+              size="small"
+              label={I18n.t("aiu_provider")}
+              value={this.state.providerChoice[credential.id] || ""}
+              onChange={e =>
+                this.setState(prev => ({
+                  providerChoice: { ...prev.providerChoice, [credential.id]: e.target.value },
+                }))
+              }
+              sx={{ minWidth: 170 }}
+            >
+              {KEY_PROVIDERS.map(entry => (
+                <MenuItem key={entry.provider} value={entry.provider}>
+                  {entry.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : null}
+          {row ? this.renderThreshold(`${credential.id}-t`, row, { credentialId: credential.id }) : null}
+          <Switch
+            checked={!!row}
+            disabled={!chosen}
+            onChange={e => this.commit(toggleCredential(rows, credential, chosen, e.target.checked))}
+            sx={{ ml: row ? 0 : "auto" }}
+          />
         </Box>
-        {needsChoice ? (
-          <TextField
-            select
-            size="small"
-            label={I18n.t("aiu_provider")}
-            value={this.state.providerChoice[credential.id] || ""}
-            onChange={e =>
-              this.setState({ providerChoice: { ...this.state.providerChoice, [credential.id]: e.target.value } })
-            }
-            sx={{ minWidth: 160 }}
-          >
-            {Object.entries(PROVIDER_LABELS).map(([kind, label]) => (
-              <MenuItem
-                key={kind}
-                value={kind}
-              >
-                {label}
-              </MenuItem>
-            ))}
-          </TextField>
+        {row && needsAdminKey ? (
+          <Alert severity="info" sx={{ mb: 1 }}>
+            {I18n.t("aiu_adminKeyHint")}
+          </Alert>
         ) : null}
-        {row ? this.renderThreshold(credential.id, row) : null}
-        <Switch
-          checked={!!row}
-          disabled={unsupported || (needsChoice && !this.state.providerChoice[credential.id])}
-          onChange={e => this.toggleCredential(credential, e.target.checked)}
-          sx={{ ml: row ? 0 : "auto" }}
-        />
       </Box>
     );
   }
 
   renderItem(): React.JSX.Element {
-    const rows: { name: string; element: React.JSX.Element }[] = this.state.credentials.map(credential => ({
-      name: credential.name,
-      element: this.renderCredentialRow(credential),
-    }));
-    rows.push({ name: I18n.t("aiu_claudeTitle"), element: this.renderClaudeRow() });
-    rows.sort((a, b) => a.name.localeCompare(b.name));
     return (
-      <Box
-        data-testid="aiu-config"
-        sx={{ maxWidth: 720 }}
-      >
+      <Box data-testid="aiu-config" sx={{ maxWidth: 760 }}>
         <Card variant="outlined">
           <CardContent>
-            <Typography
-              variant="h6"
-              sx={{ mb: 0.5 }}
-            >
+            <Typography variant="h6" sx={{ mb: 0.5 }}>
               {I18n.t("aiu_storedTitle")}
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ opacity: 0.8, mb: 1 }}
-            >
+            <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
               {I18n.t("aiu_storedHint")}
             </Typography>
-            {!this.state.credentialsLoaded ? <CircularProgress size={24} /> : rows.map(r => r.element)}
+            {SUBSCRIPTIONS.map(entry => this.renderSubscriptionRow(entry))}
+            {!this.state.credentialsLoaded ? (
+              <CircularProgress size={24} sx={{ mt: 1 }} />
+            ) : (
+              this.state.credentials.map(credential => this.renderCredentialRow(credential))
+            )}
             {this.state.credentialsLoaded && this.state.credentials.length === 0 ? (
-              <Alert
-                severity="info"
-                sx={{ mt: 1 }}
-              >
+              <Alert severity="info" sx={{ mt: 1 }}>
                 {I18n.t("aiu_noCredentials")}
               </Alert>
             ) : null}
