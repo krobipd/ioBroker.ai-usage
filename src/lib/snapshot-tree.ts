@@ -212,18 +212,40 @@ export function mapSnapshot(
 }
 
 /**
- * The highest limit percent in a snapshot, or undefined when it has no windows.
+ * The window that decides how full an account is: the highest PLAN-WIDE limit, or
+ * the granted budget when the account has no windows at all.
+ *
+ * Windows marked `scoped` are left out on purpose — they cover a single model and
+ * may sit at 100 % permanently for a model the user never touches, which would
+ * pin the account's warning on forever. Their datapoints still exist; they just
+ * do not speak for the account.
+ *
+ * @param snapshot the snapshot
+ * @returns percent plus the label that produced it, or undefined when nothing applies
+ */
+export function limitingWindow(snapshot: UsageSnapshot): { percent: number; label: string } | undefined {
+  let best: { percent: number; label: string } | undefined;
+  for (const limit of snapshot.limits ?? []) {
+    if (limit.scoped) {
+      continue;
+    }
+    if (!best || limit.percent > best.percent) {
+      best = { percent: limit.percent, label: limit.label };
+    }
+  }
+  const credits = snapshot.credits?.percent;
+  if (credits !== undefined && (!best || credits > best.percent)) {
+    best = { percent: credits, label: "Credits" };
+  }
+  return best;
+}
+
+/**
+ * The highest plan-wide limit percent in a snapshot, or undefined when it has none.
  *
  * @param snapshot the snapshot
  * @returns the maximum percent
  */
 export function maxLimitPercent(snapshot: UsageSnapshot): number | undefined {
-  const percents = [
-    ...(snapshot.limits?.map(limit => limit.percent) ?? []),
-    ...(snapshot.credits?.percent !== undefined ? [snapshot.credits.percent] : []),
-  ];
-  if (percents.length === 0) {
-    return undefined;
-  }
-  return Math.max(...percents);
+  return limitingWindow(snapshot)?.percent;
 }

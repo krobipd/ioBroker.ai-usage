@@ -60,7 +60,7 @@ describe("parseClaudeUsage", () => {
     expect(snapshot.limits).toEqual([
       { name: "session", label: "Session (5 h)", percent: 34, resetAt: "2026-08-25T14:00:00Z" },
       { name: "week", label: "Week (all models)", percent: 62, resetAt: "2026-09-01T09:00:00Z" },
-      { name: "weekly_scoped-Fable_5", label: "weekly scoped Fable 5", percent: 71 },
+      { name: "weekly_scoped-Fable_5", label: "weekly scoped Fable 5", percent: 71, scoped: true },
     ]);
   });
 

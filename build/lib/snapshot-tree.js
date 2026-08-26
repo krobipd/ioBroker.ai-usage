@@ -18,6 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var snapshot_tree_exports = {};
 __export(snapshot_tree_exports, {
+  limitingWindow: () => limitingWindow,
   mapSnapshot: () => mapSnapshot,
   maxLimitPercent: () => maxLimitPercent
 });
@@ -156,19 +157,30 @@ function mapSnapshot(accountId, accountName, provider, snapshot) {
   }
   return { objects, writes };
 }
-function maxLimitPercent(snapshot) {
-  var _a, _b, _c;
-  const percents = [
-    ...(_b = (_a = snapshot.limits) == null ? void 0 : _a.map((limit) => limit.percent)) != null ? _b : [],
-    ...((_c = snapshot.credits) == null ? void 0 : _c.percent) !== void 0 ? [snapshot.credits.percent] : []
-  ];
-  if (percents.length === 0) {
-    return void 0;
+function limitingWindow(snapshot) {
+  var _a, _b;
+  let best;
+  for (const limit of (_a = snapshot.limits) != null ? _a : []) {
+    if (limit.scoped) {
+      continue;
+    }
+    if (!best || limit.percent > best.percent) {
+      best = { percent: limit.percent, label: limit.label };
+    }
   }
-  return Math.max(...percents);
+  const credits = (_b = snapshot.credits) == null ? void 0 : _b.percent;
+  if (credits !== void 0 && (!best || credits > best.percent)) {
+    best = { percent: credits, label: "Credits" };
+  }
+  return best;
+}
+function maxLimitPercent(snapshot) {
+  var _a;
+  return (_a = limitingWindow(snapshot)) == null ? void 0 : _a.percent;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  limitingWindow,
   mapSnapshot,
   maxLimitPercent
 });

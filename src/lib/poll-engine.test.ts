@@ -207,4 +207,136 @@ describe("PollEngine", () => {
     expect(h.states.get("f.limitReached")).toBe(true);
     expect(h.states.get("total.limitReached")).toBe(true);
   });
+
+  test("a full MODEL bucket raises neither the warning nor limitReached", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      {
+        limits: [
+          { name: "session", label: "Session (5 h)", percent: 72 },
+          { name: "week", label: "Week (all models)", percent: 72 },
+          { name: "weekly_scoped-Fable", label: "weekly scoped Fable", percent: 100, scoped: true },
+        ],
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "c", name: "Claude" })], new Map([["c", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("c.limitReached")).toBe(false);
+    expect(h.states.get("c.warning")).toBe(false);
+    expect(h.states.get("total.maxLimitPercent")).toBe(72);
+    expect(h.notifications).toEqual([]);
+    // the bucket itself is still reported
+    expect(h.states.get("c.limits.weekly_scoped-Fable.percent")).toBe(100);
+  });
+
+  test("the warning names the window it came from", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      {
+        limits: [
+          { name: "session", label: "Session (5 h)", percent: 40 },
+          { name: "week", label: "Week (all models)", percent: 91 },
+        ],
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "c", name: "Claude" })], new Map([["c", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.notifications).toEqual(["Claude: Week (all models) at 91 % (threshold 80 %)"]);
+  });
+
+  test("a rejected sign-in leaves the AI service marked online — it answered", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      () => {
+        throw new FetchError("auth", "HTTP 401");
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    expect(h.states.get("a.info.serviceOnline")).toBe(true);
+    expect(h.states.get("a.info.state")).toBe("unauthorized");
+    expect(h.states.get("a.info.reachable")).toBe(false);
+  });
+
+  test("a fault reported BY the service marks it offline at once, without three strikes", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      () => {
+        throw new FetchError("service", "HTTP 503");
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.info.serviceOnline")).toBe(true);
+    await h.tick();
+    expect(h.states.get("a.info.serviceOnline")).toBe(false);
+    expect(h.states.get("a.info.state")).toBe("service-down");
+  });
+
+  test("a single transport hiccup does not make the indicator flap", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      () => {
+        throw new FetchError("network", "ECONNRESET");
+      },
+      { limits: [{ name: "week", label: "Week", percent: 11 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    expect(h.states.get("a.info.serviceOnline")).toBe(true);
+    expect(h.states.get("a.info.state")).toBe("ok");
+    await h.tick();
+    expect(h.states.get("a.info.state")).toBe("ok");
+  });
+
+  test("three transport failures in a row report no connection", async () => {
+    const h = makeHarness();
+    const boom = (): never => {
+      throw new FetchError("network", "ETIMEDOUT");
+    };
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      boom,
+      boom,
+      boom,
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    await h.tick();
+    await h.tick();
+    expect(h.states.get("a.info.serviceOnline")).toBe(false);
+    expect(h.states.get("a.info.state")).toBe("no-connection");
+  });
+
+  test("an unchanged state is not written again", async () => {
+    const writes: string[] = [];
+    const h = makeHarness();
+    const original = h.deps.setState;
+    h.deps.setState = (id, value) => {
+      writes.push(id);
+      original(id, value);
+    };
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      { limits: [{ name: "week", label: "Week", percent: 11 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    const before = writes.filter(id => id === "a.info.state").length;
+    await h.tick();
+    expect(writes.filter(id => id === "a.info.state").length).toBe(before);
+  });
 });

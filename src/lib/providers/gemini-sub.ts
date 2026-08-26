@@ -126,6 +126,9 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
       continue;
     }
     seen.add(name);
+    // NOT marked as `scoped`: Google reports no plan-wide bucket at all, so these
+    // per-model buckets ARE the user's quota. Marking them would leave the account
+    // without any window that can raise a warning.
     const window: LimitWindow = {
       name,
       label: model || kind || "Quota",

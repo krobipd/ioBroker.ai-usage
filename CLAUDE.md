@@ -81,6 +81,19 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
    bleiben draußen.
 9. **Nach erfolgreicher Anmeldung sofort abfragen** (`engine.pollNow`) — sonst wirkt ein
    erfolgreicher Login bis zu 5 Minuten lang wie ein Fehlschlag (krobi-Fund 2026-08-26).
+10. **Nur PLAN-WEITE Fenster sprechen fürs Konto** (`LimitWindow.scoped`, krobi-Fund 2026-08-26:
+    „das betrifft nur Fable, nicht allgemein"): Modell-Kontingente bekommen eigene Datenpunkte,
+    lösen aber nie `warning`/`limitReached` aus — ein Modell, das der Nutzer nie anfasst, kann
+    dauerhaft auf 100 % stehen, und ein Alarm, der nie ausgeht, ist schlimmer als keiner
+    (dieselbe Regel wie bei der Gemini-Kennung). Wer scoped setzt, entscheidet der Anbieter-Parser:
+    Claude alles außer `session`/`weekly_all`, ChatGPT die `additional_rate_limits`, Google GAR
+    NICHTS — dort sind die Modell-Eimer das ganze Kontingent. Jede Warnmeldung nennt das Fenster.
+11. **Vier Fehlerklassen, damit „offline" etwas bedeutet**: `auth` und `rate-limit` heißen, der
+    Dienst hat GEANTWORTET (er ist online, er sagt nur nein), `service` = er meldet eigenen Defekt
+    (sofort als offline gewertet, er hat es uns ja gesagt), `network` = nie erreicht (erst nach
+    3 Versuchen, sonst flattert die Anzeige). Ergebnis: `info.serviceOnline` + `info.state`
+    (ok/unauthorized/rate-limited/service-down/no-connection), beide nur bei ÄNDERUNG geschrieben —
+    ein zyklisch neu geschriebener Indikator flutet die Historie (govee-Lehre).
 
 ## Tests
 

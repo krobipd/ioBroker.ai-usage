@@ -8,8 +8,10 @@ export type JsonFetch = (url: string, headers: Record<string, string>) => Promis
 
 /**
  * GET a JSON document with the shared failure classification: 401/403 become an
- * auth error, 429 a rate-limit error, everything else (bad status, network throw,
- * timeout, invalid JSON) a network error — the classes the poll engine acts on.
+ * auth error, 429 a rate-limit error, any other bad status or unparsable body a
+ * SERVICE error (the service answered and is broken), and only a throw — refused
+ * connection, DNS failure, timeout — a network error. The poll engine turns that
+ * split into "the AI service is down" versus "this host has no connection".
  *
  * @param url the request URL
  * @param headers request headers (Authorization etc.)
@@ -29,12 +31,15 @@ export async function getJson(url: string, headers: Record<string, string>): Pro
     throw new FetchError("rate-limit", "HTTP 429");
   }
   if (!response.ok) {
-    throw new FetchError("network", `HTTP ${response.status}`);
+    // 5xx = the service answered and is broken; anything else unexpected is treated
+    // the same way, because the service DID answer — only a throw above means we
+    // never reached it.
+    throw new FetchError("service", `HTTP ${response.status}`);
   }
   try {
     return await response.json();
   } catch {
-    throw new FetchError("network", "invalid JSON response");
+    throw new FetchError("service", "invalid JSON response");
   }
 }
 
@@ -64,12 +69,15 @@ export async function postJson(url: string, body: Record<string, unknown>): Prom
     throw new FetchError("rate-limit", "HTTP 429");
   }
   if (!response.ok) {
-    throw new FetchError("network", `HTTP ${response.status}`);
+    // 5xx = the service answered and is broken; anything else unexpected is treated
+    // the same way, because the service DID answer — only a throw above means we
+    // never reached it.
+    throw new FetchError("service", `HTTP ${response.status}`);
   }
   try {
     return await response.json();
   } catch {
-    throw new FetchError("network", "invalid JSON response");
+    throw new FetchError("service", "invalid JSON response");
   }
 }
 
@@ -108,11 +116,14 @@ export async function postForm(
     throw new FetchError("rate-limit", "HTTP 429");
   }
   if (!response.ok) {
-    throw new FetchError("network", `HTTP ${response.status}`);
+    // 5xx = the service answered and is broken; anything else unexpected is treated
+    // the same way, because the service DID answer — only a throw above means we
+    // never reached it.
+    throw new FetchError("service", `HTTP ${response.status}`);
   }
   try {
     return await response.json();
   } catch (e) {
-    throw new FetchError("network", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+    throw new FetchError("service", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
 }

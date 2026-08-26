@@ -2,7 +2,7 @@
 
 **Release:** [![npm version](https://img.shields.io/npm/v/iobroker.ai-usage)](https://www.npmjs.com/package/iobroker.ai-usage) ![stable](https://iobroker.live/badges/ai-usage-stable.svg) ![Installations](https://iobroker.live/badges/ai-usage-installed.svg) [![npm downloads](https://img.shields.io/npm/dt/iobroker.ai-usage)](https://www.npmjs.com/package/iobroker.ai-usage)
 
-**Build:** [![Test and Release](https://github.com/krobipd/ioBroker.ai-usage/actions/workflows/test-and-release.yml/badge.svg)](https://github.com/krobipd/ioBroker.ai-usage/actions/workflows/test-and-release.yml) ![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+**Build:** [![Test and Release](https://github.com/krobipd/ioBroker.ai-usage/actions/workflows/test-and-release.yml/badge.svg)](https://github.com/krobipd/ioBroker.ai-usage/actions/workflows/test-and-release.yml) ![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Sentry](https://img.shields.io/badge/error%20reporting-Sentry-362d59?logo=sentry&logoColor=white)](https://github.com/ioBroker/plugin-sentry#plugin-sentry)
 
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
@@ -21,7 +21,16 @@ accounts — as clean datapoints for dashboards, history and automations ("send 
 - **Three subscriptions** — Claude, ChatGPT and Google are signed in with your own account; the settings page guides each sign-in step by step
 - **Central credentials** — API keys live in the admin's central credential storage and are shared with the admin AI assistant
 - **Read-only by design** — the adapter only reads usage data; it never calls, configures or writes to any AI service
+- **Service status per account** — one indicator that tells apart "the AI service is down", "your sign-in is rejected" and "this host has no connection"
 - **Throttle-safe polling** — a hard minimum interval and automatic backoff protect your accounts from provider rate-limit lockouts
+
+---
+
+## Sentry / Error reporting
+
+**This adapter uses Sentry libraries to automatically report exceptions and code errors to the developers.** Reporting only happens if you have enabled error reporting in the ioBroker diagnostics (**System settings → Diagnostics and error reporting**). Only an anonymous installation ID is transmitted — no name, e-mail address or IP address.
+
+For details and how to disable it, see the [Sentry plugin documentation](https://github.com/ioBroker/plugin-sentry#plugin-sentry). Error reporting requires js-controller 3.0 or newer.
 
 ---
 
@@ -98,16 +107,35 @@ ai-usage.0.
 │   ├── warningsActive         — number of accounts above their threshold
 │   └── limitReached           — any window full (automation trigger)
 ├── claude / chatgpt / gemini  — one node per subscription
-│   ├── info.*                 — provider, reachable, signed in, last update
+│   ├── info.serviceOnline     — the AI service itself answered (bool)
+│   ├── info.state             — ok · unauthorized · rate-limited · service-down · no-connection
+│   ├── info.reachable         — usage data was read successfully (bool)
+│   ├── info.signedIn          — the sign-in is in place (bool)
 │   ├── limits.<window>.*      — percent + reset time (session, week, per model, …)
 │   └── credits.*              — where the provider reports a balance
 └── <name>-api                 — one node per key-based account
-    ├── info.*                 — provider, reachable, last update
+    ├── info.*                 — same status states as above
     ├── credits.* / costs.*    — granted budget and real money
     └── tokens.*               — token counters
 ```
 
 Only what an account's source actually delivers is created.
+
+### Is it online?
+
+`info.serviceOnline` answers "is the AI service itself up", `info.state` says why not:
+
+| State | What happened |
+|-------|---------------|
+| `ok` | Data was read |
+| `unauthorized` | The service answered, but rejects the sign-in or key — the service is **up** |
+| `rate-limited` | The service answered with a throttle; the adapter backs off and keeps the last values |
+| `service-down` | The service answered with a fault of its own (reported immediately) |
+| `no-connection` | The service was not reachable at all — reported after three attempts in a row, so a single hiccup does not flip the indicator |
+
+Model-specific limit windows (for example a single model's weekly quota) get their own
+datapoints but never raise the account's warning: a model you never use can sit at 100 %
+forever, and an alarm that never clears is worse than none.
 
 ---
 
@@ -136,6 +164,12 @@ removed automatically, and an existing Claude sign-in is carried over.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Fixed: A limit that belongs to a single model no longer reports the whole account as full, and the warning names the window it came from instead of just "usage"
+- New: Each account shows whether the AI service itself is online, telling a service outage apart from a rejected sign-in or a missing internet connection
+- New: Error reporting via Sentry — crashes reach the developer automatically, but only if you enabled diagnostics and error reporting in the ioBroker system settings
+
 ### 0.3.0 (2026-08-26)
 
 - New: ChatGPT and Google/Gemini subscriptions can now be monitored like the Claude one — each with its own guided sign-in that the settings page walks you through step by step

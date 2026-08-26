@@ -34,7 +34,7 @@ function parseClaudeUsage(body) {
   const raw = body;
   const limits = [];
   const seen = /* @__PURE__ */ new Set();
-  const push = (name, label, percent, resetsAt) => {
+  const push = (name, label, percent, resetsAt, scoped = false) => {
     const id = (0, import_pure_helpers.sanitizeId)(name);
     const value = Number(percent);
     if (!id || seen.has(id) || !Number.isFinite(value)) {
@@ -44,6 +44,9 @@ function parseClaudeUsage(body) {
     const window = { name: id, label, percent: value };
     if (typeof resetsAt === "string" && resetsAt) {
       window.resetAt = resetsAt;
+    }
+    if (scoped) {
+      window.scoped = true;
     }
     limits.push(window);
   };
@@ -72,20 +75,21 @@ function parseClaudeUsage(body) {
         nameParts.push(surface);
         labelParts.push(`(${surface})`);
       }
-      push(nameParts.join("-"), labelParts.join(" "), limit.percent, limit.resets_at);
+      const scoped = kind !== "session" && kind !== "weekly_all";
+      push(nameParts.join("-"), labelParts.join(" "), limit.percent, limit.resets_at, scoped);
     }
   }
   if (limits.length === 0) {
-    const flat = (key, name, label) => {
+    const flat = (key, name, label, scoped = false) => {
       const block = raw[key];
       if (typeof block === "object" && block !== null) {
         const data = block;
-        push(name, label, data.utilization, data.resets_at);
+        push(name, label, data.utilization, data.resets_at, scoped);
       }
     };
     flat("five_hour", "session", "Session (5 h)");
     flat("seven_day", "week", "Week (all models)");
-    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet");
+    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet", true);
   }
   const snapshot = {};
   if (limits.length > 0) {

@@ -52,7 +52,10 @@ class PollEngine {
         skipUntil: 0,
         backoffMs: BACKOFF_START_MS,
         authNotified: false,
-        createdObjects: /* @__PURE__ */ new Set()
+        serviceOnline: false,
+        state: "no-connection",
+        createdObjects: /* @__PURE__ */ new Set(),
+        written: /* @__PURE__ */ new Map()
       });
     }
   }
@@ -122,6 +125,8 @@ class PollEngine {
       runtime.authNotified = false;
       runtime.status.snapshot = snapshot;
       runtime.status.reachable = true;
+      runtime.serviceOnline = true;
+      runtime.state = "ok";
       await this.applySnapshot(runtime, snapshot);
     } catch (e) {
       this.handleFailure(runtime, e);
@@ -149,20 +154,28 @@ class PollEngine {
     for (const write of writes) {
       this.deps.setState(write.id, write.value);
     }
-    const percent = (_a = (0, import_snapshot_tree.maxLimitPercent)(snapshot)) != null ? _a : 0;
+    const driver = (0, import_snapshot_tree.limitingWindow)(snapshot);
+    const percent = (_a = driver == null ? void 0 : driver.percent) != null ? _a : 0;
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
     this.deps.setState(`${config.id}.warning`, runtime.status.warning);
     this.deps.setState(`${config.id}.limitReached`, percent >= 100);
     if (runtime.status.warning && !wasWarning) {
-      const message = `${config.name}: usage at ${Math.round(percent)} % (threshold ${config.warnThreshold} %)`;
+      const window = driver ? `${driver.label} ` : "";
+      const message = `${config.name}: ${window}at ${Math.round(percent)} % (threshold ${config.warnThreshold} %)`;
       this.deps.log.warn(message);
       (_c = (_b = this.deps).notify) == null ? void 0 : _c.call(_b, config.name, message);
     }
   }
   /**
-   * Classify a fetch failure: auth = unreachable + ONE notification until it recovers;
-   * rate-limit = backoff, last values stay; network = tolerated MAX_NETWORK_FAILURES times.
+   * Classify a fetch failure.
+   *
+   * The split matters for the online indicator: with `auth` and `rate-limit` the AI
+   * service ANSWERED — it is online, it just said no — so only our own access is
+   * broken. `service` means the service answered with a fault of its own and is
+   * reported as down at once (it told us, that is not a flake). A `network` failure
+   * is tolerated MAX_NETWORK_FAILURES times before we call the connection gone, so
+   * a single hiccup does not make the indicator flap.
    *
    * @param runtime the account's runtime
    * @param error the thrown error
@@ -173,6 +186,8 @@ class PollEngine {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof import_provider.FetchError && error.kind === "auth") {
       runtime.status.reachable = false;
+      runtime.serviceOnline = true;
+      runtime.state = "unauthorized";
       if (!runtime.authNotified) {
         runtime.authNotified = true;
         const text = `${config.name}: credentials rejected \u2014 ${message}`;
@@ -182,6 +197,8 @@ class PollEngine {
       return;
     }
     if (error instanceof import_provider.FetchError && error.kind === "rate-limit") {
+      runtime.serviceOnline = true;
+      runtime.state = "rate-limited";
       runtime.skipUntil = this.deps.now() + runtime.backoffMs;
       this.deps.log.warn(
         `${config.name}: rate-limited \u2014 backing off for ${Math.round(runtime.backoffMs / 6e4)} min, keeping last values`
@@ -189,23 +206,54 @@ class PollEngine {
       runtime.backoffMs = Math.min(BACKOFF_MAX_MS, runtime.backoffMs * 2);
       return;
     }
+    if (error instanceof import_provider.FetchError && error.kind === "service") {
+      runtime.status.reachable = false;
+      runtime.failCount = 0;
+      if (runtime.serviceOnline) {
+        this.deps.log.warn(`${config.name}: the service reports a fault (${message}) \u2014 values kept`);
+      }
+      runtime.serviceOnline = false;
+      runtime.state = "service-down";
+      return;
+    }
     runtime.failCount++;
     this.deps.log.debug(`${config.name}: fetch failed (${message}), attempt ${runtime.failCount}`);
     if (runtime.failCount >= MAX_NETWORK_FAILURES) {
       runtime.status.reachable = false;
+      if (runtime.serviceOnline) {
+        this.deps.log.warn(`${config.name}: not reachable after ${runtime.failCount} attempts (${message})`);
+      }
+      runtime.serviceOnline = false;
+      runtime.state = "no-connection";
     }
   }
   /**
-   * Write one account's info states (reachable, last update).
+   * Write one account's info states (data received, service online, state, last update).
    *
    * @param runtime the account's runtime
    */
   writeAccountInfo(runtime) {
     const { config } = runtime;
     this.deps.setState(`${config.id}.info.reachable`, runtime.status.reachable);
+    this.setIfChanged(runtime, `${config.id}.info.serviceOnline`, runtime.serviceOnline);
+    this.setIfChanged(runtime, `${config.id}.info.state`, runtime.state);
     if (runtime.status.reachable) {
       this.deps.setState(`${config.id}.info.lastUpdate`, new Date(this.deps.now()).toISOString());
     }
+  }
+  /**
+   * Write a state only when its value actually changed since the last write.
+   *
+   * @param runtime the account's runtime (holds the last-written cache)
+   * @param id the state id
+   * @param value the value
+   */
+  setIfChanged(runtime, id, value) {
+    if (runtime.written.get(id) === value) {
+      return;
+    }
+    runtime.written.set(id, value);
+    this.deps.setState(id, value);
   }
   /** Recompute and write the totals + info.connection. */
   async writeTotals() {
@@ -242,6 +290,22 @@ class PollEngine {
         common: { name: "Reachable", type: "boolean", role: "indicator.reachable", read: true, write: false }
       },
       {
+        id: `${config.id}.info.serviceOnline`,
+        type: "state",
+        common: { name: "AI service online", type: "boolean", role: "indicator.connected", read: true, write: false }
+      },
+      {
+        id: `${config.id}.info.state`,
+        type: "state",
+        common: {
+          name: "State (ok, unauthorized, rate-limited, service-down, no-connection)",
+          type: "string",
+          role: "text",
+          read: true,
+          write: false
+        }
+      },
+      {
         id: `${config.id}.info.lastUpdate`,
         type: "state",
         common: { name: "Last successful update", type: "string", role: "date", read: true, write: false }
@@ -263,6 +327,8 @@ class PollEngine {
     }
     this.deps.setState(`${config.id}.info.provider`, config.provider);
     this.deps.setState(`${config.id}.info.reachable`, false);
+    this.setIfChanged(runtime, `${config.id}.info.serviceOnline`, runtime.serviceOnline);
+    this.setIfChanged(runtime, `${config.id}.info.state`, runtime.state);
   }
   /** The totals skeleton (channel + states). */
   async createTotalsSkeleton() {

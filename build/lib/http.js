@@ -39,12 +39,12 @@ async function getJson(url, headers) {
     throw new import_provider.FetchError("rate-limit", "HTTP 429");
   }
   if (!response.ok) {
-    throw new import_provider.FetchError("network", `HTTP ${response.status}`);
+    throw new import_provider.FetchError("service", `HTTP ${response.status}`);
   }
   try {
     return await response.json();
   } catch {
-    throw new import_provider.FetchError("network", "invalid JSON response");
+    throw new import_provider.FetchError("service", "invalid JSON response");
   }
 }
 async function postJson(url, body) {
@@ -66,12 +66,12 @@ async function postJson(url, body) {
     throw new import_provider.FetchError("rate-limit", "HTTP 429");
   }
   if (!response.ok) {
-    throw new import_provider.FetchError("network", `HTTP ${response.status}`);
+    throw new import_provider.FetchError("service", `HTTP ${response.status}`);
   }
   try {
     return await response.json();
   } catch {
-    throw new import_provider.FetchError("network", "invalid JSON response");
+    throw new import_provider.FetchError("service", "invalid JSON response");
   }
 }
 async function postForm(url, form, headers = {}) {
@@ -93,12 +93,12 @@ async function postForm(url, form, headers = {}) {
     throw new import_provider.FetchError("rate-limit", "HTTP 429");
   }
   if (!response.ok) {
-    throw new import_provider.FetchError("network", `HTTP ${response.status}`);
+    throw new import_provider.FetchError("service", `HTTP ${response.status}`);
   }
   try {
     return await response.json();
   } catch (e) {
-    throw new import_provider.FetchError("network", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+    throw new import_provider.FetchError("service", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

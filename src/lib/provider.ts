@@ -25,6 +25,17 @@ export interface LimitWindow {
   percent: number;
   /** When the window resets (ISO timestamp), if the source reports it. */
   resetAt?: string;
+  /**
+   * True when this window covers only a PART of the plan — a single model or
+   * surface that sits next to a plan-wide window of the same period.
+   *
+   * Such a bucket is reported as its own datapoint but never drives the account's
+   * warning: a model the user does not use can sit at 100 % forever, and a counter
+   * that never falls is worse than no counter (krobi 2026-08-26: "das betrifft nur
+   * Fable, nicht allgemein"). Providers whose ONLY buckets are per-model (Google)
+   * leave this unset — there the model buckets are the plan.
+   */
+  scoped?: boolean;
 }
 
 /** Granted budget (prepaid money or request credits). */
@@ -88,8 +99,15 @@ export interface UsageSnapshot {
   available?: boolean;
 }
 
-/** Why a fetch failed — drives reachability, backoff and notifications. */
-export type FetchErrorKind = "auth" | "rate-limit" | "network";
+/**
+ * Why a fetch failed — drives reachability, backoff and notifications.
+ *
+ * `auth` and `rate-limit` mean the AI service ANSWERED (it is online, it just said
+ * no), `service` means it answered with a server fault of its own, and `network`
+ * means we never reached it. Keeping the last two apart is what lets the adapter
+ * say whether the AI service is down or the ioBroker host has no connection.
+ */
+export type FetchErrorKind = "auth" | "rate-limit" | "service" | "network";
 
 /** A typed fetch failure. */
 export class FetchError extends Error {

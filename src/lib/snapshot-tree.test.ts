@@ -1,5 +1,5 @@
 import type { UsageSnapshot } from "./provider";
-import { mapSnapshot, maxLimitPercent } from "./snapshot-tree";
+import { limitingWindow, mapSnapshot, maxLimitPercent } from "./snapshot-tree";
 
 describe("mapSnapshot", () => {
   test("a subscription snapshot yields device, limit channels and percent/reset states", () => {
@@ -101,5 +101,32 @@ describe("maxLimitPercent", () => {
     ).toBe(80);
     expect(maxLimitPercent({ credits: { percent: 55, currency: "USD" } })).toBe(55);
     expect(maxLimitPercent({})).toBeUndefined();
+  });
+
+  test("a model-scoped window never speaks for the account, however full it is", () => {
+    const snapshot = {
+      limits: [
+        { name: "session", label: "Session (5 h)", percent: 72 },
+        { name: "week", label: "Week (all models)", percent: 72 },
+        { name: "weekly_scoped-Fable", label: "weekly scoped Fable", percent: 100, scoped: true },
+      ],
+    };
+    expect(maxLimitPercent(snapshot)).toBe(72);
+    expect(limitingWindow(snapshot)).toEqual({ percent: 72, label: "Session (5 h)" });
+  });
+
+  test("an account whose windows are ALL scoped reports none rather than the wrong one", () => {
+    expect(maxLimitPercent({ limits: [{ name: "m", label: "M", percent: 100, scoped: true }] })).toBeUndefined();
+  });
+
+  test("the label of the deciding window comes back for the warning message", () => {
+    expect(
+      limitingWindow({
+        limits: [
+          { name: "session", label: "Session (5 h)", percent: 40 },
+          { name: "week", label: "Week (all models)", percent: 91 },
+        ],
+      }),
+    ).toEqual({ percent: 91, label: "Week (all models)" });
   });
 });

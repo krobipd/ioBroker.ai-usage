@@ -85,6 +85,9 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
     }
     const window = readWindow(entry.rate_limit, name, label);
     if (window) {
+      // These sit next to the plan-wide session/week windows and cover one model
+      // each — reported, but never the reason for a warning (LimitWindow.scoped).
+      window.scoped = true;
       limits.push(window);
     }
   }

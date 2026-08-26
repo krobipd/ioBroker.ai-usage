@@ -30,7 +30,7 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
   const raw = body as Record<string, unknown>;
   const limits: LimitWindow[] = [];
   const seen = new Set<string>();
-  const push = (name: string, label: string, percent: unknown, resetsAt: unknown): void => {
+  const push = (name: string, label: string, percent: unknown, resetsAt: unknown, scoped = false): void => {
     const id = sanitizeId(name);
     const value = Number(percent);
     if (!id || seen.has(id) || !Number.isFinite(value)) {
@@ -40,6 +40,9 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
     const window: LimitWindow = { name: id, label, percent: value };
     if (typeof resetsAt === "string" && resetsAt) {
       window.resetAt = resetsAt;
+    }
+    if (scoped) {
+      window.scoped = true;
     }
     limits.push(window);
   };
@@ -70,22 +73,26 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
         nameParts.push(surface);
         labelParts.push(`(${surface})`);
       }
-      push(nameParts.join("-"), labelParts.join(" "), limit.percent, limit.resets_at);
+      // `session` and `weekly_all` are the plan-wide meters; every other kind
+      // (weekly_scoped and friends) covers ONE model and must not drive the
+      // account's warning — see LimitWindow.scoped.
+      const scoped = kind !== "session" && kind !== "weekly_all";
+      push(nameParts.join("-"), labelParts.join(" "), limit.percent, limit.resets_at, scoped);
     }
   }
 
   // Fallback for older payloads without the limits[] array.
   if (limits.length === 0) {
-    const flat = (key: string, name: string, label: string): void => {
+    const flat = (key: string, name: string, label: string, scoped = false): void => {
       const block = raw[key];
       if (typeof block === "object" && block !== null) {
         const data = block as Record<string, unknown>;
-        push(name, label, data.utilization, data.resets_at);
+        push(name, label, data.utilization, data.resets_at, scoped);
       }
     };
     flat("five_hour", "session", "Session (5 h)");
     flat("seven_day", "week", "Week (all models)");
-    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet");
+    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet", true);
   }
 
   const snapshot: UsageSnapshot = {};

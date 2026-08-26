@@ -43,6 +43,11 @@
         "zh-cn": "首个版本：将 Claude、OpenAI、Anthropic、OpenRouter 和 DeepSeek 账户的使用限额、余额与费用作为数据点，并在达到所选阈值时发出警告"
       }
     },
+    "plugins": {
+      "sentry": {
+        "dsn": "https://66f27ceff38c1ce1e6cdcc3095ba06d3@o4511524771266560.ingest.de.sentry.io/4511524773560400"
+      }
+    },
     "titleLang": {
       "en": "AI Usage",
       "de": "AI Usage",

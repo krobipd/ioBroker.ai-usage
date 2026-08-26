@@ -73,6 +73,7 @@ function parseChatgptUsage(body) {
     }
     const window = readWindow(entry.rate_limit, name, label);
     if (window) {
+      window.scoped = true;
       limits.push(window);
     }
   }

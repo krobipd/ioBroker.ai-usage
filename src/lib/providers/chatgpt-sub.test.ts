@@ -57,7 +57,7 @@ describe("parseChatgptUsage", () => {
     });
     expect(snapshot.limits).toEqual([
       { name: "session", label: "Session (5 h)", percent: 10 },
-      { name: "gpt-5-pro", label: "GPT-5 Pro", percent: 60 },
+      { name: "gpt-5-pro", label: "GPT-5 Pro", percent: 60, scoped: true },
     ]);
   });
 
