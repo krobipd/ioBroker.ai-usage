@@ -6,23 +6,22 @@
 
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
-Monitors your AI accounts in ioBroker: usage windows, limits, credits and costs of your
-Claude, ChatGPT and Google subscriptions plus OpenRouter, DeepSeek, OpenAI and Anthropic API
-accounts — as clean datapoints for dashboards, history and automations ("send a message at
-90 % of the weekly limit").
+Monitors usage, limits and costs of your AI accounts — the Claude, ChatGPT and Google
+subscriptions plus OpenRouter, DeepSeek, OpenAI and Anthropic API accounts. Needs ioBroker Admin 8.
+
 
 ---
 
 ## Features
 
-- **Per-account monitoring** — one device node per AI account with harmonised datapoints: limit windows (percent + reset time), credits, costs and tokens
-- **Totals** — summed costs, the highest limit utilisation across all accounts, and one `limitReached` trigger for automations
-- **Warn threshold per account** — a single notification when an account crosses its threshold
-- **Three subscriptions** — Claude, ChatGPT and Google are signed in with your own account; the settings page guides each sign-in step by step
-- **Central credentials** — API keys live in the admin's central credential storage and are shared with the admin AI assistant
-- **Read-only by design** — the adapter only reads usage data; it never calls, configures or writes to any AI service
-- **Online status per account** — ioBroker's standard offline marker plus a plain-text reason that tells "the AI service is down" apart from "your sign-in is rejected"
-- **Throttle-safe polling** — a hard minimum interval and automatic backoff protect your accounts from provider rate-limit lockouts
+- **One node per account** — limit windows with percent and reset time, credits, costs and tokens, named the same way for every provider
+- **Totals** — summed costs, the highest utilisation of any account, and one trigger for automations
+- **Warn threshold per account** — one notification when an account crosses it
+- **Three subscriptions** — Claude, ChatGPT and Google, signed in with your own account; the settings page walks you through each step
+- **Central credentials** — API keys come from the admin's credential storage, shared with the admin AI assistant
+- **Online status** — the connection icon you know from every device, plus the reason in plain text
+- **Read-only** — the adapter only reads; it never calls or configures an AI service
+- **Throttle-safe** — a minimum interval and automatic backoff keep the provider from locking your account
 
 ---
 
@@ -44,54 +43,24 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 ## Configuration
 
-The instance settings show one list of AI accounts. Switch on what you want to monitor:
+The instance settings show one list of AI accounts. Switch on what you want to monitor.
 
 | Account | How it is connected |
 |---------|---------------------|
-| **Claude subscription** | Sign in once with your Claude account (guided, in the settings) |
-| **ChatGPT subscription** | Sign in once with your ChatGPT account (guided, in the settings) |
-| **Google/Gemini subscription** | Sign in once with your Google account (guided, in the settings) |
-| **OpenRouter, DeepSeek** | Pick the stored key from the admin's central credential storage |
-| **OpenAI, Anthropic (organisation)** | Needs an **admin key** of your organisation — see below |
+| **Claude subscription** | Open the sign-in page, log in, copy the code shown there and paste it back |
+| **ChatGPT subscription** | The adapter shows a short code; type it on the OpenAI page it links to. The settings page notices by itself. Your Codex CLI session is not touched |
+| **Google/Gemini subscription** | Open the sign-in page and log in. Google sends the result to `localhost`, so **your browser shows an error page — that is expected**. Copy the **whole address** from the address bar and paste it back |
+| **OpenRouter, DeepSeek** | Pick the stored key from the admin's credential storage |
+| **OpenAI, Anthropic** | Needs an **admin key** of your organisation, not the key the admin assistant uses. A personal account without an organisation cannot deliver these reports at all — use the Claude subscription instead |
 
-### Signing in to a subscription
-
-Each provider needs a different last step, and the settings page tells you which one:
-
-- **Claude** — open the sign-in page, log in, copy the code shown there and paste it back.
-- **ChatGPT** — the adapter shows a short code; type it on the OpenAI page it links to. The
-  settings page notices by itself once you confirmed. The adapter signs in separately from the
-  Codex CLI and does not disturb its session.
-- **Google/Gemini** — open the sign-in page and log in. Google then sends the result to
-  `localhost`, so **your browser shows an error page ("site cannot be reached"). That is expected**
-  — the address bar still carries the sign-in result. Copy the **whole address** and paste it back.
-
-> The three subscription endpoints are **not officially documented**. They are the same ones the
-> providers' own tools use, but they can change without notice. If a subscription stops delivering
-> data, that is the likely reason.
->
-> **Verification status:** the Claude sign-in and read-out were tested against a live subscription.
-> ChatGPT and Google/Gemini were built from the requests those providers' own tools make, but no
-> live subscription of either was available to test them on — please open an issue if a value looks
-> wrong or a sign-in step behaves differently than described.
-
-### API accounts with a key
-
-Keys come from the admin's central credential storage (Settings → Credentials) and are shared with
-the admin AI assistant. Two of them need a **different** key than the assistant uses:
-
-- **OpenAI** — the usage and cost reports are organisation endpoints and need an **admin key**
-  created in the organisation settings.
-- **Anthropic** — same, an **admin key** (`sk-ant-admin…`), which only an organisation
-  administrator can create. Personal accounts without an organisation cannot deliver these reports
-  at all; use the Claude subscription row instead.
-
-Add such a key as its own entry in the credential storage (template "Key") and pick it in the row.
+The three subscription endpoints are **not officially documented**; they are the ones those
+providers' own tools use and can change without notice. Claude was tested against a live
+subscription, ChatGPT and Google could not be — please open an issue if something looks wrong.
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | **Warn at %** | Per account: one notification when a plan-wide limit window crosses this utilisation | 80 |
-| **Poll interval** | How often each account is queried, 60–3600 seconds. The floor is deliberate — asking too often gets the account throttled by the provider | 300 |
+| **Poll interval** | How often each account is queried, 60–3600 seconds. The floor keeps the provider from throttling you | 300 |
 | **Notifications** | One notification on threshold crossing or broken credentials | on |
 
 ---
@@ -104,7 +73,7 @@ ai-usage.0.
 ├── total.                     — totals across all accounts
 │   ├── costs.today/month/…    — summed real money (same currency only)
 │   ├── maxLimitPercent        — highest plan-wide utilisation of any account
-│   ├── warningsActive         — number of accounts above their threshold
+│   ├── warningsActive         — accounts above their threshold
 │   ├── limitReached           — a plan-wide window is full (automation trigger)
 │   ├── accountsReachable      — accounts currently delivering data
 │   └── accounts               — configured accounts
@@ -125,52 +94,29 @@ ai-usage.0.
 
 Only what an account's source actually delivers is created.
 
-### Is it online?
+**The connection icon** sits next to each account, green while it delivers. A throttle keeps it
+green — the last values stay valid while the adapter waits. A rejected sign-in or a broken service
+switch it off at once, an unreachable service after three attempts, so a hiccup does not make it
+flap. `info.error` always names the cause.
 
-Each account carries the connection icon you know from every other device: **green while it
-delivers, struck through when it does not**. The account is linked to its own status state, so
-the icon shows up in the object tree without you configuring anything.
-
-**`info.unreach`** is that marker. **`info.error`** says what is wrong, in a sentence you can read:
-
-| Situation | Icon | `info.error` |
-|-----------|------|--------------|
-| Everything works | connected | empty |
-| Throttled by the provider | **connected** — the last values stay valid while the adapter waits | `Throttled by the provider — retrying in 10 min …` |
-| Sign-in or key rejected | disconnected | `Sign-in rejected — …` |
-| The service reports a fault | disconnected, immediately | `The AI service reports a fault — HTTP 503` |
-| Not reachable at all | disconnected after three attempts in a row, so a hiccup does not make it flap | `Not reachable after 3 attempts — …` |
-
-### Which limit raises the warning
-
-Only **plan-wide** windows — your session and your week — decide `warning`, `limitReached` and
-`total.maxLimitPercent`, and the warning always names the window it came from. A window that
-belongs to a single model keeps its own datapoints but stays out of it: a model you never use can
-sit at 100 % forever, and an alarm that never clears is worse than none. Google is the exception,
-because there every bucket belongs to a model — those are your quota, so they do count.
-
-Want a specific model watched anyway? Build the automation on its own datapoint,
-`limits.<window>.percent`.
+**Only plan-wide windows raise the warning** — your session and your week — and the message names
+the window it came from. A window belonging to a single model keeps its own datapoints but stays
+out of it: a model you never use can sit at 100 % forever, and an alarm that never clears is worse
+than none. Google is the exception, because there every bucket belongs to a model. To watch one
+model anyway, build the automation on its own `limits.<window>.percent`.
 
 ---
 
 ## Troubleshooting
 
 ### An account delivers no data
-Read `info.error` first — it names the cause in plain text. A rejected sign-in means signing in
-again in the settings, or that the key is not an admin key (see Configuration). A service fault
-or a missing connection is outside your instance and clears up by itself. The adapter log states
-the same reason once and raises a single notification.
+Read `info.error` — it names the cause. A rejected sign-in means signing in again in the settings,
+or that the key is not an organisation admin key. A service fault or a missing connection is
+outside your instance and clears up by itself. The log states the same reason once.
 
 ### A subscription says "not signed in" although you just signed in
 Save the settings first, then sign in — the row needs a saved account to attach the sign-in to.
-After a successful sign-in the adapter queries the account immediately, so values appear within
-seconds.
-
-### The object tree changed after updating to 0.3.0
-Accounts now live under fixed ids (`claude`, `chatgpt`, `gemini`, `<name>-api`) and the separate
-`auth` branch is gone — the sign-in state moved into `<account>.info.signedIn`. Old nodes are
-removed automatically, and an existing Claude sign-in is carried over.
+After a successful sign-in the account is queried immediately, so values appear within seconds.
 
 ---
 
