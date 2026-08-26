@@ -28,5 +28,10 @@
     "aiu_instanceNotRunning": "L'istanza non è in esecuzione — avviala per accedere.",
     "aiu_noAnswer": "l'istanza non ha risposto",
     "aiu_noCredentials": "Nessuna credenziale IA salvata — aggiungila in Impostazioni → Credenziali.",
-    "aiu_adminKeyHint": "Questo account richiede una chiave di AMMINISTRAZIONE della tua organizzazione, non quella dell'assistente IA. Gli account personali senza organizzazione non forniscono rapporti di utilizzo."
+    "aiu_adminKeyHint": "Questo account richiede una chiave di AMMINISTRAZIONE della tua organizzazione, non quella dell'assistente IA. Gli account personali senza organizzazione non forniscono rapporti di utilizzo.",
+    "aiu_stOk": "Online",
+    "aiu_stRateLimited": "Limitato",
+    "aiu_stUnauthorized": "Accesso rifiutato",
+    "aiu_stServiceDown": "Servizio offline",
+    "aiu_stNoConnection": "Nessuna connessione"
 }

@@ -1,4 +1,4 @@
-# <img src="https://cdn.jsdelivr.net/gh/krobipd/ioBroker.ai-usage@main/admin/ai-usage.svg" width="48" align="top" /> ioBroker.ai-usage
+# <img src="https://cdn.jsdelivr.net/gh/krobipd/ioBroker.ai-usage@main/admin/ai-usage.svg?v=2" width="48" align="top" /> ioBroker.ai-usage
 
 **Release:** [![npm version](https://img.shields.io/npm/v/iobroker.ai-usage)](https://www.npmjs.com/package/iobroker.ai-usage) ![stable](https://iobroker.live/badges/ai-usage-stable.svg) ![Installations](https://iobroker.live/badges/ai-usage-installed.svg) [![npm downloads](https://img.shields.io/npm/dt/iobroker.ai-usage)](https://www.npmjs.com/package/iobroker.ai-usage)
 
@@ -181,6 +181,7 @@ removed automatically, and an existing Claude sign-in is carried over.
 -->
 ### **WORK IN PROGRESS**
 
+- New: The settings page now shows the service status next to every switched-on account — online, throttled, sign-in rejected, service offline or no connection
 - Changed: The names of the total and per-account limit datapoints now say "plan-wide", matching what they have actually counted since 0.4.0
 
 ### 0.4.0 (2026-08-26)

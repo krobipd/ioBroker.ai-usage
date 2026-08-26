@@ -28,5 +28,10 @@
     "aiu_instanceNotRunning": "Die Instanz läuft nicht — zum Anmelden bitte starten.",
     "aiu_noAnswer": "die Instanz hat nicht geantwortet",
     "aiu_noCredentials": "Noch keine KI-Zugangsdaten gespeichert — im Admin unter Einstellungen → Zugangsdaten anlegen.",
-    "aiu_adminKeyHint": "Dieses Konto braucht einen VERWALTUNGS-Schlüssel Ihrer Organisation, nicht den Schlüssel des Admin-KI-Assistenten. Einzelkonten ohne Organisation können keine Verbrauchs-Berichte liefern."
+    "aiu_adminKeyHint": "Dieses Konto braucht einen VERWALTUNGS-Schlüssel Ihrer Organisation, nicht den Schlüssel des Admin-KI-Assistenten. Einzelkonten ohne Organisation können keine Verbrauchs-Berichte liefern.",
+    "aiu_stOk": "Online",
+    "aiu_stRateLimited": "Gedrosselt",
+    "aiu_stUnauthorized": "Anmeldung abgelehnt",
+    "aiu_stServiceDown": "Dienst offline",
+    "aiu_stNoConnection": "Keine Verbindung"
 }

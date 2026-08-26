@@ -28,5 +28,10 @@
     "aiu_instanceNotRunning": "De instantie draait niet — start deze om aan te melden.",
     "aiu_noAnswer": "de instantie antwoordde niet",
     "aiu_noCredentials": "Nog geen AI-toegangsgegevens opgeslagen — voeg ze toe via Instellingen → Toegangsgegevens.",
-    "aiu_adminKeyHint": "Dit account heeft een BEHEER-sleutel van uw organisatie nodig, niet die van de AI-assistent. Persoonlijke accounts zonder organisatie leveren geen verbruiksrapporten."
+    "aiu_adminKeyHint": "Dit account heeft een BEHEER-sleutel van uw organisatie nodig, niet die van de AI-assistent. Persoonlijke accounts zonder organisatie leveren geen verbruiksrapporten.",
+    "aiu_stOk": "Online",
+    "aiu_stRateLimited": "Beperkt",
+    "aiu_stUnauthorized": "Aanmelding geweigerd",
+    "aiu_stServiceDown": "Dienst offline",
+    "aiu_stNoConnection": "Geen verbinding"
 }

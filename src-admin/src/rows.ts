@@ -29,6 +29,73 @@ export interface KeyProviderOffer {
     needsAdminKey: boolean;
 }
 
+/** Fixed object id per subscription — must match `SUBSCRIPTION_IDS` in the adapter. */
+const SUBSCRIPTION_IDS: Record<string, string> = {
+    'claude-sub': 'claude',
+    'chatgpt-sub': 'chatgpt',
+    'gemini-sub': 'gemini',
+};
+
+/**
+ * The object id of one account — the same rule the adapter uses in `pure-helpers.ts`.
+ *
+ * Kept as a second copy on purpose: the admin panel is its own bundle and cannot
+ * import from the adapter's sources. Both sides must change together, which is why
+ * the rule is deliberately tiny.
+ *
+ * @param provider the provider kind
+ * @param credentialId the central credential id, for key-based accounts
+ * @returns the id, or an empty string when nothing fits
+ */
+export function accountId(provider: string, credentialId: string): string {
+    const fixed = SUBSCRIPTION_IDS[provider];
+    if (fixed) {
+        return fixed;
+    }
+    const suffix = credentialId
+        .replace(/^system\.credentials\./, '')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return suffix ? `${suffix}-api` : '';
+}
+
+/** How a row's service status is shown: which colour, which label. */
+export interface ServiceBadge {
+    /** Translation key of the label. */
+    key: string;
+    /** MUI chip colour. */
+    color: 'success' | 'warning' | 'error' | 'default';
+}
+
+/**
+ * Turn the account's `info.state` into the badge shown in its row.
+ *
+ * `ok` and `rate-limited` both mean the AI service answered — it is online, it just
+ * throttles us — so both are green; only the two states where nothing came back are
+ * red. An unknown or missing value shows nothing rather than guessing.
+ *
+ * @param state the value of `<account>.info.state`
+ * @returns the badge, or null when there is nothing to show
+ */
+export function serviceBadge(state: unknown): ServiceBadge | null {
+    switch (state) {
+        case 'ok':
+            return { key: 'aiu_stOk', color: 'success' };
+        case 'rate-limited':
+            return { key: 'aiu_stRateLimited', color: 'warning' };
+        case 'unauthorized':
+            return { key: 'aiu_stUnauthorized', color: 'warning' };
+        case 'service-down':
+            return { key: 'aiu_stServiceDown', color: 'error' };
+        case 'no-connection':
+            return { key: 'aiu_stNoConnection', color: 'error' };
+        default:
+            return null;
+    }
+}
+
 /** The three subscriptions, in the order the panel lists them. */
 export const SUBSCRIPTIONS: { provider: string; label: string; captionKey: string }[] = [
     { provider: 'claude-sub', label: 'Claude', captionKey: 'aiu_capClaude' },

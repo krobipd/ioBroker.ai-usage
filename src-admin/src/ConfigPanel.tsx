@@ -29,6 +29,8 @@ import {
   offerForCredential,
   setThreshold,
   subscriptionRow,
+  accountId,
+  serviceBadge,
   toggleCredential,
   toggleSubscription,
   type AccountRow,
@@ -52,6 +54,8 @@ interface PanelState extends ConfigGenericState {
   drafts: Record<string, string>;
   /** Provider chosen manually for a credential whose name gives nothing away. */
   providerChoice: Record<string, string>;
+  /** Live `<account>.info.state` per account id — drives the status badge in the row. */
+  serviceState: Record<string, unknown>;
   busy: string;
 }
 
@@ -76,6 +80,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       signIn: {},
       drafts: {},
       providerChoice: {},
+      serviceState: {},
       busy: "",
     };
   }
@@ -83,9 +88,9 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   async componentDidMount(): Promise<void> {
     void super.componentDidMount?.();
     await this.loadCredentials();
-    await this.refreshSignIn();
+    await this.refresh();
     // A device-code sign-in finishes in the adapter, not here — poll while the card is open.
-    this.timer = setInterval(() => void this.refreshSignIn(), 4000);
+    this.timer = setInterval(() => void this.refresh(), 4000);
   }
 
   componentWillUnmount(): void {
@@ -125,6 +130,53 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     } catch {
       this.setState({ credentialsLoaded: true });
     }
+  }
+
+  /** One poll round: sign-in state of the subscriptions plus every row's service status. */
+  private async refresh(): Promise<void> {
+    await this.refreshSignIn();
+    await this.refreshServiceState();
+  }
+
+  /**
+   * Read `<account>.info.state` for every switched-on row.
+   *
+   * This is what makes the online indicator visible where the user actually looks —
+   * the datapoints alone answer the question only for someone who browses the object
+   * tree (krobi 2026-08-26).
+   */
+  private async refreshServiceState(): Promise<void> {
+    const ctx = this.props.oContext;
+    const serviceState: Record<string, unknown> = {};
+    for (const row of this.accounts()) {
+      const id = accountId(row.provider, row.credentialId);
+      if (!id) {
+        continue;
+      }
+      try {
+        const state = await ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.state`);
+        if (state && state.val !== null && state.val !== undefined) {
+          serviceState[id] = state.val;
+        }
+      } catch {
+        // an instance that never ran has no states yet — show nothing, guess nothing
+      }
+    }
+    this.setState({ serviceState });
+  }
+
+  /**
+   * The status badge of one row, or null while the account has never reported.
+   *
+   * @param provider the provider kind
+   * @param credentialId the credential id for key-based accounts
+   */
+  private renderServiceBadge(provider: string, credentialId: string): React.JSX.Element | null {
+    const badge = serviceBadge(this.state.serviceState[accountId(provider, credentialId)]);
+    if (!badge) {
+      return null;
+    }
+    return <Chip size="small" color={badge.color} variant="outlined" label={I18n.t(badge.key)} />;
   }
 
   /** Ask the adapter for the sign-in state of every switched-on subscription. */
@@ -364,6 +416,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
               {I18n.t(entry.captionKey)}
             </Typography>
           </Box>
+          {row ? this.renderServiceBadge(entry.provider, "") : null}
           {row ? this.renderThreshold(`${entry.provider}-t`, row, { provider: entry.provider }) : null}
           <Switch
             checked={!!row}
@@ -424,6 +477,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
               ))}
             </TextField>
           ) : null}
+          {row ? this.renderServiceBadge(row.provider, credential.id) : null}
           {row ? this.renderThreshold(`${credential.id}-t`, row, { credentialId: credential.id }) : null}
           <Switch
             checked={!!row}

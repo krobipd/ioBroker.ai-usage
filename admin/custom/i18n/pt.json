@@ -28,5 +28,10 @@
     "aiu_instanceNotRunning": "A instância não está em execução — inicie-a para entrar.",
     "aiu_noAnswer": "a instância não respondeu",
     "aiu_noCredentials": "Ainda não há credenciais de IA guardadas — adicione-as em Definições → Credenciais.",
-    "aiu_adminKeyHint": "Esta conta precisa de uma chave de ADMINISTRAÇÃO da organização, não da chave do assistente de IA. Contas pessoais sem organização não fornecem relatórios de uso."
+    "aiu_adminKeyHint": "Esta conta precisa de uma chave de ADMINISTRAÇÃO da organização, não da chave do assistente de IA. Contas pessoais sem organização não fornecem relatórios de uso.",
+    "aiu_stOk": "Online",
+    "aiu_stRateLimited": "Limitado",
+    "aiu_stUnauthorized": "Sessão recusada",
+    "aiu_stServiceDown": "Serviço offline",
+    "aiu_stNoConnection": "Sem ligação"
 }

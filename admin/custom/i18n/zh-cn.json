@@ -28,5 +28,10 @@
     "aiu_instanceNotRunning": "实例未运行——请启动后再登录。",
     "aiu_noAnswer": "实例没有响应",
     "aiu_noCredentials": "尚未保存任何 AI 凭据——请在 设置 → 凭据 中添加。",
-    "aiu_adminKeyHint": "此账户需要您所在组织的管理密钥，而不是管理界面 AI 助手使用的密钥。没有组织的个人账户无法提供用量报告。"
+    "aiu_adminKeyHint": "此账户需要您所在组织的管理密钥，而不是管理界面 AI 助手使用的密钥。没有组织的个人账户无法提供用量报告。",
+    "aiu_stOk": "在线",
+    "aiu_stRateLimited": "已限流",
+    "aiu_stUnauthorized": "登录被拒",
+    "aiu_stServiceDown": "服务离线",
+    "aiu_stNoConnection": "无连接"
 }

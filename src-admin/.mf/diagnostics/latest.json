@@ -1,10 +1,10 @@
 {
   "latestErrorEvent": {
     "code": "TYPE-001",
-    "message": "Failed to generate type declaration. Execute the below cmd to reproduce and fix the error. #TYPE-001\nargs: {\"cmd\":\"/Users/krobi/.nvm/versions/node/v22.22.2/bin/node /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/typescript/bin/tsc --project /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/.federation/tsconfig.a2ff4b2e0a52f3e80c5a00f090d38296.json\"}\nView the docs to see how to solve: https://module-federation.io/guide/troubleshooting/type#type-001",
+    "message": "Failed to generate type declaration. Execute the below cmd to reproduce and fix the error. #TYPE-001\nargs: {\"cmd\":\"/Users/krobi/.nvm/versions/node/v22.22.2/bin/node /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/typescript/bin/tsc --project /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/.federation/tsconfig.b163bfadce706c75b8cef6f9b52206ec.json\"}\nView the docs to see how to solve: https://module-federation.io/guide/troubleshooting/type#type-001",
     "args": {
-      "cmd": "/Users/krobi/.nvm/versions/node/v22.22.2/bin/node /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/typescript/bin/tsc --project /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/.federation/tsconfig.a2ff4b2e0a52f3e80c5a00f090d38296.json"
+      "cmd": "/Users/krobi/.nvm/versions/node/v22.22.2/bin/node /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/typescript/bin/tsc --project /Volumes/ssd/claude/iobroker/Entwicklung/iobroker.ai-usage/src-admin/node_modules/.federation/tsconfig.b163bfadce706c75b8cef6f9b52206ec.json"
     },
-    "timestamp": 1787765702314
+    "timestamp": 1787774996468
   }
 }
