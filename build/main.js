@@ -198,7 +198,6 @@ class AiUsageAdapter extends utils.Adapter {
     this.stopDevicePoller(provider);
     const id = import_pure_helpers.SUBSCRIPTION_IDS[provider];
     if (id) {
-      await this.setSignedInState(id, true);
       await ((_a = this.engine) == null ? void 0 : _a.pollNow(id));
     }
     this.log.info(`${provider}: signed in`);
@@ -285,10 +284,6 @@ class AiUsageAdapter extends utils.Adapter {
     this.attempts.delete(provider);
     this.signInErrors.delete(provider);
     this.stopDevicePoller(provider);
-    const id = import_pure_helpers.SUBSCRIPTION_IDS[provider];
-    if (id) {
-      await this.setSignedInState(id, false);
-    }
     return { status: "signed-out" };
   }
   // ------------------------------------------------------------ token files
@@ -402,7 +397,10 @@ class AiUsageAdapter extends utils.Adapter {
         ) : void 0
       });
       await this.engine.start();
-      await this.publishSignedInStates(accounts);
+      const removed = await this.removeRetiredStates(accounts);
+      if (removed > 0) {
+        this.log.info(`Object tree updated: removed ${removed} obsolete status datapoint(s)`);
+      }
       this.log.info(`Monitoring ${providers.size} of ${accounts.length} AI account(s), polling every ${interval} s`);
     } catch (e) {
       this.log.error(`Startup failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -469,40 +467,43 @@ class AiUsageAdapter extends utils.Adapter {
     }
   }
   /**
-   * Create and write `<account>.info.signedIn` for every subscription in the table.
+   * Status states retired in 0.5.0 — `provider` (visible in the node name anyway),
+   * `reachable`/`serviceOnline`/`state` (three spellings of one fact) and `signedIn`
+   * (the settings page asks the adapter directly).
+   *
+   * ioBroker never garbage-collects an object whose id the adapter stopped writing:
+   * it would sit there frozen on its last value and keep lying. So the old ids are
+   * deleted from a fixed list on every start — no state reading, no heuristics.
+   */
+  static RETIRED_INFO_STATES = [
+    "info.provider",
+    "info.reachable",
+    "info.serviceOnline",
+    "info.state",
+    "info.signedIn"
+  ];
+  /**
+   * Remove the retired status states of every configured account.
    *
    * @param accounts the configured accounts
+   * @returns how many objects were actually deleted
    */
-  async publishSignedInStates(accounts) {
+  async removeRetiredStates(accounts) {
+    let removed = 0;
     for (const account of accounts) {
-      if (!import_sign_in.SIGN_IN_FLOWS[account.provider]) {
-        continue;
+      for (const suffix of AiUsageAdapter.RETIRED_INFO_STATES) {
+        const id = `${account.id}.${suffix}`;
+        try {
+          if (await this.getObjectAsync(id)) {
+            await this.delObjectAsync(id);
+            removed++;
+          }
+        } catch (e) {
+          this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
-      const tokens = await this.tokenStore(account.provider).load();
-      await this.setSignedInState(account.id, !!tokens);
     }
-  }
-  /**
-   * Write the sign-in indicator INSIDE the account node — the pre-0.3.0 layout kept
-   * a second `auth.<name>` branch, which showed every subscription twice in the tree.
-   *
-   * @param accountId the account's object id
-   * @param signedIn whether a usable sign-in exists
-   */
-  async setSignedInState(accountId, signedIn) {
-    await this.extendObject(`${accountId}.info.signedIn`, {
-      type: "state",
-      common: {
-        name: { en: "Signed in", de: "Angemeldet" },
-        type: "boolean",
-        role: "indicator",
-        read: true,
-        write: false,
-        def: false
-      },
-      native: {}
-    });
-    await this.setState(`${accountId}.info.signedIn`, { val: signedIn, ack: true });
+    return removed;
   }
   /**
    * Delete object trees that no longer belong to a configured account, plus the

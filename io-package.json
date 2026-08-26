@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "news": {
+      "0.5.0": {
+        "en": "Two status datapoints per account instead of six: an offline marker ioBroker actually shows plus the reason in plain text; the retired ones are removed automatically",
+        "de": "Zwei Status-Datenpunkte je Konto statt sechs: ein Offline-Kennzeichen, das ioBroker wirklich anzeigt, plus den Grund im Klartext; die alten werden automatisch entfernt",
+        "ru": "Два статусных состояния на аккаунт вместо шести: признак «не в сети», который ioBroker действительно показывает, и причина текстом; старые удаляются автоматически",
+        "pt": "Dois pontos de estado por conta em vez de seis: um marcador offline que o ioBroker mostra mesmo, mais o motivo em texto; os antigos são removidos automaticamente",
+        "nl": "Twee statusdatapunten per account in plaats van zes: een offline-markering die ioBroker echt toont, plus de reden in gewone taal; de oude worden automatisch verwijderd",
+        "fr": "Deux points d'état par compte au lieu de six : un marqueur hors ligne qu'ioBroker affiche vraiment, plus la raison en clair ; les anciens sont supprimés automatiquement",
+        "it": "Due punti di stato per account invece di sei: un contrassegno offline che ioBroker mostra davvero e il motivo in chiaro; quelli superati vengono rimossi automaticamente",
+        "es": "Dos puntos de estado por cuenta en lugar de seis: un marcador de desconexión que ioBroker sí muestra y el motivo en texto claro; los antiguos se eliminan automáticamente",
+        "pl": "Dwa punkty stanu na konto zamiast sześciu: znacznik offline, który ioBroker naprawdę pokazuje, oraz powód tekstem; stare są usuwane automatycznie",
+        "uk": "Дві точки стану на акаунт замість шести: позначка «не в мережі», яку ioBroker справді показує, і причина текстом; застарілі видаляються автоматично",
+        "zh-cn": "每个账户从六个状态数据点减到两个：ioBroker 真正会显示的离线标记，加上纯文本的原因；旧的会被自动删除"
+      },
       "0.4.0": {
         "en": "Limits of a single model no longer report the whole account as full, every account shows whether the AI service itself is online, plus Sentry error reporting and a new icon",
         "de": "Limits eines einzelnen Modells melden nicht mehr das ganze Konto als voll, jedes Konto zeigt ob der KI-Dienst selbst online ist, dazu Fehlerberichte über Sentry und ein neues Symbol",

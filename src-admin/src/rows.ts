@@ -66,34 +66,35 @@ export interface ServiceBadge {
     /** Translation key of the label. */
     key: string;
     /** MUI chip colour. */
-    color: 'success' | 'warning' | 'error' | 'default';
+    color: 'success' | 'warning' | 'error';
+    /** The plain-text reason, shown on hover; empty while everything works. */
+    title: string;
 }
 
 /**
- * Turn the account's `info.state` into the badge shown in its row.
+ * Turn an account's two status states into the badge shown in its row.
  *
- * `ok` and `rate-limited` both mean the AI service answered — it is online, it just
- * throttles us — so both are green; only the two states where nothing came back are
- * red. An unknown or missing value shows nothing rather than guessing.
+ * `unreach` is the AI service itself being unreachable — that is the red case. A
+ * rejected sign-in or a throttle leave the service reachable but stop the data, so
+ * they are amber with the reason on hover. Nothing known yet shows nothing at all
+ * rather than a guess.
  *
- * @param state the value of `<account>.info.state`
- * @returns the badge, or null when there is nothing to show
+ * @param unreach value of `<account>.info.unreach`
+ * @param error value of `<account>.info.error`
+ * @returns the badge, or null while the account has never reported
  */
-export function serviceBadge(state: unknown): ServiceBadge | null {
-    switch (state) {
-        case 'ok':
-            return { key: 'aiu_stOk', color: 'success' };
-        case 'rate-limited':
-            return { key: 'aiu_stRateLimited', color: 'warning' };
-        case 'unauthorized':
-            return { key: 'aiu_stUnauthorized', color: 'warning' };
-        case 'service-down':
-            return { key: 'aiu_stServiceDown', color: 'error' };
-        case 'no-connection':
-            return { key: 'aiu_stNoConnection', color: 'error' };
-        default:
-            return null;
+export function serviceBadge(unreach: unknown, error: unknown): ServiceBadge | null {
+    if (unreach === undefined || unreach === null) {
+        return null;
     }
+    const reason = typeof error === 'string' ? error : '';
+    if (unreach === true) {
+        return { key: 'aiu_stOffline', color: 'error', title: reason };
+    }
+    if (reason) {
+        return { key: 'aiu_stLimited', color: 'warning', title: reason };
+    }
+    return { key: 'aiu_stOnline', color: 'success', title: '' };
 }
 
 /** The three subscriptions, in the order the panel lists them. */

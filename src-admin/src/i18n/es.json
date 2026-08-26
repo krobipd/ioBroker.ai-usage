@@ -29,9 +29,7 @@
     "aiu_noAnswer": "la instancia no respondió",
     "aiu_noCredentials": "Aún no hay credenciales de IA guardadas — añádalas en Ajustes → Credenciales.",
     "aiu_adminKeyHint": "Esta cuenta necesita una clave de ADMINISTRACIÓN de su organización, no la del asistente de IA. Las cuentas personales sin organización no ofrecen informes de uso.",
-    "aiu_stOk": "En línea",
-    "aiu_stRateLimited": "Limitado",
-    "aiu_stUnauthorized": "Acceso rechazado",
-    "aiu_stServiceDown": "Servicio sin conexión",
-    "aiu_stNoConnection": "Sin conexión"
+    "aiu_stOnline": "En línea",
+    "aiu_stLimited": "Limitado",
+    "aiu_stOffline": "Sin conexión"
 }

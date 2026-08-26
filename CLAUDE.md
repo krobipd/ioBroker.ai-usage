@@ -97,10 +97,18 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     NICHTS — dort sind die Modell-Eimer das ganze Kontingent. Jede Warnmeldung nennt das Fenster.
 11. **Vier Fehlerklassen, damit „offline" etwas bedeutet**: `auth` und `rate-limit` heißen, der
     Dienst hat GEANTWORTET (er ist online, er sagt nur nein), `service` = er meldet eigenen Defekt
-    (sofort als offline gewertet, er hat es uns ja gesagt), `network` = nie erreicht (erst nach
-    3 Versuchen, sonst flattert die Anzeige). Ergebnis: `info.serviceOnline` + `info.state`
-    (ok/unauthorized/rate-limited/service-down/no-connection), beide nur bei ÄNDERUNG geschrieben —
-    ein zyklisch neu geschriebener Indikator flutet die Historie (govee-Lehre).
+    (sofort offline, er hat es uns ja gesagt), `network` = nie erreicht (erst nach 3 Versuchen,
+    sonst flattert die Anzeige).
+12. **ZWEI Status-Datenpunkte je Konto, an ioBrokers eigenen Plätzen** (krobi 2026-08-26, nachdem
+    ich sechs angelegt hatte, von denen zwei etwas sagten): `info.unreach` (Ja/Nein) ist das
+    Offline-Kennzeichen, das der Typ-Erkenner kennt — `indicator.reachable` ist dort ausdrücklich
+    VERALTET, deshalb sah man von den alten Datenpunkten nirgends ein Symbol. `info.error` trägt
+    den Grund im Klartext. **Nicht** mit der Rolle `indicator.error`: die zwei offiziellen Quellen
+    widersprechen sich (Typ-Erkenner: Text, Gültigkeits-Liste des Prüfbots: nur Ja/Nein → E1009) —
+    Gültigkeit gewinnt, der Text läuft auf `text`. Beide nur bei ÄNDERUNG geschrieben (govee-Lehre).
+    Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` — beim Start
+    deterministisch gelöscht (feste Liste, kein Zustands-Raten), ioBroker räumt Verwaistes nie
+    selbst weg, ein toter Datenpunkt lügt weiter.
 
 ## Tests
 

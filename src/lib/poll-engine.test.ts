@@ -98,11 +98,11 @@ describe("PollEngine", () => {
     const provider = scriptedProvider([{ credits: { used: 41.2, limit: 100, percent: 41.2, currency: "USD" } }]);
     const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
     await engine.start();
-    expect(h.objects).toEqual(expect.arrayContaining(["router", "router.info.reachable", "total.costs.today"]));
+    expect(h.objects).toEqual(expect.arrayContaining(["router", "router.info.unreach", "router.info.error", "total.costs.today"]));
     await h.tick();
     expect(provider.fetches).toBe(1);
     expect(h.states.get("router.credits.used")).toBe(41.2);
-    expect(h.states.get("router.info.reachable")).toBe(true);
+    expect(h.states.get("router.info.unreach")).toBe(false);
     expect(h.states.get("info.connection")).toBe(true);
     expect(h.states.get("total.accountsReachable")).toBe(1);
     expect(h.states.get("router.warning")).toBe(false);
@@ -127,7 +127,7 @@ describe("PollEngine", () => {
     expect(h.states.get("total.warningsActive")).toBe(1);
   });
 
-  test("auth failure: unreachable + one notification, recovery resets it", async () => {
+  test("auth failure: one notification, service stays marked reachable, recovery resets it", async () => {
     const h = makeHarness();
     const authFail = (): never => {
       throw new FetchError("auth", "401");
@@ -136,12 +136,14 @@ describe("PollEngine", () => {
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
-    expect(h.states.get("a.info.reachable")).toBe(false);
+    // the service answered with 401 — it is up, so the offline marker stays off
+    expect(h.states.get("a.info.unreach")).toBe(false);
+    expect(String(h.states.get("a.info.error"))).toContain("Sign-in rejected");
     expect(h.notifications).toHaveLength(1);
     await h.tick(); // still broken — no second notification
     expect(h.notifications).toHaveLength(1);
     await h.tick(); // recovers
-    expect(h.states.get("a.info.reachable")).toBe(true);
+    expect(h.states.get("a.info.error")).toBe("");
     await h.tick(); // breaks again → a NEW notification
     expect(h.notifications).toHaveLength(2);
   });
@@ -180,11 +182,11 @@ describe("PollEngine", () => {
     await engine.start();
     await h.tick(); // ok
     await h.tick(); // fail 1
-    expect(h.states.get("router.info.reachable")).toBe(true);
+    expect(h.states.get("router.info.unreach")).toBe(false);
     await h.tick(); // fail 2
-    expect(h.states.get("router.info.reachable")).toBe(true);
+    expect(h.states.get("router.info.unreach")).toBe(false);
     await h.tick(); // fail 3
-    expect(h.states.get("router.info.reachable")).toBe(false);
+    expect(h.states.get("router.info.unreach")).toBe(true);
     expect(h.states.get("info.connection")).toBe(false);
   });
 
@@ -258,9 +260,9 @@ describe("PollEngine", () => {
     await engine.start();
     await h.tick();
     await h.tick();
-    expect(h.states.get("a.info.serviceOnline")).toBe(true);
-    expect(h.states.get("a.info.state")).toBe("unauthorized");
-    expect(h.states.get("a.info.reachable")).toBe(false);
+    // the service answered with 401 — it is up, only our access is broken
+    expect(h.states.get("a.info.unreach")).toBe(false);
+    expect(String(h.states.get("a.info.error"))).toContain("Sign-in rejected");
   });
 
   test("a fault reported BY the service marks it offline at once, without three strikes", async () => {
@@ -274,10 +276,10 @@ describe("PollEngine", () => {
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
-    expect(h.states.get("a.info.serviceOnline")).toBe(true);
+    expect(h.states.get("a.info.unreach")).toBe(false);
     await h.tick();
-    expect(h.states.get("a.info.serviceOnline")).toBe(false);
-    expect(h.states.get("a.info.state")).toBe("service-down");
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(String(h.states.get("a.info.error"))).toContain("reports a fault");
   });
 
   test("a single transport hiccup does not make the indicator flap", async () => {
@@ -293,10 +295,10 @@ describe("PollEngine", () => {
     await engine.start();
     await h.tick();
     await h.tick();
-    expect(h.states.get("a.info.serviceOnline")).toBe(true);
-    expect(h.states.get("a.info.state")).toBe("ok");
+    expect(h.states.get("a.info.unreach")).toBe(false);
+    expect(h.states.get("a.info.error")).toBe("");
     await h.tick();
-    expect(h.states.get("a.info.state")).toBe("ok");
+    expect(h.states.get("a.info.error")).toBe("");
   });
 
   test("three transport failures in a row report no connection", async () => {
@@ -316,8 +318,8 @@ describe("PollEngine", () => {
     await h.tick();
     await h.tick();
     await h.tick();
-    expect(h.states.get("a.info.serviceOnline")).toBe(false);
-    expect(h.states.get("a.info.state")).toBe("no-connection");
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(String(h.states.get("a.info.error"))).toContain("Not reachable");
   });
 
   test("an unchanged state is not written again", async () => {
@@ -335,8 +337,8 @@ describe("PollEngine", () => {
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
-    const before = writes.filter(id => id === "a.info.state").length;
+    const before = writes.filter(id => id === "a.info.error").length;
     await h.tick();
-    expect(writes.filter(id => id === "a.info.state").length).toBe(before);
+    expect(writes.filter(id => id === "a.info.error").length).toBe(before);
   });
 });

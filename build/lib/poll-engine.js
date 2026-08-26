@@ -54,6 +54,7 @@ class PollEngine {
         authNotified: false,
         serviceOnline: false,
         state: "no-connection",
+        error: "waiting for the first query",
         createdObjects: /* @__PURE__ */ new Set(),
         written: /* @__PURE__ */ new Map()
       });
@@ -127,6 +128,7 @@ class PollEngine {
       runtime.status.reachable = true;
       runtime.serviceOnline = true;
       runtime.state = "ok";
+      runtime.error = "";
       await this.applySnapshot(runtime, snapshot);
     } catch (e) {
       this.handleFailure(runtime, e);
@@ -188,6 +190,7 @@ class PollEngine {
       runtime.status.reachable = false;
       runtime.serviceOnline = true;
       runtime.state = "unauthorized";
+      runtime.error = `Sign-in rejected \u2014 ${message}`;
       if (!runtime.authNotified) {
         runtime.authNotified = true;
         const text = `${config.name}: credentials rejected \u2014 ${message}`;
@@ -199,6 +202,7 @@ class PollEngine {
     if (error instanceof import_provider.FetchError && error.kind === "rate-limit") {
       runtime.serviceOnline = true;
       runtime.state = "rate-limited";
+      runtime.error = `Throttled by the provider \u2014 retrying in ${Math.round(runtime.backoffMs / 6e4)} min, last values kept`;
       runtime.skipUntil = this.deps.now() + runtime.backoffMs;
       this.deps.log.warn(
         `${config.name}: rate-limited \u2014 backing off for ${Math.round(runtime.backoffMs / 6e4)} min, keeping last values`
@@ -214,6 +218,7 @@ class PollEngine {
       }
       runtime.serviceOnline = false;
       runtime.state = "service-down";
+      runtime.error = `The AI service reports a fault \u2014 ${message}`;
       return;
     }
     runtime.failCount++;
@@ -225,6 +230,7 @@ class PollEngine {
       }
       runtime.serviceOnline = false;
       runtime.state = "no-connection";
+      runtime.error = `Not reachable after ${runtime.failCount} attempts \u2014 ${message}`;
     }
   }
   /**
@@ -234,12 +240,25 @@ class PollEngine {
    */
   writeAccountInfo(runtime) {
     const { config } = runtime;
-    this.deps.setState(`${config.id}.info.reachable`, runtime.status.reachable);
-    this.setIfChanged(runtime, `${config.id}.info.serviceOnline`, runtime.serviceOnline);
-    this.setIfChanged(runtime, `${config.id}.info.state`, runtime.state);
+    this.writeAccountStatus(runtime);
     if (runtime.status.reachable) {
       this.deps.setState(`${config.id}.info.lastUpdate`, new Date(this.deps.now()).toISOString());
     }
+  }
+  /**
+   * Write the two status states.
+   *
+   * `unreach` says whether the AI SERVICE answered at all — a rejected sign-in or a
+   * throttle both mean it is up, so those leave the marker off and only fill the
+   * error text. Both are written on change only: an indicator rewritten every cycle
+   * floods the history and hides the real transition.
+   *
+   * @param runtime the account's runtime
+   */
+  writeAccountStatus(runtime) {
+    const { config } = runtime;
+    this.setIfChanged(runtime, `${config.id}.info.unreach`, !runtime.serviceOnline);
+    this.setIfChanged(runtime, `${config.id}.info.error`, runtime.error);
   }
   /**
    * Write a state only when its value actually changed since the last write.
@@ -280,30 +299,27 @@ class PollEngine {
       { id: config.id, type: "device", common: { name: `${config.name} (${config.provider})` } },
       { id: `${config.id}.info`, type: "channel", common: { name: "Info" } },
       {
-        id: `${config.id}.info.provider`,
-        type: "state",
-        common: { name: "Provider", type: "string", role: "text", read: true, write: false }
-      },
-      {
-        id: `${config.id}.info.reachable`,
-        type: "state",
-        common: { name: "Reachable", type: "boolean", role: "indicator.reachable", read: true, write: false }
-      },
-      {
-        id: `${config.id}.info.serviceOnline`,
-        type: "state",
-        common: { name: "AI service online", type: "boolean", role: "indicator.connected", read: true, write: false }
-      },
-      {
-        id: `${config.id}.info.state`,
+        // The two slots ioBroker itself provides for this — measured against
+        // @iobroker/type-detector 6.0.0: `unreach` is the offline marker every
+        // device type carries (`indicator.reachable` is deprecated there), and
+        // `indicator.error` is the standard home for the reason.
+        id: `${config.id}.info.unreach`,
         type: "state",
         common: {
-          name: "State (ok, unauthorized, rate-limited, service-down, no-connection)",
-          type: "string",
-          role: "text",
+          name: "AI service not reachable",
+          type: "boolean",
+          role: "indicator.maintenance.unreach",
           read: true,
           write: false
         }
+      },
+      {
+        // NOT `indicator.error`: the two official sources disagree — the type-detector
+        // lists that role as a String, the repochecker's validity whitelist allows
+        // boolean only (E1009). Validity wins, so the message rides on `text`.
+        id: `${config.id}.info.error`,
+        type: "state",
+        common: { name: "Last error", type: "string", role: "text", read: true, write: false }
       },
       {
         id: `${config.id}.info.lastUpdate`,
@@ -331,10 +347,7 @@ class PollEngine {
       await this.deps.upsertObject(def);
       runtime.createdObjects.add(def.id);
     }
-    this.deps.setState(`${config.id}.info.provider`, config.provider);
-    this.deps.setState(`${config.id}.info.reachable`, false);
-    this.setIfChanged(runtime, `${config.id}.info.serviceOnline`, runtime.serviceOnline);
-    this.setIfChanged(runtime, `${config.id}.info.state`, runtime.state);
+    this.writeAccountStatus(runtime);
   }
   /** The totals skeleton (channel + states). */
   async createTotalsSkeleton() {

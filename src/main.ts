@@ -217,7 +217,6 @@ export class AiUsageAdapter extends utils.Adapter {
     this.stopDevicePoller(provider);
     const id = SUBSCRIPTION_IDS[provider];
     if (id) {
-      await this.setSignedInState(id, true);
       await this.engine?.pollNow(id);
     }
     this.log.info(`${provider}: signed in`);
@@ -308,10 +307,6 @@ export class AiUsageAdapter extends utils.Adapter {
     this.attempts.delete(provider);
     this.signInErrors.delete(provider);
     this.stopDevicePoller(provider);
-    const id = SUBSCRIPTION_IDS[provider];
-    if (id) {
-      await this.setSignedInState(id, false);
-    }
     return { status: "signed-out" };
   }
 
@@ -437,7 +432,10 @@ export class AiUsageAdapter extends utils.Adapter {
           : undefined,
       });
       await this.engine.start();
-      await this.publishSignedInStates(accounts);
+      const removed = await this.removeRetiredStates(accounts);
+      if (removed > 0) {
+        this.log.info(`Object tree updated: removed ${removed} obsolete status datapoint(s)`);
+      }
       this.log.info(`Monitoring ${providers.size} of ${accounts.length} AI account(s), polling every ${interval} s`);
     } catch (e) {
       this.log.error(`Startup failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -507,41 +505,46 @@ export class AiUsageAdapter extends utils.Adapter {
   }
 
   /**
-   * Create and write `<account>.info.signedIn` for every subscription in the table.
+   * Status states retired in 0.5.0 — `provider` (visible in the node name anyway),
+   * `reachable`/`serviceOnline`/`state` (three spellings of one fact) and `signedIn`
+   * (the settings page asks the adapter directly).
    *
-   * @param accounts the configured accounts
+   * ioBroker never garbage-collects an object whose id the adapter stopped writing:
+   * it would sit there frozen on its last value and keep lying. So the old ids are
+   * deleted from a fixed list on every start — no state reading, no heuristics.
    */
-  private async publishSignedInStates(accounts: readonly AccountConfig[]): Promise<void> {
-    for (const account of accounts) {
-      if (!SIGN_IN_FLOWS[account.provider]) {
-        continue;
-      }
-      const tokens = await this.tokenStore(account.provider).load();
-      await this.setSignedInState(account.id, !!tokens);
-    }
-  }
+  private static readonly RETIRED_INFO_STATES = [
+    "info.provider",
+    "info.reachable",
+    "info.serviceOnline",
+    "info.state",
+    "info.signedIn",
+  ];
 
   /**
-   * Write the sign-in indicator INSIDE the account node — the pre-0.3.0 layout kept
-   * a second `auth.<name>` branch, which showed every subscription twice in the tree.
+   * Remove the retired status states of every configured account.
    *
-   * @param accountId the account's object id
-   * @param signedIn whether a usable sign-in exists
+   * @param accounts the configured accounts
+   * @returns how many objects were actually deleted
    */
-  private async setSignedInState(accountId: string, signedIn: boolean): Promise<void> {
-    await this.extendObject(`${accountId}.info.signedIn`, {
-      type: "state",
-      common: {
-        name: { en: "Signed in", de: "Angemeldet" },
-        type: "boolean",
-        role: "indicator",
-        read: true,
-        write: false,
-        def: false,
-      },
-      native: {},
-    });
-    await this.setState(`${accountId}.info.signedIn`, { val: signedIn, ack: true });
+  private async removeRetiredStates(accounts: readonly AccountConfig[]): Promise<number> {
+    let removed = 0;
+    for (const account of accounts) {
+      for (const suffix of AiUsageAdapter.RETIRED_INFO_STATES) {
+        const id = `${account.id}.${suffix}`;
+        try {
+          // Existence-checked so the log line can report a real number; these are
+          // stable dead orphans, never touched concurrently.
+          if (await this.getObjectAsync(id)) {
+            await this.delObjectAsync(id);
+            removed++;
+          }
+        } catch (e) {
+          this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+    return removed;
   }
 
   /**

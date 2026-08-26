@@ -29,9 +29,7 @@
     "aiu_noAnswer": "l'instance n'a pas répondu",
     "aiu_noCredentials": "Aucun identifiant IA enregistré — ajoutez-les via Réglages → Identifiants.",
     "aiu_adminKeyHint": "Ce compte nécessite une clé d'ADMINISTRATION de votre organisation, pas celle de l'assistant IA. Les comptes personnels sans organisation ne fournissent pas de rapports d'utilisation.",
-    "aiu_stOk": "En ligne",
-    "aiu_stRateLimited": "Limité",
-    "aiu_stUnauthorized": "Connexion refusée",
-    "aiu_stServiceDown": "Service hors ligne",
-    "aiu_stNoConnection": "Pas de connexion"
+    "aiu_stOnline": "En ligne",
+    "aiu_stLimited": "Limité",
+    "aiu_stOffline": "Hors ligne"
 }

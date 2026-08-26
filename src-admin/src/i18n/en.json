@@ -29,9 +29,7 @@
     "aiu_noAnswer": "the instance did not answer",
     "aiu_noCredentials": "No AI credentials stored yet — add them in the admin under Settings → Credentials.",
     "aiu_adminKeyHint": "This account needs an ADMIN key of your organisation, not the key the admin AI assistant uses. Personal accounts without an organisation cannot deliver usage reports.",
-    "aiu_stOk": "Online",
-    "aiu_stRateLimited": "Throttled",
-    "aiu_stUnauthorized": "Sign-in rejected",
-    "aiu_stServiceDown": "Service offline",
-    "aiu_stNoConnection": "No connection"
+    "aiu_stOnline": "Online",
+    "aiu_stLimited": "Limited",
+    "aiu_stOffline": "Offline"
 }

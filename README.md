@@ -1,4 +1,4 @@
-# <img src="https://cdn.jsdelivr.net/gh/krobipd/ioBroker.ai-usage@main/admin/ai-usage.svg?v=2" width="48" align="top" /> ioBroker.ai-usage
+# <img src="https://cdn.jsdelivr.net/gh/krobipd/ioBroker.ai-usage@main/admin/ai-usage.svg?v=3" width="48" align="top" /> ioBroker.ai-usage
 
 **Release:** [![npm version](https://img.shields.io/npm/v/iobroker.ai-usage)](https://www.npmjs.com/package/iobroker.ai-usage) ![stable](https://iobroker.live/badges/ai-usage-stable.svg) ![Installations](https://iobroker.live/badges/ai-usage-installed.svg) [![npm downloads](https://img.shields.io/npm/dt/iobroker.ai-usage)](https://www.npmjs.com/package/iobroker.ai-usage)
 
@@ -21,7 +21,7 @@ accounts — as clean datapoints for dashboards, history and automations ("send 
 - **Three subscriptions** — Claude, ChatGPT and Google are signed in with your own account; the settings page guides each sign-in step by step
 - **Central credentials** — API keys live in the admin's central credential storage and are shared with the admin AI assistant
 - **Read-only by design** — the adapter only reads usage data; it never calls, configures or writes to any AI service
-- **Service status per account** — one indicator that tells apart "the AI service is down", "your sign-in is rejected" and "this host has no connection"
+- **Online status per account** — ioBroker's standard offline marker plus a plain-text reason that tells "the AI service is down" apart from "your sign-in is rejected"
 - **Throttle-safe polling** — a hard minimum interval and automatic backoff protect your accounts from provider rate-limit lockouts
 
 ---
@@ -111,17 +111,14 @@ ai-usage.0.
 ├── claude / chatgpt / gemini  — one node per subscription
 │   ├── warning                — this account is above its warn threshold (bool)
 │   ├── limitReached           — a plan-wide window of this account is full (bool)
-│   ├── info.serviceOnline     — the AI service itself answered (bool)
-│   ├── info.state             — ok · unauthorized · rate-limited · service-down · no-connection
-│   ├── info.reachable         — usage data was read successfully (bool)
-│   ├── info.signedIn          — the sign-in is in place (bool)
-│   ├── info.provider          — which provider this node speaks to
+│   ├── info.unreach           — the AI service is not reachable (bool, ioBroker's offline marker)
+│   ├── info.error             — why there is no data, in plain text; empty while all is well
 │   ├── info.lastUpdate        — time of the last successful read
 │   ├── limits.<window>.*      — percent + reset time (session, week, per model, …)
 │   └── credits.*              — where the provider reports a balance
 └── <name>-api                 — one node per key-based account
     ├── warning / limitReached — same triggers as above
-    ├── info.*                 — same status states as above (no signedIn — it uses a key)
+    ├── info.*                 — same three status states as above
     ├── credits.* / costs.*    — granted budget and real money
     └── tokens.*               — token counters
 ```
@@ -130,15 +127,21 @@ Only what an account's source actually delivers is created.
 
 ### Is it online?
 
-`info.serviceOnline` answers "is the AI service itself up", `info.state` says why not:
+**`info.unreach`** is the online/offline marker — the same one ioBroker uses for every device,
+so the account shows up as offline wherever your visualisation or script looks for it. It goes
+on only when the AI service itself did not answer: a fault reported by the service switches it
+on immediately, an unreachable host after three attempts in a row, so a single hiccup does not
+make it flap.
 
-| State | What happened |
-|-------|---------------|
-| `ok` | Data was read |
-| `unauthorized` | The service answered, but rejects the sign-in or key — the service is **up** |
-| `rate-limited` | The service answered with a throttle; the adapter backs off and keeps the last values |
-| `service-down` | The service answered with a fault of its own (reported immediately) |
-| `no-connection` | The service was not reachable at all — reported after three attempts in a row, so a single hiccup does not flip the indicator |
+**`info.error`** says what is wrong, in a sentence you can read:
+
+| Situation | `info.unreach` | `info.error` |
+|-----------|----------------|--------------|
+| Everything works | off | empty |
+| Sign-in or key rejected | **off** — the service answered, only your access is broken | `Sign-in rejected — …` |
+| Throttled by the provider | **off** — the service answered; last values are kept | `Throttled by the provider — retrying in 10 min …` |
+| The service reports a fault | **on** | `The AI service reports a fault — HTTP 503` |
+| Not reachable at all | **on** | `Not reachable after 3 attempts — …` |
 
 ### Which limit raises the warning
 
@@ -156,10 +159,10 @@ Want a specific model watched anyway? Build the automation on its own datapoint,
 ## Troubleshooting
 
 ### An account delivers no data
-Read `info.state` first, it names the cause: `unauthorized` means the sign-in expired (sign in
-again in the settings) or the key is not an admin key (see Configuration); `service-down` and
-`no-connection` are outside your instance and clear up by themselves. The adapter log states the
-same reason once and raises a single notification.
+Read `info.error` first — it names the cause in plain text. A rejected sign-in means signing in
+again in the settings, or that the key is not an admin key (see Configuration). A service fault
+or a missing connection is outside your instance and clears up by itself. The adapter log states
+the same reason once and raises a single notification.
 
 ### A subscription says "not signed in" although you just signed in
 Save the settings first, then sign in — the row needs a saved account to attach the sign-in to.
@@ -179,9 +182,10 @@ removed automatically, and an existing Claude sign-in is carried over.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.5.0 (2026-08-26)
 
-- New: The settings page now shows the service status next to every switched-on account — online, throttled, sign-in rejected, service offline or no connection
+- Changed: Each account now has two status datapoints instead of six — an offline marker ioBroker actually shows, and the reason in plain text. The retired ones are deleted on start
+- New: The settings page shows every switched-on account as online, limited or offline at a glance, with the full reason in plain text when you hover the badge
 - Changed: The names of the total and per-account limit datapoints now say "plan-wide", matching what they have actually counted since 0.4.0
 
 ### 0.4.0 (2026-08-26)
@@ -207,12 +211,6 @@ removed automatically, and an existing Claude sign-in is carried over.
 ### 0.1.0 (2026-08-25)
 
 - New: First release — reads usage limits, credits and costs of your Claude, OpenAI, Anthropic, OpenRouter and DeepSeek accounts into datapoints, with one warning at your chosen threshold
-
-### 0.0.1 (2026-08-25)
-
-- Initial development version
-
----
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

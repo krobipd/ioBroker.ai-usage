@@ -154,9 +154,11 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
         continue;
       }
       try {
-        const state = await ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.state`);
-        if (state && state.val !== null && state.val !== undefined) {
-          serviceState[id] = state.val;
+        const unreach = await ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.unreach`);
+        const error = await ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.error`);
+        if (unreach && unreach.val !== null && unreach.val !== undefined) {
+          serviceState[`${id}.unreach`] = unreach.val;
+          serviceState[`${id}.error`] = error?.val ?? "";
         }
       } catch {
         // an instance that never ran has no states yet — show nothing, guess nothing
@@ -172,11 +174,14 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
    * @param credentialId the credential id for key-based accounts
    */
   private renderServiceBadge(provider: string, credentialId: string): React.JSX.Element | null {
-    const badge = serviceBadge(this.state.serviceState[accountId(provider, credentialId)]);
+    const id = accountId(provider, credentialId);
+    const badge = serviceBadge(this.state.serviceState[`${id}.unreach`], this.state.serviceState[`${id}.error`]);
     if (!badge) {
       return null;
     }
-    return <Chip size="small" color={badge.color} variant="outlined" label={I18n.t(badge.key)} />;
+    return (
+      <Chip size="small" color={badge.color} variant="outlined" label={I18n.t(badge.key)} title={badge.title} />
+    );
   }
 
   /** Ask the adapter for the sign-in state of every switched-on subscription. */

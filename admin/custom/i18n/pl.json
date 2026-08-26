@@ -29,9 +29,7 @@
     "aiu_noAnswer": "instancja nie odpowiedziała",
     "aiu_noCredentials": "Brak zapisanych danych dostępu AI — dodaj je w Ustawienia → Dane dostępu.",
     "aiu_adminKeyHint": "To konto wymaga klucza ADMINISTRACYJNEGO organizacji, a nie klucza asystenta AI. Konta osobiste bez organizacji nie dostarczają raportów zużycia.",
-    "aiu_stOk": "Online",
-    "aiu_stRateLimited": "Ograniczone",
-    "aiu_stUnauthorized": "Logowanie odrzucone",
-    "aiu_stServiceDown": "Usługa offline",
-    "aiu_stNoConnection": "Brak połączenia"
+    "aiu_stOnline": "Online",
+    "aiu_stLimited": "Ograniczone",
+    "aiu_stOffline": "Offline"
 }
