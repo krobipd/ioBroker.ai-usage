@@ -90,8 +90,8 @@ Add such a key as its own entry in the credential storage (template "Key") and p
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| **Warn at %** | Per account: one notification when a limit window crosses this utilisation | 80 |
-| **Poll interval** | How often each account is queried (seconds) | 300 |
+| **Warn at %** | Per account: one notification when a plan-wide limit window crosses this utilisation | 80 |
+| **Poll interval** | How often each account is queried, 60–3600 seconds. The floor is deliberate — asking too often gets the account throttled by the provider | 300 |
 | **Notifications** | One notification on threshold crossing or broken credentials | on |
 
 ---
@@ -100,21 +100,28 @@ Add such a key as its own entry in the credential storage (template "Key") and p
 
 ```
 ai-usage.0.
-├── info.connection            — at least one account reachable (bool)
+├── info.connection            — at least one account is delivering data (bool)
 ├── total.                     — totals across all accounts
-│   ├── costs.*                — summed real money (same currency only)
-│   ├── maxLimitPercent        — highest window utilisation of any account
+│   ├── costs.today/month/…    — summed real money (same currency only)
+│   ├── maxLimitPercent        — highest plan-wide utilisation of any account
 │   ├── warningsActive         — number of accounts above their threshold
-│   └── limitReached           — any window full (automation trigger)
+│   ├── limitReached           — a plan-wide window is full (automation trigger)
+│   ├── accountsReachable      — accounts currently delivering data
+│   └── accounts               — configured accounts
 ├── claude / chatgpt / gemini  — one node per subscription
+│   ├── warning                — this account is above its warn threshold (bool)
+│   ├── limitReached           — a plan-wide window of this account is full (bool)
 │   ├── info.serviceOnline     — the AI service itself answered (bool)
 │   ├── info.state             — ok · unauthorized · rate-limited · service-down · no-connection
 │   ├── info.reachable         — usage data was read successfully (bool)
 │   ├── info.signedIn          — the sign-in is in place (bool)
+│   ├── info.provider          — which provider this node speaks to
+│   ├── info.lastUpdate        — time of the last successful read
 │   ├── limits.<window>.*      — percent + reset time (session, week, per model, …)
 │   └── credits.*              — where the provider reports a balance
 └── <name>-api                 — one node per key-based account
-    ├── info.*                 — same status states as above
+    ├── warning / limitReached — same triggers as above
+    ├── info.*                 — same status states as above (no signedIn — it uses a key)
     ├── credits.* / costs.*    — granted budget and real money
     └── tokens.*               — token counters
 ```
@@ -133,18 +140,26 @@ Only what an account's source actually delivers is created.
 | `service-down` | The service answered with a fault of its own (reported immediately) |
 | `no-connection` | The service was not reachable at all — reported after three attempts in a row, so a single hiccup does not flip the indicator |
 
-Model-specific limit windows (for example a single model's weekly quota) get their own
-datapoints but never raise the account's warning: a model you never use can sit at 100 %
-forever, and an alarm that never clears is worse than none.
+### Which limit raises the warning
+
+Only **plan-wide** windows — your session and your week — decide `warning`, `limitReached` and
+`total.maxLimitPercent`, and the warning always names the window it came from. A window that
+belongs to a single model keeps its own datapoints but stays out of it: a model you never use can
+sit at 100 % forever, and an alarm that never clears is worse than none. Google is the exception,
+because there every bucket belongs to a model — those are your quota, so they do count.
+
+Want a specific model watched anyway? Build the automation on its own datapoint,
+`limits.<window>.percent`.
 
 ---
 
 ## Troubleshooting
 
-### An account shows `reachable = false`
-Check the adapter log — an authentication failure states the reason and raises one notification.
-For a subscription this usually means the sign-in expired: sign in again in the settings. For an
-OpenAI or Anthropic account it usually means the key is not an admin key (see Configuration).
+### An account delivers no data
+Read `info.state` first, it names the cause: `unauthorized` means the sign-in expired (sign in
+again in the settings) or the key is not an admin key (see Configuration); `service-down` and
+`no-connection` are outside your instance and clear up by themselves. The adapter log states the
+same reason once and raises a single notification.
 
 ### A subscription says "not signed in" although you just signed in
 Save the settings first, then sign in — the row needs a saved account to attach the sign-in to.
@@ -164,7 +179,7 @@ removed automatically, and an existing Claude sign-in is carried over.
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.4.0 (2026-08-26)
 
 - Fixed: A limit that belongs to a single model no longer reports the whole account as full, and the warning names the window it came from instead of just "usage"
 - New: Each account shows whether the AI service itself is online, telling a service outage apart from a rejected sign-in or a missing internet connection

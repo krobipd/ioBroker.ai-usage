@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "news": {
+      "0.4.0": {
+        "en": "Limits of a single model no longer report the whole account as full, every account shows whether the AI service itself is online, plus Sentry error reporting and a new icon",
+        "de": "Limits eines einzelnen Modells melden nicht mehr das ganze Konto als voll, jedes Konto zeigt ob der KI-Dienst selbst online ist, dazu Fehlerberichte über Sentry und ein neues Symbol",
+        "ru": "Лимиты отдельной модели больше не отмечают весь аккаунт как исчерпанный, каждый аккаунт показывает, онлайн ли сам сервис ИИ, плюс отчёты об ошибках Sentry и новый значок",
+        "pt": "Limites de um único modelo já não marcam a conta inteira como cheia, cada conta mostra se o próprio serviço de IA está online, mais relatórios de erros Sentry e um novo ícone",
+        "nl": "Limieten van één model melden niet langer het hele account als vol, elk account toont of de AI-dienst zelf online is, plus foutrapportage via Sentry en een nieuw pictogram",
+        "fr": "Les limites d'un seul modèle ne marquent plus tout le compte comme plein, chaque compte indique si le service IA est en ligne, plus les rapports d'erreurs Sentry et une nouvelle icône",
+        "it": "I limiti di un singolo modello non segnalano più l'intero account come pieno, ogni account mostra se il servizio IA è online, più i rapporti di errore Sentry e una nuova icona",
+        "es": "Los límites de un solo modelo ya no marcan toda la cuenta como llena, cada cuenta muestra si el servicio de IA está en línea, además de informes de errores Sentry y un icono nuevo",
+        "pl": "Limity pojedynczego modelu nie oznaczają już całego konta jako pełnego, każde konto pokazuje, czy usługa AI jest online, do tego raporty błędów Sentry i nowa ikona",
+        "uk": "Ліміти окремої моделі більше не позначають весь акаунт як заповнений, кожен акаунт показує, чи сервіс ШІ онлайн, а також звіти про помилки Sentry і нова піктограма",
+        "zh-cn": "单个模型的限额不再把整个账户标记为已满，每个账户都会显示 AI 服务本身是否在线，另有 Sentry 错误报告和新图标"
+      },
       "0.3.0": {
         "en": "Three subscriptions instead of one: Claude, ChatGPT and Google/Gemini each with their own guided sign-in; ChatGPT and Gemini could not be tested on a live account yet",
         "de": "Drei Abos statt einem: Claude, ChatGPT und Google/Gemini mit je eigener geführter Anmeldung; ChatGPT und Gemini konnten noch an keinem echten Konto getestet werden",
