@@ -1,0 +1,4 @@
+{
+  "instance": "ai-usage.0",
+  "mountSelectors": ["[data-testid=\"aiu-config\"]"]
+}
