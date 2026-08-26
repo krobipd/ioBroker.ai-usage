@@ -67,8 +67,9 @@ interface AccountRuntime {
 /**
  * Drives the polling of all configured accounts: staggered starts, one independent
  * cycle per account, typed failure handling (auth = immediate + one notification,
- * rate-limit = backoff keeping last values, network = tolerant), warn-threshold
- * transitions and the adapter-wide totals. Pure orchestration — all IO is injected.
+ * rate-limit = backoff keeping last values, service = reported down at once,
+ * network = tolerated three times), warn-threshold transitions on the PLAN-WIDE
+ * windows only, and the adapter-wide totals. Pure orchestration — all IO is injected.
  */
 export class PollEngine {
   private readonly runtimes: AccountRuntime[] = [];
@@ -378,7 +379,13 @@ export class PollEngine {
       {
         id: `${config.id}.limitReached`,
         type: "state",
-        common: { name: "A limit window is full", type: "boolean", role: "indicator", read: true, write: false },
+        common: {
+          name: "A plan-wide limit window is full",
+          type: "boolean",
+          role: "indicator",
+          read: true,
+          write: false,
+        },
       },
     ];
     for (const def of defs) {
@@ -435,7 +442,7 @@ export class PollEngine {
         id: "total.maxLimitPercent",
         type: "state",
         common: {
-          name: "Highest limit utilisation of any account",
+          name: "Highest plan-wide utilisation of any account",
           type: "number",
           role: "value",
           read: true,
@@ -457,7 +464,13 @@ export class PollEngine {
       {
         id: "total.limitReached",
         type: "state",
-        common: { name: "Any limit window full", type: "boolean", role: "indicator", read: true, write: false },
+        common: {
+          name: "Any plan-wide limit window full",
+          type: "boolean",
+          role: "indicator",
+          read: true,
+          write: false,
+        },
       },
       {
         id: "total.accountsReachable",

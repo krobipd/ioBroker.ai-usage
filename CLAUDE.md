@@ -19,12 +19,16 @@ auf (Abgrenzung zu ai-toolbox/ai-assistant), schreibt nie zum Anbieter.
 
 ```
 src/main.ts                    → Adapter: Engine-Verdrahtung, Credential-Auflösung (zentraler
-                                 Admin-Speicher), Claude-Anmelde-Nachrichten, Token-Datei, Cleanup
+                                 Admin-Speicher), Anmelde-Nachrichten aller drei Abos
+                                 (signInStart/Submit/Status/signOut), je Anbieter eine
+                                 verschlüsselte Token-Datei + Migration der alten, Cleanup
 src/lib/poll-engine.ts         → Orchestrierung (pur, IO injiziert): Zyklen je Konto, Fehlerklassen
-                                 (auth=1×Meldung / rate-limit=Backoff / network=tolerant),
+                                 (auth=1×Meldung / rate-limit=Backoff / service=sofort offline /
+                                 network=3 Versuche), Dienst-Status je Konto,
                                  Warnschwellen-Übergänge, totals
 src/lib/provider.ts            → UsageProvider-Vertrag + UsageSnapshot + FetchError-Klassen
-src/lib/http.ts                → getJson/postJson (natives fetch, Status→Fehlerklasse)
+src/lib/http.ts                → getJson/postJson/postForm (natives fetch, Status→eine von VIER
+                                 Fehlerklassen: auth · rate-limit · service · network)
 src/lib/providers/claude-auth.ts   → OAuth-Konstanten/PKCE/Tausch/Auffrischung (HA-Vorbild-verifiziert)
 src/lib/providers/claude-sub.ts    → Abo-Abfrage: limits[]-Auswertung, Extra-Guthaben beide Schemata
 src/lib/providers/chatgpt-auth.ts   → Geräte-Code-Anmeldung (Start/Poll/Einlösen/Erneuern)
@@ -40,7 +44,10 @@ src/lib/totals.ts              → total.* aus den Snapshots im Speicher
 src/lib/pure-helpers.ts        → Konten-Tabelle parsen (API-Boundary), sanitizeId, Cleanup-Ids
 src/types/adapter-config.d.ts  → native-Typen
 src-admin/                     → React-Konfig-Panel (Module-Federation, Admin-8-only, guiApi 2):
-                                 Claude-Karte + Zugangs-Liste; Build → admin/custom (git-getrackt,
+                                 EINE Liste — 3 Abo-Zeilen + je eine Zeile pro gespeichertem
+                                 Schlüssel, Anmelde-Bereich klappt pro Zeile auf und rendert den
+                                 Fluss des jeweiligen Anbieters; `src/rows.ts` = pure Zeilen-Logik
+                                 (testbar ohne React). Build → admin/custom (git-getrackt,
                                  sonst GitHub-Install leer) via `npm run build:admin` (tasks.js)
 ```
 
@@ -105,5 +112,8 @@ test/integration.js            → standard: @iobroker/testing integration (CI)
 test/standards/                → iobroker-adapter-checks (Repo-Standards)
 ```
 
-**Test-Oberfläche krobi:** Claude-Abo (Max) vorhanden; übrige Anbieter ggf. ohne Live-Konto →
-Changelog „sagen, nicht behaupten".
+**Test-Oberfläche krobi:** NUR das Claude-Abo (Max). ChatGPT-Abo, Gemini-Abo, OpenRouter, DeepSeek,
+OpenAI-Organisation und Anthropic-Organisation sind vorbild-/messungs-belegt, aber nie an einem
+echten Konto gelaufen — der Adapter ist trotzdem für die Community gebaut (krobi 2026-08-26).
+Das Ungetestete steht ausdrücklich im Changelog UND in der README: „sagen, nicht behaupten".
+Das Stil-Gate prüft Präfix und Länge, NICHT Wahrheit — der Satz muss von Hand rein.

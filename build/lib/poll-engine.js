@@ -318,7 +318,13 @@ class PollEngine {
       {
         id: `${config.id}.limitReached`,
         type: "state",
-        common: { name: "A limit window is full", type: "boolean", role: "indicator", read: true, write: false }
+        common: {
+          name: "A plan-wide limit window is full",
+          type: "boolean",
+          role: "indicator",
+          read: true,
+          write: false
+        }
       }
     ];
     for (const def of defs) {
@@ -374,7 +380,7 @@ class PollEngine {
         id: "total.maxLimitPercent",
         type: "state",
         common: {
-          name: "Highest limit utilisation of any account",
+          name: "Highest plan-wide utilisation of any account",
           type: "number",
           role: "value",
           read: true,
@@ -396,7 +402,13 @@ class PollEngine {
       {
         id: "total.limitReached",
         type: "state",
-        common: { name: "Any limit window full", type: "boolean", role: "indicator", read: true, write: false }
+        common: {
+          name: "Any plan-wide limit window full",
+          type: "boolean",
+          role: "indicator",
+          read: true,
+          write: false
+        }
       },
       {
         id: "total.accountsReachable",
