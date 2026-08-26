@@ -169,6 +169,7 @@ removed automatically, and an existing Claude sign-in is carried over.
 - Fixed: A limit that belongs to a single model no longer reports the whole account as full, and the warning names the window it came from instead of just "usage"
 - New: Each account shows whether the AI service itself is online, telling a service outage apart from a rejected sign-in or a missing internet connection
 - New: Error reporting via Sentry — crashes reach the developer automatically, but only if you enabled diagnostics and error reporting in the ioBroker system settings
+- Changed: New adapter icon — a network of nodes instead of the dark tile, so it reads as AI at a glance and sits cleanly in both the light and the dark admin
 
 ### 0.3.0 (2026-08-26)
 
