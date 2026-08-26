@@ -47,11 +47,11 @@ The instance settings show one list of AI accounts. Switch on what you want to m
 
 | Account | How it is connected |
 |---------|---------------------|
-| **Claude subscription** | Open the sign-in page, log in, copy the code shown there and paste it back |
-| **ChatGPT subscription** | The adapter shows a short code; type it on the OpenAI page it links to. The settings page notices by itself. Your Codex CLI session is not touched |
-| **Google/Gemini subscription** | Open the sign-in page and log in. Google sends the result to `localhost`, so **your browser shows an error page — that is expected**. Copy the **whole address** from the address bar and paste it back |
-| **OpenRouter, DeepSeek** | Pick the stored key from the admin's credential storage |
-| **OpenAI, Anthropic** | Needs an **admin key** of your organisation, not the key the admin assistant uses. A personal account without an organisation cannot deliver these reports at all — use the Claude subscription instead |
+| **[Claude](https://claude.ai) subscription** | Open the sign-in page, log in, copy the code shown there and paste it back |
+| **[ChatGPT](https://chatgpt.com) subscription** | The adapter shows a short code; type it on the OpenAI page it links to. The settings page notices by itself. Your Codex CLI session is not touched |
+| **[Google Gemini](https://gemini.google.com) subscription** | Open the sign-in page and log in. Google sends the result to `localhost`, so **your browser shows an error page — that is expected**. Copy the **whole address** from the address bar and paste it back |
+| **[OpenRouter](https://openrouter.ai), [DeepSeek](https://www.deepseek.com)** | Pick the stored key from the admin's credential storage |
+| **[OpenAI](https://openai.com), [Anthropic](https://www.anthropic.com)** | Needs an **admin key** of your organisation, not the key the admin assistant uses. A personal account without an organisation cannot deliver these reports at all — use the Claude subscription instead |
 
 The three subscription endpoints are **not officially documented**; they are the ones those
 providers' own tools use and can change without notice. Claude was tested against a live
