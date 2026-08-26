@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "news": {
+      "0.2.0": {
+        "en": "Completely new settings page: your stored AI credentials as simple on/off switches, and a reliable guided Claude sign-in",
+        "de": "Komplett neue Einstellungs-Seite: gespeicherte KI-Zugänge als einfache An/Aus-Schalter und eine zuverlässige geführte Claude-Anmeldung",
+        "ru": "Полностью новая страница настроек: сохранённые данные доступа ИИ как простые переключатели и надёжный пошаговый вход Claude",
+        "pt": "Página de definições totalmente nova: credenciais de IA guardadas como interruptores simples e um início de sessão Claude guiado e fiável",
+        "nl": "Volledig nieuwe instellingenpagina: opgeslagen AI-toegangsgegevens als eenvoudige aan/uit-schakelaars en een betrouwbare begeleide Claude-aanmelding",
+        "fr": "Page de réglages entièrement nouvelle : identifiants IA enregistrés comme simples interrupteurs et une connexion Claude guidée et fiable",
+        "it": "Pagina delle impostazioni completamente nuova: credenziali IA salvate come semplici interruttori e un accesso Claude guidato e affidabile",
+        "es": "Página de ajustes completamente nueva: credenciales de IA guardadas como simples interruptores y un inicio de sesión Claude guiado y fiable",
+        "pl": "Całkowicie nowa strona ustawień: zapisane dane dostępu AI jako proste przełączniki i niezawodne prowadzone logowanie Claude",
+        "uk": "Повністю нова сторінка налаштувань: збережені дані доступу ШІ як прості перемикачі та надійний покроковий вхід Claude",
+        "zh-cn": "全新的设置页面：已保存的 AI 凭据变为简单的开关，并提供可靠的引导式 Claude 登录"
+      },
       "0.1.0": {
         "en": "First release: usage limits, credits and costs of your Claude, OpenAI, Anthropic, OpenRouter and DeepSeek accounts as datapoints, with a warning at your chosen threshold",
         "de": "Erste Version: Auslastungs-Limits, Guthaben und Kosten Ihrer Claude-, OpenAI-, Anthropic-, OpenRouter- und DeepSeek-Konten als Datenpunkte, mit Warnung an Ihrer Schwelle",
@@ -15,19 +28,6 @@
         "pl": "Pierwsze wydanie: limity użycia, środki i koszty kont Claude, OpenAI, Anthropic, OpenRouter i DeepSeek jako punkty danych, z ostrzeżeniem przy wybranym progu",
         "uk": "Перший випуск: ліміти використання, кредити та витрати акаунтів Claude, OpenAI, Anthropic, OpenRouter і DeepSeek як точки даних, з попередженням на обраному порозі",
         "zh-cn": "首个版本：将 Claude、OpenAI、Anthropic、OpenRouter 和 DeepSeek 账户的使用限额、余额与费用作为数据点，并在达到所选阈值时发出警告"
-      },
-      "0.0.1": {
-        "en": "Initial development version",
-        "de": "Erste Entwicklungsversion",
-        "ru": "Первая версия для разработки",
-        "pt": "Primeira versão de desenvolvimento",
-        "nl": "Eerste ontwikkelversie",
-        "fr": "Première version de développement",
-        "it": "Prima versione di sviluppo",
-        "es": "Primera versión de desarrollo",
-        "pl": "Pierwsza wersja rozwojowa",
-        "uk": "Перша версія для розробки",
-        "zh-cn": "初始开发版本"
       }
     },
     "titleLang": {
