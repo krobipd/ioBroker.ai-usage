@@ -7,6 +7,13 @@ on:
     tags:
       - v[0-9]+.[0-9]+.[0-9]+
       - v[0-9]+.[0-9]+.[0-9]+-**
+    # Reine Doku-Pushes lösen keinen Lauf aus: an einer Textzeile kann kein
+    # Test fallen. Laut GitHub-Doku gilt "Path filters are not evaluated for
+    # pushes of tags" — der Release-Lauf am Tag bleibt also unberührt. Bewusst
+    # NUR unter `push`, nicht unter `pull_request`: dort liefert der Lauf den
+    # Pflicht-Prüfauftrag der Branch-Sperre (Dependabot-Zusammenführung).
+    paths-ignore:
+      - "**.md"
   pull_request:
     branches:
       - main
