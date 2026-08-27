@@ -118,6 +118,14 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` — beim Start
     deterministisch gelöscht (feste Liste, kein Zustands-Raten), ioBroker räumt Verwaistes nie
     selbst weg, ein toter Datenpunkt lügt weiter.
+14. **Datenpunkt-Bilanz beim Start** (Flotten-Standard, beszel-Vorbild): EINE `info`-Zeile
+    „Object tree updated: created N, removed M datapoint(s)", still bei 0/0. Damit sie nicht nach
+    jedem Neustart alles als neu meldet, wird VOR Aufräumen und Engine ein Schnappschuss aller
+    vorhandenen Zustands-Ids gezogen — der Anlege-Pfad läuft pro Prozess einmal über JEDEN
+    Datenpunkt, auch über bestehende. Die Einmal-Migration der abgeschafften Status-Datenpunkte
+    zählt NICHT mit, sie meldet ihre eigene Summe. Ausgelöst wird die Zeile, wenn das LETZTE Konto
+    seine erste Abfrage hinter sich hat (`afterFirstRound`) — die erste Runde ist bewusst versetzt,
+    und ein Konfig-Wechsel startet die Instanz ohnehin neu.
 
 ## Tests
 

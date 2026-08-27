@@ -206,6 +206,75 @@ describe("PollEngine", () => {
     expect(h.upserted.get("c")?.common.statusStates).toEqual({ offlineId: "info.unreach" });
   });
 
+  test("the first-round hook fires once, after the LAST account polled", async () => {
+    const h = makeHarness();
+    const rounds: number[] = [];
+    h.deps.afterFirstRound = () => rounds.push(1);
+    const a = scriptedProvider([{ limits: [{ name: "w", label: "W", percent: 1 }] }, { limits: [] }]);
+    const b = scriptedProvider([{ limits: [{ name: "w", label: "W", percent: 2 }] }, { limits: [] }]);
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" }), account({ id: "b", name: "B" })],
+      new Map([
+        ["a", a],
+        ["b", b],
+      ]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick(); // both staggered first polls
+    expect(rounds).toHaveLength(1);
+    await h.tick(); // second round must not report again
+    expect(rounds).toHaveLength(1);
+  });
+
+  test("with no usable account the hook still fires, so a cleanup-only start is reported", async () => {
+    const h = makeHarness();
+    let fired = 0;
+    h.deps.afterFirstRound = () => void fired++;
+    const engine = new PollEngine([account()], new Map(), 300, h.deps);
+    await engine.start();
+    expect(fired).toBe(1);
+  });
+
+  test("an account sitting in a backoff does not hold the first-round report back", async () => {
+    const h = makeHarness();
+    let fired = 0;
+    h.deps.afterFirstRound = () => void fired++;
+    const provider = scriptedProvider([
+      () => {
+        throw new FetchError("rate-limit", "HTTP 429");
+      },
+      { limits: [] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick(); // first poll → rate-limited, backoff armed
+    expect(fired).toBe(1);
+    await h.tick(); // inside the backoff: the poll is skipped, no second report
+    expect(fired).toBe(1);
+  });
+
+  test("warning and limitReached are written only when they change", async () => {
+    const writes: string[] = [];
+    const h = makeHarness();
+    const original = h.deps.setState;
+    h.deps.setState = (id, value) => {
+      writes.push(id);
+      original(id, value);
+    };
+    const provider = scriptedProvider([
+      { limits: [{ name: "w", label: "W", percent: 10 }] },
+      { limits: [{ name: "w", label: "W", percent: 11 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    const before = writes.filter(id => id === "a.warning").length;
+    await h.tick(); // percent moved, the warning verdict did not
+    expect(writes.filter(id => id === "a.warning").length).toBe(before);
+  });
+
   test("an account without a provider is skipped with a warning", async () => {
     const h = makeHarness();
     const warnings: string[] = [];

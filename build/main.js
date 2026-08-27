@@ -58,6 +58,54 @@ class AiUsageAdapter extends utils.Adapter {
   /** Device-code pollers, so they can be stopped on unload. */
   devicePollers = /* @__PURE__ */ new Map();
   /**
+   * Every state id that already existed when this process started.
+   *
+   * The create path runs `extendObject` for every state once per process — also for
+   * states that were already in the database — so "the create path touched it" would
+   * report every datapoint as new after each restart. Only what is missing from this
+   * snapshot is a real addition (beszel pattern).
+   */
+  knownStateIds = /* @__PURE__ */ new Set();
+  /** Datapoints created since the snapshot. */
+  createdStates = 0;
+  /** Datapoints removed since the snapshot — excluding the one-shot migration, which reports itself. */
+  removedStates = 0;
+  /** Whether the startup balance was already logged. */
+  balanceLogged = false;
+  /**
+   * Read every existing state id once, before anything creates or deletes.
+   *
+   * @returns nothing; fills {@link knownStateIds}
+   */
+  async snapshotExistingStates() {
+    var _a;
+    try {
+      const view = await this.getObjectViewAsync("system", "state", {
+        startkey: `${this.namespace}.`,
+        endkey: `${this.namespace}.\uFFFF`
+      });
+      for (const row of (_a = view == null ? void 0 : view.rows) != null ? _a : []) {
+        this.knownStateIds.add(row.id.substring(this.namespace.length + 1));
+      }
+    } catch (e) {
+      this.log.debug(`Could not snapshot existing states: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  /**
+   * Report what the object tree gained and lost in this startup — one line, both
+   * sides, silent when nothing changed. A normal restart must stay quiet.
+   */
+  logDatapointBalance() {
+    if (this.balanceLogged) {
+      return;
+    }
+    this.balanceLogged = true;
+    const line = (0, import_pure_helpers.datapointBalanceLine)(this.createdStates, this.removedStates);
+    if (line) {
+      this.log.info(line);
+    }
+  }
+  /**
    * @param options the adapter options
    */
   constructor(options = {}) {
@@ -169,6 +217,10 @@ class AiUsageAdapter extends utils.Adapter {
     if (!attempt || attempt.flow === "device-code") {
       return { status: "failed", reason: "start the sign-in first" };
     }
+    if ((0, import_sign_in.attemptExpired)(attempt.expiresAt, Date.now())) {
+      this.attempts.delete(provider);
+      return { status: "failed", reason: "the sign-in window expired \u2014 start the sign-in again" };
+    }
     if (!value) {
       return { status: "failed", reason: "nothing pasted" };
     }
@@ -191,7 +243,7 @@ class AiUsageAdapter extends utils.Adapter {
    * @param tokens the token set
    */
   async finishSignIn(provider, tokens) {
-    var _a;
+    var _a, _b;
     await this.tokenStore(provider).save(tokens);
     this.attempts.delete(provider);
     this.signInErrors.delete(provider);
@@ -200,7 +252,7 @@ class AiUsageAdapter extends utils.Adapter {
     if (id) {
       await ((_a = this.engine) == null ? void 0 : _a.pollNow(id));
     }
-    this.log.info(`${provider}: signed in`);
+    this.log.info(`${(_b = import_sign_in.SIGN_IN_LABELS[provider]) != null ? _b : provider}: signed in`);
   }
   /**
    * Poll the device-code endpoint until the user confirmed, the window closed or
@@ -266,6 +318,10 @@ class AiUsageAdapter extends utils.Adapter {
       };
     }
     if (attempt) {
+      if ((0, import_sign_in.attemptExpired)(attempt.expiresAt, Date.now())) {
+        this.attempts.delete(provider);
+        return { status: "failed", reason: "the sign-in window expired \u2014 start the sign-in again" };
+      }
       return { status: "awaiting-paste", url: attempt.url, flow: attempt.flow };
     }
     if (failure) {
@@ -354,7 +410,12 @@ class AiUsageAdapter extends utils.Adapter {
       const accounts = (0, import_pure_helpers.parseAccounts)(this.config.accounts);
       const interval = (0, import_pure_helpers.clampPollInterval)(this.config.pollInterval);
       await this.migrateTokenFiles();
+      await this.snapshotExistingStates();
       await this.cleanupStaleObjects();
+      const retired = await this.removeRetiredStates(accounts);
+      if (retired > 0) {
+        this.log.info(`Object tree updated: removed ${retired} obsolete status datapoint(s)`);
+      }
       if (accounts.length === 0) {
         this.log.info("No AI accounts configured \u2014 add accounts in the instance settings");
         await this.setState("info.connection", { val: false, ack: true });
@@ -370,6 +431,10 @@ class AiUsageAdapter extends utils.Adapter {
       this.engine = new import_poll_engine.PollEngine(accounts, providers, interval, {
         upsertObject: async (def) => {
           await this.extendObject(def.id, { type: def.type, common: def.common, native: {} });
+          if (def.type === "state" && !this.knownStateIds.has(def.id)) {
+            this.knownStateIds.add(def.id);
+            this.createdStates++;
+          }
         },
         setState: (id, value) => {
           void this.setState(id, { val: value, ack: true }).catch(() => {
@@ -392,15 +457,12 @@ class AiUsageAdapter extends utils.Adapter {
           warn: (m) => this.log.warn(m),
           error: (m) => this.log.error(m)
         },
+        afterFirstRound: () => this.logDatapointBalance(),
         notify: this.config.notifications ? (_account, message) => void this.registerNotification("ai-usage", "userActionRequired", message).catch(
           (e) => this.log.debug(`Could not raise notification: ${e instanceof Error ? e.message : String(e)}`)
         ) : void 0
       });
       await this.engine.start();
-      const removed = await this.removeRetiredStates(accounts);
-      if (removed > 0) {
-        this.log.info(`Object tree updated: removed ${removed} obsolete status datapoint(s)`);
-      }
       this.log.info(`Monitoring ${providers.size} of ${accounts.length} AI account(s), polling every ${interval} s`);
     } catch (e) {
       this.log.error(`Startup failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -497,6 +559,7 @@ class AiUsageAdapter extends utils.Adapter {
           if (await this.getObjectAsync(id)) {
             await this.delObjectAsync(id);
             removed++;
+            this.knownStateIds.delete(id);
           }
         } catch (e) {
           this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
@@ -529,6 +592,12 @@ class AiUsageAdapter extends utils.Adapter {
         this.log.info(
           root === "auth" ? "Removing the old sign-in branch \u2014 the sign-in state now lives inside each account" : `Removing objects of no longer configured account "${root}"`
         );
+        for (const id of [...this.knownStateIds]) {
+          if (id === root || id.startsWith(`${root}.`)) {
+            this.knownStateIds.delete(id);
+            this.removedStates++;
+          }
+        }
         await this.delObjectAsync(root, { recursive: true });
       }
     } catch (e) {

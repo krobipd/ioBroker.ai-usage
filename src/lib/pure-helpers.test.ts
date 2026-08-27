@@ -1,4 +1,11 @@
-import { accountId, clampPollInterval, parseAccounts, sanitizeId, validAccountIds } from "./pure-helpers";
+import {
+  accountId,
+  clampPollInterval,
+  datapointBalanceLine,
+  parseAccounts,
+  sanitizeId,
+  validAccountIds,
+} from "./pure-helpers";
 
 describe("sanitizeId", () => {
   test("keeps safe characters and collapses the rest to single underscores", () => {
@@ -104,5 +111,20 @@ describe("validAccountIds", () => {
       ]),
     ).toEqual(["claude", "paused-api"]);
     expect(validAccountIds(undefined)).toEqual([]);
+  });
+});
+
+describe("datapointBalanceLine", () => {
+  test("stays silent when nothing changed — a normal restart must write nothing", () => {
+    expect(datapointBalanceLine(0, 0)).toBeNull();
+  });
+
+  test("names only the side that actually happened", () => {
+    expect(datapointBalanceLine(4, 0)).toBe("Object tree updated: created 4 datapoint(s)");
+    expect(datapointBalanceLine(0, 3)).toBe("Object tree updated: removed 3 datapoint(s)");
+  });
+
+  test("reports both sides in one line", () => {
+    expect(datapointBalanceLine(12, 3)).toBe("Object tree updated: created 12 datapoint(s), removed 3 datapoint(s)");
   });
 });

@@ -20,6 +20,13 @@ export type SignInState =
   /** The last attempt failed — reason is user-facing. */
   | { status: "failed"; reason: string };
 
+/** Readable name per subscription — log lines must not show the internal kind. */
+export const SIGN_IN_LABELS: Record<string, string> = {
+  "claude-sub": "Claude",
+  "chatgpt-sub": "ChatGPT",
+  "gemini-sub": "Gemini",
+};
+
 /**
  * Whether a running sign-in attempt is over.
  *

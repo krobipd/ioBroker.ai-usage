@@ -24,6 +24,7 @@ __export(pure_helpers_exports, {
   SUBSCRIPTION_KINDS: () => SUBSCRIPTION_KINDS,
   accountId: () => accountId,
   clampPollInterval: () => clampPollInterval,
+  datapointBalanceLine: () => datapointBalanceLine,
   parseAccounts: () => parseAccounts,
   sanitizeId: () => sanitizeId,
   validAccountIds: () => validAccountIds
@@ -116,6 +117,16 @@ function clampPollInterval(raw) {
   }
   return Math.min(3600, Math.max(60, Math.round(value)));
 }
+function datapointBalanceLine(created, removed) {
+  const parts = [];
+  if (created > 0) {
+    parts.push(`created ${created} datapoint(s)`);
+  }
+  if (removed > 0) {
+    parts.push(`removed ${removed} datapoint(s)`);
+  }
+  return parts.length ? `Object tree updated: ${parts.join(", ")}` : null;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   PROVIDER_KINDS,
@@ -124,6 +135,7 @@ function clampPollInterval(raw) {
   SUBSCRIPTION_KINDS,
   accountId,
   clampPollInterval,
+  datapointBalanceLine,
   parseAccounts,
   sanitizeId,
   validAccountIds

@@ -19,6 +19,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var sign_in_exports = {};
 __export(sign_in_exports, {
   SIGN_IN_FLOWS: () => SIGN_IN_FLOWS,
+  SIGN_IN_LABELS: () => SIGN_IN_LABELS,
   attemptExpired: () => attemptExpired
 });
 module.exports = __toCommonJS(sign_in_exports);
@@ -27,12 +28,18 @@ const SIGN_IN_FLOWS = {
   "chatgpt-sub": "device-code",
   "gemini-sub": "paste-url"
 };
+const SIGN_IN_LABELS = {
+  "claude-sub": "Claude",
+  "chatgpt-sub": "ChatGPT",
+  "gemini-sub": "Gemini"
+};
 function attemptExpired(expiresAt, now) {
   return now >= expiresAt;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   SIGN_IN_FLOWS,
+  SIGN_IN_LABELS,
   attemptExpired
 });
 //# sourceMappingURL=sign-in.js.map

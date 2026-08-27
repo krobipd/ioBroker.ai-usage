@@ -154,3 +154,25 @@ export function clampPollInterval(raw: unknown): number {
   }
   return Math.min(3600, Math.max(60, Math.round(value)));
 }
+
+/**
+ * The one-line balance of what the object tree gained and lost, or null when
+ * nothing changed.
+ *
+ * Silence at 0/0 is the point: a normal restart must not write anything, otherwise
+ * the line becomes noise and stops being read (fleet standard, beszel).
+ *
+ * @param created datapoints added since the snapshot
+ * @param removed datapoints deleted since the snapshot
+ * @returns the log line, or null when there is nothing to report
+ */
+export function datapointBalanceLine(created: number, removed: number): string | null {
+  const parts: string[] = [];
+  if (created > 0) {
+    parts.push(`created ${created} datapoint(s)`);
+  }
+  if (removed > 0) {
+    parts.push(`removed ${removed} datapoint(s)`);
+  }
+  return parts.length ? `Object tree updated: ${parts.join(", ")}` : null;
+}

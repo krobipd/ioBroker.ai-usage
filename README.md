@@ -9,7 +9,6 @@
 Monitors usage, limits and costs of your AI accounts — the Claude, ChatGPT and Google
 subscriptions plus OpenRouter, DeepSeek, OpenAI and Anthropic API accounts. Needs ioBroker Admin 8.
 
-
 ---
 
 ## Features
@@ -126,6 +125,12 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.7.0 (2026-08-27)
+
+- New: One log line after a change tells you how many datapoints the object tree gained and lost, instead of leaving you to click through the tree
+- Fixed: A started sign-in that sat unused for a quarter of an hour now says so plainly instead of failing later with the provider's own cryptic answer
+- Fixed: Datapoints that only repeat their previous value are no longer rewritten every cycle, which kept flooding the history of anyone recording them
+
 ### 0.6.0 (2026-08-26)
 
 - New: Each account now shows the connection icon in the object tree — green while it delivers, struck through when it does not, exactly like every other ioBroker device
@@ -150,11 +155,6 @@ After a successful sign-in the account is queried immediately, so values appear 
 - Changed: Each account now owns exactly one node in the object tree (`claude`, `chatgpt`, `gemini`, `<name>-api`); the separate sign-in branch is gone and old nodes are cleaned up automatically
 - Fixed: After signing in, the account is queried immediately instead of waiting for the next poll — no restart needed
 - Fixed: OpenAI and Anthropic rows now state that they need an organisation admin key, instead of failing with an unexplained rejection
-
-### 0.2.0 (2026-08-26)
-
-- Changed: Completely new settings page — your stored AI credentials appear as simple on/off switches instead of a table, and new keys are picked up straight from the admin credential storage
-- Fixed: The Claude subscription sign-in works reliably now — a guided card with live status, and the sign-in link stays valid until it is used instead of regenerating while you type
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

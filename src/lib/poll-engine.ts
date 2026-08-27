@@ -39,6 +39,14 @@ export interface EngineDeps {
   log: { debug(m: string): void; info(m: string): void; warn(m: string): void; error(m: string): void };
   /** Raise a user-facing notification (threshold crossing, broken credentials). */
   notify?(accountName: string, message: string): void;
+  /**
+   * Called once, when every account has finished its FIRST poll.
+   *
+   * The first round is staggered on purpose, so the adapter cannot report what the
+   * object tree gained until the last account has been through. A config change
+   * restarts the instance, so this is also the only moment a user needs the report.
+   */
+  afterFirstRound?(): void;
 }
 
 /** One account's runtime state inside the engine. */
@@ -64,6 +72,8 @@ interface AccountRuntime {
   createdObjects: Set<string>;
   /** Last written value per state id — keeps unchanged values out of the history. */
   written: Map<string, boolean | number | string>;
+  /** Whether this account has been through its first poll. */
+  firstPollDone: boolean;
 }
 
 /**
@@ -77,6 +87,9 @@ export class PollEngine {
   private readonly runtimes: AccountRuntime[] = [];
   private readonly handles: unknown[] = [];
   private stopped = false;
+  private firstRoundReported = false;
+  /** Last written value of the adapter-wide indicators — keeps history free of repeats. */
+  private readonly writtenTotals = new Map<string, boolean | number | string>();
 
   /**
    * @param accounts the validated account configs
@@ -109,6 +122,7 @@ export class PollEngine {
         error: "waiting for the first query",
         createdObjects: new Set(),
         written: new Map(),
+        firstPollDone: false,
       });
     }
   }
@@ -120,6 +134,11 @@ export class PollEngine {
     }
     await this.createTotalsSkeleton();
     await this.writeTotals();
+    if (this.runtimes.length === 0) {
+      // Nothing will ever poll — report right away, the cleanup may still have changed something.
+      this.reportFirstRoundOnce();
+      return;
+    }
     this.runtimes.forEach((runtime, index) => {
       this.handles.push(
         this.deps.scheduleOnce(() => void this.pollAccount(runtime), index * STAGGER_MS),
@@ -170,6 +189,10 @@ export class PollEngine {
     const { config } = runtime;
     if (this.deps.now() < runtime.skipUntil) {
       this.deps.log.debug(`${config.name}: in rate-limit backoff — poll skipped`);
+      // Still counts as "been through": otherwise an account that starts inside a
+      // backoff would hold the first-round report back forever.
+      runtime.firstPollDone = true;
+      this.reportFirstRoundOnce();
       return;
     }
     try {
@@ -188,6 +211,17 @@ export class PollEngine {
     }
     this.writeAccountInfo(runtime);
     await this.writeTotals();
+    runtime.firstPollDone = true;
+    this.reportFirstRoundOnce();
+  }
+
+  /** Fire the first-round hook exactly once, when no account is still pending. */
+  private reportFirstRoundOnce(): void {
+    if (this.firstRoundReported || this.runtimes.some(runtime => !runtime.firstPollDone)) {
+      return;
+    }
+    this.firstRoundReported = true;
+    this.deps.afterFirstRound?.();
   }
 
   /**
@@ -215,8 +249,9 @@ export class PollEngine {
     const percent = driver?.percent ?? 0;
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
-    this.deps.setState(`${config.id}.warning`, runtime.status.warning);
-    this.deps.setState(`${config.id}.limitReached`, percent >= 100);
+    // Indicators on change only — the same reason as for the status states.
+    this.setIfChanged(runtime, `${config.id}.warning`, runtime.status.warning);
+    this.setIfChanged(runtime, `${config.id}.limitReached`, percent >= 100);
     if (runtime.status.warning && !wasWarning) {
       // Always name the window: "usage at 100 %" without it was misleading whenever
       // several windows existed.
@@ -292,7 +327,7 @@ export class PollEngine {
   }
 
   /**
-   * Write one account's info states (data received, service online, state, last update).
+   * Write one account's info states (offline marker, error text, last update).
    *
    * @param runtime the account's runtime
    */
@@ -330,6 +365,20 @@ export class PollEngine {
    * @param id the state id
    * @param value the value
    */
+  /**
+   * Write an adapter-wide indicator only when it changed.
+   *
+   * @param id the state id
+   * @param value the value
+   */
+  private setTotalIfChanged(id: string, value: boolean | number | string): void {
+    if (this.writtenTotals.get(id) === value) {
+      return;
+    }
+    this.writtenTotals.set(id, value);
+    this.deps.setState(id, value);
+  }
+
   private setIfChanged(runtime: AccountRuntime, id: string, value: boolean | number | string): void {
     if (runtime.written.get(id) === value) {
       return;
@@ -346,10 +395,10 @@ export class PollEngine {
     this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
     this.deps.setState("total.maxLimitPercent", totals.maxLimitPercent);
     this.deps.setState("total.warningsActive", totals.warningsActive);
-    this.deps.setState("total.limitReached", totals.limitReached);
+    this.setTotalIfChanged("total.limitReached", totals.limitReached);
     this.deps.setState("total.accountsReachable", totals.accountsReachable);
     this.deps.setState("total.accounts", totals.accounts);
-    this.deps.setState("info.connection", totals.accountsReachable > 0);
+    this.setTotalIfChanged("info.connection", totals.accountsReachable > 0);
     return Promise.resolve();
   }
 

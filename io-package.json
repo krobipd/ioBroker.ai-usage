@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "news": {
+      "0.7.0": {
+        "en": "After a change the log says in one line how many datapoints the object tree gained and lost — no clicking through the tree to find out",
+        "de": "Nach einer Änderung sagt das Protokoll in einer Zeile, wie viele Datenpunkte dazugekommen und weggefallen sind — kein Durchklicken des Objektbaums nötig",
+        "ru": "После изменения журнал одной строкой сообщает, сколько точек данных добавилось и исчезло — не нужно просматривать дерево объектов",
+        "pt": "Após uma alteração, o registo indica numa linha quantos pontos de dados foram criados e removidos — sem percorrer a árvore de objetos",
+        "nl": "Na een wijziging meldt het logboek in één regel hoeveel datapunten erbij kwamen en verdwenen — zonder de objectboom door te klikken",
+        "fr": "Après une modification, le journal indique en une ligne combien de points de données ont été créés et supprimés — sans parcourir l'arbre des objets",
+        "it": "Dopo una modifica il log indica in una riga quanti punti dati sono stati creati e rimossi — senza scorrere l'albero degli oggetti",
+        "es": "Tras un cambio, el registro indica en una línea cuántos puntos de datos se crearon y eliminaron — sin recorrer el árbol de objetos",
+        "pl": "Po zmianie dziennik podaje w jednej linii, ile punktów danych przybyło i ubyło — bez przeglądania drzewa obiektów",
+        "uk": "Після зміни журнал одним рядком повідомляє, скільки точок даних додалося та зникло — без перегляду дерева об'єктів",
+        "zh-cn": "更改后，日志用一行说明对象树新增和移除了多少数据点，无需逐层点开查看"
+      },
       "0.6.0": {
         "en": "Every account now carries the connection icon in the object tree — green while it delivers, struck through when it does not, like any other ioBroker device",
         "de": "Jedes Konto trägt jetzt das Verbindungs-Symbol im Objektbaum — grün solange es liefert, durchgestrichen wenn nicht, wie bei jedem anderen ioBroker-Gerät",

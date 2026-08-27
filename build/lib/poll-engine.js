@@ -56,7 +56,8 @@ class PollEngine {
         state: "no-connection",
         error: "waiting for the first query",
         createdObjects: /* @__PURE__ */ new Set(),
-        written: /* @__PURE__ */ new Map()
+        written: /* @__PURE__ */ new Map(),
+        firstPollDone: false
       });
     }
   }
@@ -65,6 +66,9 @@ class PollEngine {
   runtimes = [];
   handles = [];
   stopped = false;
+  firstRoundReported = false;
+  /** Last written value of the adapter-wide indicators — keeps history free of repeats. */
+  writtenTotals = /* @__PURE__ */ new Map();
   /** Create the static per-account and totals objects, then arm the poll cycles. */
   async start() {
     for (const runtime of this.runtimes) {
@@ -72,6 +76,10 @@ class PollEngine {
     }
     await this.createTotalsSkeleton();
     await this.writeTotals();
+    if (this.runtimes.length === 0) {
+      this.reportFirstRoundOnce();
+      return;
+    }
     this.runtimes.forEach((runtime, index) => {
       this.handles.push(
         this.deps.scheduleOnce(() => void this.pollAccount(runtime), index * STAGGER_MS),
@@ -117,6 +125,8 @@ class PollEngine {
     const { config } = runtime;
     if (this.deps.now() < runtime.skipUntil) {
       this.deps.log.debug(`${config.name}: in rate-limit backoff \u2014 poll skipped`);
+      runtime.firstPollDone = true;
+      this.reportFirstRoundOnce();
       return;
     }
     try {
@@ -135,6 +145,17 @@ class PollEngine {
     }
     this.writeAccountInfo(runtime);
     await this.writeTotals();
+    runtime.firstPollDone = true;
+    this.reportFirstRoundOnce();
+  }
+  /** Fire the first-round hook exactly once, when no account is still pending. */
+  reportFirstRoundOnce() {
+    var _a, _b;
+    if (this.firstRoundReported || this.runtimes.some((runtime) => !runtime.firstPollDone)) {
+      return;
+    }
+    this.firstRoundReported = true;
+    (_b = (_a = this.deps).afterFirstRound) == null ? void 0 : _b.call(_a);
   }
   /**
    * Write a successful snapshot: upsert new objects (create-once cache), write the
@@ -160,8 +181,8 @@ class PollEngine {
     const percent = (_a = driver == null ? void 0 : driver.percent) != null ? _a : 0;
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
-    this.deps.setState(`${config.id}.warning`, runtime.status.warning);
-    this.deps.setState(`${config.id}.limitReached`, percent >= 100);
+    this.setIfChanged(runtime, `${config.id}.warning`, runtime.status.warning);
+    this.setIfChanged(runtime, `${config.id}.limitReached`, percent >= 100);
     if (runtime.status.warning && !wasWarning) {
       const window = driver ? `${driver.label} ` : "";
       const message = `${config.name}: ${window}at ${Math.round(percent)} % (threshold ${config.warnThreshold} %)`;
@@ -234,7 +255,7 @@ class PollEngine {
     }
   }
   /**
-   * Write one account's info states (data received, service online, state, last update).
+   * Write one account's info states (offline marker, error text, last update).
    *
    * @param runtime the account's runtime
    */
@@ -270,6 +291,19 @@ class PollEngine {
    * @param id the state id
    * @param value the value
    */
+  /**
+   * Write an adapter-wide indicator only when it changed.
+   *
+   * @param id the state id
+   * @param value the value
+   */
+  setTotalIfChanged(id, value) {
+    if (this.writtenTotals.get(id) === value) {
+      return;
+    }
+    this.writtenTotals.set(id, value);
+    this.deps.setState(id, value);
+  }
   setIfChanged(runtime, id, value) {
     if (runtime.written.get(id) === value) {
       return;
@@ -285,10 +319,10 @@ class PollEngine {
     this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
     this.deps.setState("total.maxLimitPercent", totals.maxLimitPercent);
     this.deps.setState("total.warningsActive", totals.warningsActive);
-    this.deps.setState("total.limitReached", totals.limitReached);
+    this.setTotalIfChanged("total.limitReached", totals.limitReached);
     this.deps.setState("total.accountsReachable", totals.accountsReachable);
     this.deps.setState("total.accounts", totals.accounts);
-    this.deps.setState("info.connection", totals.accountsReachable > 0);
+    this.setTotalIfChanged("info.connection", totals.accountsReachable > 0);
     return Promise.resolve();
   }
   /**
