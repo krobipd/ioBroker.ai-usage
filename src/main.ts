@@ -479,6 +479,11 @@ export class AiUsageAdapter extends utils.Adapter {
             /* states DB going down — never crash the poll loop */
           });
         },
+        setStateChanged: (id, value) => {
+          void this.setStateChangedAsync(id, { val: value, ack: true }).catch(() => {
+            /* states DB going down — never crash the poll loop */
+          });
+        },
         schedule: (cb, ms): TimerHandle => ({ kind: "interval", handle: this.setInterval(cb, ms) }),
         scheduleOnce: (cb, ms): TimerHandle => ({ kind: "timeout", handle: this.setTimeout(cb, ms) }),
         cancel: handle => {

@@ -25,8 +25,15 @@ const STAGGER_MS = 3000;
 export interface EngineDeps {
   /** Create or update an object. */
   upsertObject(def: ObjectDef): Promise<void>;
-  /** Write a state value with ack. */
+  /** Write a state value with ack — for MEASUREMENTS, where every cycle carries information. */
   setState(id: string, value: boolean | number | string): void;
+  /**
+   * Write a state only when the value differs from what the database holds — for
+   * INDICATORS. js-controller does the comparison (`setStateChangedAsync`), which is
+   * what the rest of the fleet uses; a hand-rolled cache would only know what this
+   * process wrote and would still write blindly after a restart.
+   */
+  setStateChanged(id: string, value: boolean | number | string): void;
   /** Schedule a repeating callback; returns a cancel handle. */
   schedule(cb: () => void, ms: number): unknown;
   /** Schedule a one-shot callback; returns a cancel handle. */
@@ -70,8 +77,6 @@ interface AccountRuntime {
   error: string;
   /** Object ids already created for this account (create-once cache). */
   createdObjects: Set<string>;
-  /** Last written value per state id — keeps unchanged values out of the history. */
-  written: Map<string, boolean | number | string>;
   /** Whether this account has been through its first poll. */
   firstPollDone: boolean;
 }
@@ -88,8 +93,6 @@ export class PollEngine {
   private readonly handles: unknown[] = [];
   private stopped = false;
   private firstRoundReported = false;
-  /** Last written value of the adapter-wide indicators — keeps history free of repeats. */
-  private readonly writtenTotals = new Map<string, boolean | number | string>();
 
   /**
    * @param accounts the validated account configs
@@ -121,7 +124,6 @@ export class PollEngine {
         state: "no-connection",
         error: "waiting for the first query",
         createdObjects: new Set(),
-        written: new Map(),
         firstPollDone: false,
       });
     }
@@ -249,9 +251,9 @@ export class PollEngine {
     const percent = driver?.percent ?? 0;
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
-    // Indicators on change only — the same reason as for the status states.
-    this.setIfChanged(runtime, `${config.id}.warning`, runtime.status.warning);
-    this.setIfChanged(runtime, `${config.id}.limitReached`, percent >= 100);
+    // Indicators go through the changed-write, measurements through the normal one.
+    this.deps.setStateChanged(`${config.id}.warning`, runtime.status.warning);
+    this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100);
     if (runtime.status.warning && !wasWarning) {
       // Always name the window: "usage at 100 %" without it was misleading whenever
       // several windows existed.
@@ -346,45 +348,16 @@ export class PollEngine {
    * has to mean what a user reads into that icon: green while the account delivers.
    * A throttle keeps the last values and the service is fine, so it stays green and
    * only fills the error text; a dead sign-in, a broken service or no connection at
-   * all turn it off. Both states are written on change only — an indicator rewritten
-   * every cycle floods the history and hides the real transition.
+   * all turn it off. Both go through the changed-write: an indicator rewritten every
+   * cycle floods the history and hides the real transition.
    *
    * @param runtime the account's runtime
    */
   private writeAccountStatus(runtime: AccountRuntime): void {
     const { config } = runtime;
     const delivering = runtime.state === "ok" || runtime.state === "rate-limited";
-    this.setIfChanged(runtime, `${config.id}.info.unreach`, !delivering);
-    this.setIfChanged(runtime, `${config.id}.info.error`, runtime.error);
-  }
-
-  /**
-   * Write a state only when its value actually changed since the last write.
-   *
-   * @param runtime the account's runtime (holds the last-written cache)
-   * @param id the state id
-   * @param value the value
-   */
-  /**
-   * Write an adapter-wide indicator only when it changed.
-   *
-   * @param id the state id
-   * @param value the value
-   */
-  private setTotalIfChanged(id: string, value: boolean | number | string): void {
-    if (this.writtenTotals.get(id) === value) {
-      return;
-    }
-    this.writtenTotals.set(id, value);
-    this.deps.setState(id, value);
-  }
-
-  private setIfChanged(runtime: AccountRuntime, id: string, value: boolean | number | string): void {
-    if (runtime.written.get(id) === value) {
-      return;
-    }
-    runtime.written.set(id, value);
-    this.deps.setState(id, value);
+    this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering);
+    this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
   }
 
   /** Recompute and write the totals + info.connection. */
@@ -395,10 +368,10 @@ export class PollEngine {
     this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
     this.deps.setState("total.maxLimitPercent", totals.maxLimitPercent);
     this.deps.setState("total.warningsActive", totals.warningsActive);
-    this.setTotalIfChanged("total.limitReached", totals.limitReached);
+    this.deps.setStateChanged("total.limitReached", totals.limitReached);
     this.deps.setState("total.accountsReachable", totals.accountsReachable);
     this.deps.setState("total.accounts", totals.accounts);
-    this.setTotalIfChanged("info.connection", totals.accountsReachable > 0);
+    this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
     return Promise.resolve();
   }
 

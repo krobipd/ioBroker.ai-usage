@@ -440,6 +440,10 @@ class AiUsageAdapter extends utils.Adapter {
           void this.setState(id, { val: value, ack: true }).catch(() => {
           });
         },
+        setStateChanged: (id, value) => {
+          void this.setStateChangedAsync(id, { val: value, ack: true }).catch(() => {
+          });
+        },
         schedule: (cb, ms) => ({ kind: "interval", handle: this.setInterval(cb, ms) }),
         scheduleOnce: (cb, ms) => ({ kind: "timeout", handle: this.setTimeout(cb, ms) }),
         cancel: (handle) => {

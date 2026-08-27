@@ -26,6 +26,8 @@ function scriptedProvider(script: (UsageSnapshot | (() => never))[]): UsageProvi
 interface Harness {
   deps: EngineDeps;
   states: Map<string, boolean | number | string>;
+  /** Ids written through the changed-write seam (indicators). */
+  changedWrites: string[];
   objects: string[];
   /** The full definition per upserted id — for assertions on `common`. */
   upserted: Map<string, ObjectDef>;
@@ -37,6 +39,7 @@ interface Harness {
 
 function makeHarness(): Harness {
   const states = new Map<string, boolean | number | string>();
+  const changedWrites: string[] = [];
   const objects: string[] = [];
   const upserted = new Map<string, ObjectDef>();
   const notifications: string[] = [];
@@ -50,6 +53,10 @@ function makeHarness(): Harness {
       return Promise.resolve();
     },
     setState: (id, value) => void states.set(id, value),
+    setStateChanged: (id, value) => {
+      changedWrites.push(id);
+      states.set(id, value);
+    },
     schedule: cb => {
       intervals.push(cb);
       return cb;
@@ -66,6 +73,7 @@ function makeHarness(): Harness {
   return {
     deps,
     states,
+    changedWrites,
     objects,
     upserted,
     notifications,
@@ -255,26 +263,6 @@ describe("PollEngine", () => {
     expect(fired).toBe(1);
   });
 
-  test("warning and limitReached are written only when they change", async () => {
-    const writes: string[] = [];
-    const h = makeHarness();
-    const original = h.deps.setState;
-    h.deps.setState = (id, value) => {
-      writes.push(id);
-      original(id, value);
-    };
-    const provider = scriptedProvider([
-      { limits: [{ name: "w", label: "W", percent: 10 }] },
-      { limits: [{ name: "w", label: "W", percent: 11 }] },
-    ]);
-    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
-    await engine.start();
-    await h.tick();
-    const before = writes.filter(id => id === "a.warning").length;
-    await h.tick(); // percent moved, the warning verdict did not
-    expect(writes.filter(id => id === "a.warning").length).toBe(before);
-  });
-
   test("an account without a provider is skipped with a warning", async () => {
     const h = makeHarness();
     const warnings: string[] = [];
@@ -407,23 +395,27 @@ describe("PollEngine", () => {
     expect(String(h.states.get("a.info.error"))).toContain("Not reachable");
   });
 
-  test("an unchanged state is not written again", async () => {
-    const writes: string[] = [];
+  test("indicators go through the changed-write, measurements through the normal one", async () => {
+    // The deduplication is js-controller's job (setStateChangedAsync); the engine's
+    // job is to send each kind through the right seam.
+    const plain: string[] = [];
     const h = makeHarness();
     const original = h.deps.setState;
     h.deps.setState = (id, value) => {
-      writes.push(id);
+      plain.push(id);
       original(id, value);
     };
-    const provider = scriptedProvider([
-      { limits: [{ name: "week", label: "Week", percent: 10 }] },
-      { limits: [{ name: "week", label: "Week", percent: 11 }] },
-    ]);
+    const provider = scriptedProvider([{ limits: [{ name: "w", label: "W", percent: 10 }] }]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
-    const before = writes.filter(id => id === "a.info.error").length;
-    await h.tick();
-    expect(writes.filter(id => id === "a.info.error").length).toBe(before);
+    for (const id of ["a.info.unreach", "a.info.error", "a.warning", "a.limitReached", "info.connection"]) {
+      expect(h.changedWrites).toContain(id);
+      expect(plain).not.toContain(id);
+    }
+    for (const id of ["a.limits.w.percent", "a.info.lastUpdate", "total.maxLimitPercent"]) {
+      expect(plain).toContain(id);
+      expect(h.changedWrites).not.toContain(id);
+    }
   });
 });

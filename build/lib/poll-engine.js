@@ -56,7 +56,6 @@ class PollEngine {
         state: "no-connection",
         error: "waiting for the first query",
         createdObjects: /* @__PURE__ */ new Set(),
-        written: /* @__PURE__ */ new Map(),
         firstPollDone: false
       });
     }
@@ -67,8 +66,6 @@ class PollEngine {
   handles = [];
   stopped = false;
   firstRoundReported = false;
-  /** Last written value of the adapter-wide indicators — keeps history free of repeats. */
-  writtenTotals = /* @__PURE__ */ new Map();
   /** Create the static per-account and totals objects, then arm the poll cycles. */
   async start() {
     for (const runtime of this.runtimes) {
@@ -181,8 +178,8 @@ class PollEngine {
     const percent = (_a = driver == null ? void 0 : driver.percent) != null ? _a : 0;
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
-    this.setIfChanged(runtime, `${config.id}.warning`, runtime.status.warning);
-    this.setIfChanged(runtime, `${config.id}.limitReached`, percent >= 100);
+    this.deps.setStateChanged(`${config.id}.warning`, runtime.status.warning);
+    this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100);
     if (runtime.status.warning && !wasWarning) {
       const window = driver ? `${driver.label} ` : "";
       const message = `${config.name}: ${window}at ${Math.round(percent)} % (threshold ${config.warnThreshold} %)`;
@@ -273,43 +270,16 @@ class PollEngine {
    * has to mean what a user reads into that icon: green while the account delivers.
    * A throttle keeps the last values and the service is fine, so it stays green and
    * only fills the error text; a dead sign-in, a broken service or no connection at
-   * all turn it off. Both states are written on change only — an indicator rewritten
-   * every cycle floods the history and hides the real transition.
+   * all turn it off. Both go through the changed-write: an indicator rewritten every
+   * cycle floods the history and hides the real transition.
    *
    * @param runtime the account's runtime
    */
   writeAccountStatus(runtime) {
     const { config } = runtime;
     const delivering = runtime.state === "ok" || runtime.state === "rate-limited";
-    this.setIfChanged(runtime, `${config.id}.info.unreach`, !delivering);
-    this.setIfChanged(runtime, `${config.id}.info.error`, runtime.error);
-  }
-  /**
-   * Write a state only when its value actually changed since the last write.
-   *
-   * @param runtime the account's runtime (holds the last-written cache)
-   * @param id the state id
-   * @param value the value
-   */
-  /**
-   * Write an adapter-wide indicator only when it changed.
-   *
-   * @param id the state id
-   * @param value the value
-   */
-  setTotalIfChanged(id, value) {
-    if (this.writtenTotals.get(id) === value) {
-      return;
-    }
-    this.writtenTotals.set(id, value);
-    this.deps.setState(id, value);
-  }
-  setIfChanged(runtime, id, value) {
-    if (runtime.written.get(id) === value) {
-      return;
-    }
-    runtime.written.set(id, value);
-    this.deps.setState(id, value);
+    this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering);
+    this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
   }
   /** Recompute and write the totals + info.connection. */
   async writeTotals() {
@@ -319,10 +289,10 @@ class PollEngine {
     this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
     this.deps.setState("total.maxLimitPercent", totals.maxLimitPercent);
     this.deps.setState("total.warningsActive", totals.warningsActive);
-    this.setTotalIfChanged("total.limitReached", totals.limitReached);
+    this.deps.setStateChanged("total.limitReached", totals.limitReached);
     this.deps.setState("total.accountsReachable", totals.accountsReachable);
     this.deps.setState("total.accounts", totals.accounts);
-    this.setTotalIfChanged("info.connection", totals.accountsReachable > 0);
+    this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
     return Promise.resolve();
   }
   /**
