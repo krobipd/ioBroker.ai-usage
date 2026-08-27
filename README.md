@@ -80,7 +80,7 @@ ai-usage.0.
 │   ├── warning                — this account is above its warn threshold (bool)
 │   ├── limitReached           — a plan-wide window of this account is full (bool)
 │   ├── info.unreach           — account is not delivering (bool) — drives the connection icon
-│   ├── info.error             — why there is no data, in plain text; empty while all is well
+│   ├── info.error             — why there is no data; empty while all is well, "Unknown" while the adapter itself has nothing to report
 │   ├── info.lastUpdate        — time of the last successful read
 │   ├── limits.<window>.*      — percent + reset time (session, week, per model, …)
 │   └── credits.*              — where the provider reports a balance
@@ -96,7 +96,7 @@ Only what an account's source actually delivers is created.
 **The connection icon** sits next to each account, green while it delivers. A throttle keeps it
 green — the last values stay valid while the adapter waits. A rejected sign-in or a broken service
 switch it off at once, an unreachable service after three attempts, so a hiccup does not make it
-flap. `info.error` always names the cause.
+flap. `info.error` names the cause whenever the provider gave one.
 
 **Only plan-wide windows raise the warning** — your session and your week — and the message names
 the window it came from. A window belonging to a single model keeps its own datapoints but stays
@@ -113,6 +113,9 @@ its own `limits.<window>.percent`.
 Read `info.error` — it names the cause. A rejected sign-in means signing in again in the settings,
 or that the key is not an organisation admin key. A service fault or a missing connection is
 outside your instance and clears up by itself. The log states the same reason once.
+
+`Unknown` there means the adapter itself has nothing to report — it is switched off, or it has just
+started and has not asked yet.
 
 ### A subscription says "not signed in" although you just signed in
 Save the settings first, then sign in — the row needs a saved account to attach the sign-in to.

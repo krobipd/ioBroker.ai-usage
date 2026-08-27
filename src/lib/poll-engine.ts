@@ -226,8 +226,8 @@ export class PollEngine {
    * The returned promise is what makes this WORK. Measured on the live server
    * 2026-08-27: issued fire-and-forget and followed by an immediate `callback()`,
    * not one of these writes ever reached the database — the process was gone first.
-   * The caller has to wait for this (with its own time limit) before saying it is
-   * done.
+   * The caller has to wait for this before telling the host it is done — the host's
+   * own deadline is the only limit there is.
    *
    * @returns resolves once every write has been acknowledged
    */
