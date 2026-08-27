@@ -1,6 +1,12 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.7.0 (2026-08-27)
+
+- New: One log line after a change tells you how many datapoints the object tree gained and lost, instead of leaving you to click through the tree
+- Fixed: A started sign-in that sat unused for a quarter of an hour now says so plainly instead of failing later with the provider's own cryptic answer
+- Fixed: Datapoints that only repeat their previous value are no longer rewritten every cycle, which kept flooding the history of anyone recording them
+
 ## 0.6.0 (2026-08-26)
 
 - New: Each account now shows the connection icon in the object tree — green while it delivers, struck through when it does not, exactly like every other ioBroker device

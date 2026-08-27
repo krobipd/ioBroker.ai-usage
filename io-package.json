@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.9.1",
+    "version": "0.9.2",
     "news": {
+      "0.9.2": {
+        "en": "Stopping the instance now marks the accounts as offline on updated installations too, not only on fresh ones — before, they kept showing as online",
+        "de": "Das Stoppen der Instanz kennzeichnet die Konten jetzt auch auf aktualisierten Installationen als offline, nicht nur auf frischen — vorher blieben sie auf online stehen",
+        "ru": "Остановка экземпляра теперь помечает аккаунты офлайн и на обновлённых установках, а не только на новых — раньше они оставались онлайн",
+        "pt": "Parar a instância passa a marcar as contas como offline também em instalações atualizadas, não só em novas — antes continuavam a aparecer online",
+        "nl": "Het stoppen van de instantie markeert de accounts nu ook op bijgewerkte installaties als offline, niet alleen op nieuwe — eerder bleven ze online staan",
+        "fr": "L'arrêt de l'instance marque désormais les comptes hors ligne sur les installations mises à jour aussi, pas seulement sur les neuves — auparavant ils restaient en ligne",
+        "it": "L'arresto dell'istanza contrassegna ora gli account come offline anche sulle installazioni aggiornate, non solo su quelle nuove — prima restavano online",
+        "es": "Detener la instancia ahora marca las cuentas sin conexión también en instalaciones actualizadas, no solo en nuevas — antes seguían apareciendo en línea",
+        "pl": "Zatrzymanie instancji oznacza teraz konta jako offline także na zaktualizowanych instalacjach, nie tylko na nowych — wcześniej pozostawały online",
+        "uk": "Зупинка екземпляра тепер позначає облікові записи офлайн і на оновлених інсталяціях, а не лише на нових — раніше вони лишалися онлайн",
+        "zh-cn": "停止实例现在在已更新的安装上也会把账户标记为离线，而不只是全新安装——此前它们仍显示为在线"
+      },
       "0.9.1": {
         "en": "While an account has nothing to report — adapter off, or started and not asked yet — the reason now reads \"Unknown\" instead of a sentence about the adapter",
         "de": "Solange ein Konto nichts zu melden hat — Adapter aus oder gestartet und noch nichts gefragt — steht als Grund jetzt „Unknown\" statt eines Satzes über den Adapter",
@@ -80,19 +93,6 @@
         "pl": "Każde konto pokazuje teraz ikonę połączenia w drzewie obiektów — zieloną, dopóki dostarcza dane, przekreśloną gdy nie, jak każde urządzenie ioBroker",
         "uk": "Кожен акаунт тепер має піктограму з’єднання в дереві об’єктів — зелену, поки дані надходять, перекреслену, коли ні, як у будь-якого пристрою ioBroker",
         "zh-cn": "每个账户现在都会在对象树中显示连接图标——有数据时为绿色，无数据时带斜杠，与其他 ioBroker 设备一致"
-      },
-      "0.5.0": {
-        "en": "Two status datapoints per account instead of six: an offline marker ioBroker actually shows plus the reason in plain text; the retired ones are removed automatically",
-        "de": "Zwei Status-Datenpunkte je Konto statt sechs: ein Offline-Kennzeichen, das ioBroker wirklich anzeigt, plus den Grund im Klartext; die alten werden automatisch entfernt",
-        "ru": "Два статусных состояния на аккаунт вместо шести: признак «не в сети», который ioBroker действительно показывает, и причина текстом; старые удаляются автоматически",
-        "pt": "Dois pontos de estado por conta em vez de seis: um marcador offline que o ioBroker mostra mesmo, mais o motivo em texto; os antigos são removidos automaticamente",
-        "nl": "Twee statusdatapunten per account in plaats van zes: een offline-markering die ioBroker echt toont, plus de reden in gewone taal; de oude worden automatisch verwijderd",
-        "fr": "Deux points d'état par compte au lieu de six : un marqueur hors ligne qu'ioBroker affiche vraiment, plus la raison en clair ; les anciens sont supprimés automatiquement",
-        "it": "Due punti di stato per account invece di sei: un contrassegno offline che ioBroker mostra davvero e il motivo in chiaro; quelli superati vengono rimossi automaticamente",
-        "es": "Dos puntos de estado por cuenta en lugar de seis: un marcador de desconexión que ioBroker sí muestra y el motivo en texto claro; los antiguos se eliminan automáticamente",
-        "pl": "Dwa punkty stanu na konto zamiast sześciu: znacznik offline, który ioBroker naprawdę pokazuje, oraz powód tekstem; stare są usuwane automatycznie",
-        "uk": "Дві точки стану на акаунт замість шести: позначка «не в мережі», яку ioBroker справді показує, і причина текстом; застарілі видаляються автоматично",
-        "zh-cn": "每个账户从六个状态数据点减到两个：ioBroker 真正会显示的离线标记，加上纯文本的原因；旧的会被自动删除"
       }
     },
     "plugins": {

@@ -52,6 +52,8 @@ vi.mock("@iobroker/adapter-core", () => {
     public delObjectAsync = vi.fn(async () => {});
     public getAdapterObjectsAsync = vi.fn(async () => ({}));
     public getObjectViewAsync = vi.fn(async () => ({ rows: [] as { id: string }[] }));
+    public getForeignObjectAsync = vi.fn(async () => null);
+    public extendForeignObjectAsync = vi.fn(async () => ({}));
     public encrypt = (value: string): string => `enc:${value}`;
     public decrypt = (value: string): string => {
       if (!value.startsWith("enc:")) {
@@ -83,6 +85,7 @@ interface Internals {
   signInState(provider: string): Promise<{ status: string }>;
   onMessage(obj: unknown): Promise<void>;
   removeRetiredStates(accounts: { id: string }[]): Promise<number>;
+  clearStopInstanceFlag(): Promise<void>;
   cleanupStaleObjects(): Promise<void>;
   snapshotExistingStates(): Promise<void>;
   knownStateIds: Set<string>;
@@ -186,6 +189,68 @@ describe("sign-in flow", () => {
     await internals(adapter).onMessage({ command: "signInStart", message: { provider: "nope" }, from: "x", callback: 1 });
     expect(answers).toHaveLength(2);
     expect(answers.every(a => !!(a as { error?: string }).error)).toBe(true);
+  });
+});
+
+describe("the leftover stopInstance flag", () => {
+  test("a flag still set in the instance object is cleared once", async () => {
+    // The entry lives in the manifest AND as a copy in the database; an update merges,
+    // it never removes. Without this the whole shutdown path stays dead on every
+    // installation that once ran a version carrying it.
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(async () => ({
+      common: { supportedMessages: { stopInstance: true } },
+    })) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(async () => ({}));
+    adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
+
+    await internals(adapter).clearStopInstanceFlag();
+
+    expect(extend).toHaveBeenCalledWith("system.adapter.ai-usage.0", {
+      common: { supportedMessages: { stopInstance: false } },
+    });
+    expect(adapter.log.info).toHaveBeenCalledWith(expect.stringContaining("restarts once"));
+  });
+
+  test("nothing is written when the flag is already gone", async () => {
+    // Otherwise every single start would rewrite the instance object, and every write
+    // makes the host restart the instance — a loop.
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(async () => ({ common: {} })) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(async () => ({}));
+    adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
+
+    await internals(adapter).clearStopInstanceFlag();
+
+    expect(extend).not.toHaveBeenCalled();
+    expect(adapter.log.info).not.toHaveBeenCalled();
+  });
+
+  test("the startup actually calls it, before anything else", async () => {
+    // Without this the correction exists but never runs — the fix would ship and
+    // change nothing on an updated installation.
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
+    const seen: string[] = [];
+    adapter.getForeignObjectAsync = vi.fn(async (id: string) => {
+      seen.push(id);
+      return { common: { supportedMessages: { stopInstance: true } } };
+    }) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(async () => ({}));
+    adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
+
+    await (adapter as unknown as { onReady(): Promise<void> }).onReady();
+
+    expect(seen).toContain("system.adapter.ai-usage.0");
+    expect(extend).toHaveBeenCalledTimes(1);
+  });
+
+  test("an unreadable instance object does not stop the startup", async () => {
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(async () => {
+      throw new Error("objects db down");
+    }) as unknown as typeof adapter.getForeignObjectAsync;
+    await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBeUndefined();
   });
 });
 

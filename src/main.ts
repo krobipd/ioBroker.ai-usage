@@ -508,8 +508,41 @@ export class AiUsageAdapter extends utils.Adapter {
   // ------------------------------------------------------------- life cycle
 
   /** Validate the configuration, clean up stale objects and start the engine. */
+  /**
+   * Clear a leftover `supportedMessages.stopInstance` from THIS instance's object.
+   *
+   * The entry lives in two places: in the adapter's manifest, and as a copy in the
+   * instance object in the database. An update merges the manifest into that copy —
+   * it never removes a field. So on every installation that ran a version carrying
+   * the entry, the host keeps killing the process outright and `onUnload` still never
+   * runs: the update alone changes nothing (found by a second pair of eyes on the
+   * live server 2026-08-27, after my own test had been contaminated by a value I had
+   * set by hand).
+   *
+   * Writing the instance object makes the host restart this instance once. That is
+   * the price, it happens on the first start after the update and never again —
+   * afterwards the condition below is false. public-holidays corrects its own run
+   * mode the same way.
+   */
+  private async clearStopInstanceFlag(): Promise<void> {
+    const id = `system.adapter.${this.namespace}`;
+    try {
+      const obj = await this.getForeignObjectAsync(id);
+      const supported = obj?.common?.supportedMessages as { stopInstance?: unknown } | undefined;
+      if (!supported?.stopInstance) {
+        return;
+      }
+      this.log.info("Correcting a leftover setting from an earlier version — this instance restarts once");
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+    } catch (e) {
+      this.log.debug(`Could not check the instance object: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   private async onReady(): Promise<void> {
     try {
+      // First: without this the whole shutdown path stays dead on an updated install.
+      await this.clearStopInstanceFlag();
       const accounts = parseAccounts(this.config.accounts);
       const interval = clampPollInterval(this.config.pollInterval);
       await this.migrateTokenFiles();

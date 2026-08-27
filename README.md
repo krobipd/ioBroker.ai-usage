@@ -126,6 +126,10 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.9.2 (2026-08-27)
+
+- Fixed: Stopping the instance now marks the accounts as offline on installations that were updated too, not only on fresh ones — the previous version left them showing as online
+
 ### 0.9.1 (2026-08-27)
 
 - Changed: While an account has nothing to report — the adapter switched off, or started and not asked yet — the reason now reads "Unknown" instead of a sentence about the adapter
@@ -150,12 +154,6 @@ After a successful sign-in the account is queried immediately, so values appear 
 ### 0.7.1 (2026-08-27)
 
 - Fixed: Restarting the adapter no longer writes one unchanged value into every status datapoint, so a recorded history stays free of restart noise
-
-### 0.7.0 (2026-08-27)
-
-- New: One log line after a change tells you how many datapoints the object tree gained and lost, instead of leaving you to click through the tree
-- Fixed: A started sign-in that sat unused for a quarter of an hour now says so plainly instead of failing later with the provider's own cryptic answer
-- Fixed: Datapoints that only repeat their previous value are no longer rewritten every cycle, which kept flooding the history of anyone recording them
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
