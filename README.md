@@ -126,6 +126,11 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Fixed: Switching the instance off now shows every account as offline in the object tree and the settings, instead of leaving them green for as long as the adapter is not running
+- Fixed: After a crash or a hard kill an account no longer keeps claiming to deliver data; every account starts as "not delivering" until its first answer arrives
+
 ### 0.8.0 (2026-08-27)
 
 - Fixed: A switched-off instance no longer leaves its accounts standing green in the object tree — every account is marked as not delivering when the adapter stops

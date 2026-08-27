@@ -69,6 +69,7 @@ function makeHarness(): Harness {
     setStateChanged: (id, value) => {
       changedWrites.push(id);
       states.set(id, value);
+      return Promise.resolve();
     },
     schedule: cb => {
       intervals.push(cb);
@@ -458,17 +459,20 @@ describe("PollEngine", () => {
     expect(h.intervalCount()).toBe(3);
   });
 
-  test("nothing is reported as offline before the account was ever asked", async () => {
-    // A fresh start used to strike every account through in the object tree and
-    // paint a red badge in the settings, for a full interval, over nothing.
+  test("an account is marked as not delivering from the start, before it was ever asked", async () => {
+    // Whatever the previous run left behind stands until someone overwrites it. After
+    // a crash or a hard kill that means an account claiming to deliver while no
+    // process exists — so the start says the truth first and the first poll corrects
+    // it seconds later.
     const h = makeHarness();
     const provider = scriptedProvider([{}]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
-    expect(h.states.has("a.info.unreach")).toBe(false);
-    expect(h.states.has("a.info.error")).toBe(false);
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(String(h.states.get("a.info.error"))).toContain("first query");
     await h.tick();
     expect(h.states.get("a.info.unreach")).toBe(false);
+    expect(h.states.get("a.info.error")).toBe("");
   });
 
   test("a window the provider stopped reporting is removed, its channel with it", async () => {
@@ -526,11 +530,12 @@ describe("PollEngine", () => {
     expect(h.states.get("total.accountsReachable")).toBe(2);
 
     engine.stop();
-    engine.markAllOffline();
+    await engine.markAllOffline();
     expect(h.states.get("a.info.unreach")).toBe(true);
     expect(h.states.get("b.info.unreach")).toBe(true);
     expect(String(h.states.get("a.info.error"))).toContain("stopped");
     expect(h.states.get("total.accountsReachable")).toBe(0);
+    expect(h.states.get("info.connection")).toBe(false);
   });
 
   test("a poll requested while one runs does not overlap it, and still happens", async () => {

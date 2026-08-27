@@ -501,8 +501,8 @@ class AiUsageAdapter extends utils.Adapter {
           void this.setState(id, { val: value, ack: true }).catch(() => {
           });
         },
-        setStateChanged: (id, value) => {
-          void this.setStateChangedAsync(id, { val: value, ack: true }).catch(() => {
+        setStateChanged: async (id, value) => {
+          await this.setStateChangedAsync(id, { val: value, ack: true }).catch(() => {
           });
         },
         deleteObject: async (id) => {
@@ -694,8 +694,22 @@ class AiUsageAdapter extends utils.Adapter {
     }
   }
   /**
-   * Tear down synchronously — no async/await here, else the controller kills the
-   * process before cleanup finishes.
+   * Tear down: cancel everything, then say that nothing is delivering any more.
+   *
+   * The final writes are AWAITED before `callback()` — measured on the live server
+   * (2026-08-27), a fire-and-forget write followed by an immediate callback never
+   * reached the database, so a switched-off instance kept showing every account as
+   * online. The whole thing takes about 100 ms.
+   *
+   * Deliberately WITHOUT a time limit of its own: the adapter's timer API refuses to
+   * arm once shutdown has begun, and the host already applies the only deadline that
+   * matters — it ends the process a second after asking. A states database that
+   * hangs would swallow the writes either way, so a second guard adds code, not
+   * safety.
+   *
+   * None of this runs while `common.supportedMessages.stopInstance` sits in the
+   * manifest: with it the host kills the process outright instead of asking, and
+   * every state written here is dead code. A test pins that the entry stays out.
    *
    * @param callback invoked when cleanup is done
    */
@@ -705,13 +719,13 @@ class AiUsageAdapter extends utils.Adapter {
       for (const provider of [...this.devicePollers.keys()]) {
         this.stopDevicePoller(provider);
       }
+      const engine = this.engine;
       (_a = this.engine) == null ? void 0 : _a.stop();
-      (_b = this.engine) == null ? void 0 : _b.markAllOffline();
       this.engine = null;
-      void this.setState("info.connection", { val: false, ack: true });
+      void ((_b = engine == null ? void 0 : engine.markAllOffline()) != null ? _b : this.setState("info.connection", { val: false, ack: true })).then(() => this.log.debug("Shutdown: final states written")).catch((e) => this.log.debug(`Shutdown: final states rejected \u2014 ${e instanceof Error ? e.message : String(e)}`)).finally(callback);
     } catch {
+      callback();
     }
-    callback();
   }
 }
 if (require.main !== module) {

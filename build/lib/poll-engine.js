@@ -114,17 +114,27 @@ class PollEngine {
    * A stopped adapter reads nothing, so it must not leave every account claiming to
    * be online: `info.unreach` is what colours the account in the admin's object tree
    * and the badge in the settings, and on its last value it stays green for as long
-   * as the instance is switched off (nut2 does the same on its devices).
+   * as the instance is switched off.
    *
-   * Synchronous, like {@link stop} — the writes go out fire-and-forget, because
-   * `onUnload` must not await anything.
+   * The returned promise is what makes this WORK. Measured on the live server
+   * 2026-08-27: issued fire-and-forget and followed by an immediate `callback()`,
+   * not one of these writes ever reached the database — the process was gone first.
+   * The caller has to wait for this (with its own time limit) before saying it is
+   * done.
+   *
+   * @returns resolves once every write has been acknowledged
    */
-  markAllOffline() {
+  async markAllOffline() {
+    const writes = [];
     for (const runtime of this.runtimes) {
-      this.deps.setStateChanged(`${runtime.config.id}.info.unreach`, true);
-      this.deps.setStateChanged(`${runtime.config.id}.info.error`, "The adapter is stopped \u2014 nothing is being read");
+      writes.push(this.deps.setStateChanged(`${runtime.config.id}.info.unreach`, true));
+      writes.push(
+        this.deps.setStateChanged(`${runtime.config.id}.info.error`, "The adapter is stopped \u2014 nothing is being read")
+      );
     }
-    this.deps.setStateChanged("total.accountsReachable", 0);
+    writes.push(this.deps.setStateChanged("total.accountsReachable", 0));
+    writes.push(this.deps.setStateChanged("info.connection", false));
+    await Promise.all(writes);
   }
   /**
    * Poll one account immediately, by id. Used after a successful sign-in: waiting
@@ -238,8 +248,8 @@ class PollEngine {
     const percent = (_a = driver == null ? void 0 : driver.percent) != null ? _a : 0;
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
-    this.deps.setStateChanged(`${config.id}.warning`, runtime.status.warning);
-    this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100);
+    void this.deps.setStateChanged(`${config.id}.warning`, runtime.status.warning);
+    void this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100);
     if (runtime.status.warning && !wasWarning) {
       const window = driver ? `${driver.label} ` : "";
       const message = `${config.name}: ${window}at ${Math.round(percent)} % (threshold ${config.warnThreshold} %)`;
@@ -338,7 +348,7 @@ class PollEngine {
    */
   writeAccountInfo(runtime) {
     const { config } = runtime;
-    this.writeAccountStatus(runtime);
+    void this.writeAccountStatus(runtime);
     if (runtime.status.reachable) {
       this.deps.setState(`${config.id}.info.lastUpdate`, new Date(this.deps.now()).toISOString());
     }
@@ -355,11 +365,13 @@ class PollEngine {
    *
    * @param runtime the account's runtime
    */
-  writeAccountStatus(runtime) {
+  async writeAccountStatus(runtime) {
     const { config } = runtime;
     const delivering = runtime.state === "ok" || runtime.state === "rate-limited";
-    this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering);
-    this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
+    await Promise.all([
+      this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering),
+      this.deps.setStateChanged(`${config.id}.info.error`, runtime.error)
+    ]);
   }
   /** Recompute and write the totals + info.connection. */
   writeTotals() {
@@ -372,10 +384,10 @@ class PollEngine {
     this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
     this.deps.setState("total.maxLimitPercent", totals.maxLimitPercent);
     this.deps.setState("total.warningsActive", totals.warningsActive);
-    this.deps.setStateChanged("total.limitReached", totals.limitReached);
+    void this.deps.setStateChanged("total.limitReached", totals.limitReached);
     this.deps.setState("total.accountsReachable", totals.accountsReachable);
-    this.deps.setStateChanged("total.accounts", totals.accounts);
-    this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
+    void this.deps.setStateChanged("total.accounts", totals.accounts);
+    void this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
   }
   /**
    * The static per-account objects that exist regardless of what the source delivers.
@@ -446,6 +458,7 @@ class PollEngine {
       runtime.createdObjects.add(def.id);
     }
     runtime.staticIds = defs.filter((def) => def.type === "state").map((def) => def.id);
+    void this.writeAccountStatus(runtime);
   }
   /** The totals skeleton (channel + states). */
   async createTotalsSkeleton() {

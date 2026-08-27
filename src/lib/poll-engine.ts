@@ -36,8 +36,11 @@ export interface EngineDeps {
    * INDICATORS. js-controller does the comparison (`setStateChangedAsync`), which is
    * what the rest of the fleet uses; a hand-rolled cache would only know what this
    * process wrote and would still write blindly after a restart.
+   *
+   * Returns a promise so the shutdown path can WAIT for its writes; everywhere else
+   * it is deliberately ignored — a poll cycle must not be held up by the database.
    */
-  setStateChanged(id: string, value: boolean | number | string): void;
+  setStateChanged(id: string, value: boolean | number | string): Promise<void>;
   /** Schedule a repeating callback; returns a cancel handle. */
   schedule(cb: () => void, ms: number): unknown;
   /** Schedule a one-shot callback; returns a cancel handle. */
@@ -201,18 +204,28 @@ export class PollEngine {
    * A stopped adapter reads nothing, so it must not leave every account claiming to
    * be online: `info.unreach` is what colours the account in the admin's object tree
    * and the badge in the settings, and on its last value it stays green for as long
-   * as the instance is switched off (nut2 does the same on its devices).
+   * as the instance is switched off.
    *
-   * Synchronous, like {@link stop} — the writes go out fire-and-forget, because
-   * `onUnload` must not await anything.
+   * The returned promise is what makes this WORK. Measured on the live server
+   * 2026-08-27: issued fire-and-forget and followed by an immediate `callback()`,
+   * not one of these writes ever reached the database — the process was gone first.
+   * The caller has to wait for this (with its own time limit) before saying it is
+   * done.
+   *
+   * @returns resolves once every write has been acknowledged
    */
-  public markAllOffline(): void {
+  public async markAllOffline(): Promise<void> {
+    const writes: Promise<void>[] = [];
     for (const runtime of this.runtimes) {
-      this.deps.setStateChanged(`${runtime.config.id}.info.unreach`, true);
-      this.deps.setStateChanged(`${runtime.config.id}.info.error`, "The adapter is stopped — nothing is being read");
+      writes.push(this.deps.setStateChanged(`${runtime.config.id}.info.unreach`, true));
+      writes.push(
+        this.deps.setStateChanged(`${runtime.config.id}.info.error`, "The adapter is stopped — nothing is being read"),
+      );
     }
     // The same lie one level up: "accounts currently delivering data" is zero.
-    this.deps.setStateChanged("total.accountsReachable", 0);
+    writes.push(this.deps.setStateChanged("total.accountsReachable", 0));
+    writes.push(this.deps.setStateChanged("info.connection", false));
+    await Promise.all(writes);
   }
 
   /**
@@ -335,8 +348,8 @@ export class PollEngine {
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
     // Indicators go through the changed-write, measurements through the normal one.
-    this.deps.setStateChanged(`${config.id}.warning`, runtime.status.warning);
-    this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100);
+    void this.deps.setStateChanged(`${config.id}.warning`, runtime.status.warning);
+    void this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100);
     if (runtime.status.warning && !wasWarning) {
       // Always name the window: "usage at 100 %" without it was misleading whenever
       // several windows existed.
@@ -438,7 +451,7 @@ export class PollEngine {
    */
   private writeAccountInfo(runtime: AccountRuntime): void {
     const { config } = runtime;
-    this.writeAccountStatus(runtime);
+    void this.writeAccountStatus(runtime);
     if (runtime.status.reachable) {
       this.deps.setState(`${config.id}.info.lastUpdate`, new Date(this.deps.now()).toISOString());
     }
@@ -456,11 +469,13 @@ export class PollEngine {
    *
    * @param runtime the account's runtime
    */
-  private writeAccountStatus(runtime: AccountRuntime): void {
+  private async writeAccountStatus(runtime: AccountRuntime): Promise<void> {
     const { config } = runtime;
     const delivering = runtime.state === "ok" || runtime.state === "rate-limited";
-    this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering);
-    this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
+    await Promise.all([
+      this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering),
+      this.deps.setStateChanged(`${config.id}.info.error`, runtime.error),
+    ]);
   }
 
   /** Recompute and write the totals + info.connection. */
@@ -474,12 +489,12 @@ export class PollEngine {
     this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
     this.deps.setState("total.maxLimitPercent", totals.maxLimitPercent);
     this.deps.setState("total.warningsActive", totals.warningsActive);
-    this.deps.setStateChanged("total.limitReached", totals.limitReached);
+    void this.deps.setStateChanged("total.limitReached", totals.limitReached);
     this.deps.setState("total.accountsReachable", totals.accountsReachable);
     // The configured count only ever changes with the configuration, which restarts
     // the instance — rewriting it every cycle would be pure noise in a recording.
-    this.deps.setStateChanged("total.accounts", totals.accounts);
-    this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
+    void this.deps.setStateChanged("total.accounts", totals.accounts);
+    void this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
   }
 
   /**
@@ -551,11 +566,18 @@ export class PollEngine {
       runtime.createdObjects.add(def.id);
     }
     runtime.staticIds = defs.filter(def => def.type === "state").map(def => def.id);
-    // Deliberately NO status write here. Before the first answer the adapter knows
-    // nothing, and writing "not reachable" would strike every account through in the
-    // object tree and paint a red badge in the settings — for a full poll interval,
-    // over an adapter that is working perfectly. Both surfaces show nothing while
-    // the datapoint has no value, which is the honest picture.
+    // Mark it as not delivering right away, before anything has been asked.
+    //
+    // This looks pessimistic and is the honest state: nothing has been read yet. It
+    // also carries the whole weight of "the instance was off". Whatever the previous
+    // run left behind stands until someone overwrites it — after a hard kill, after
+    // a crash, after an unclean shutdown the account would otherwise sit there green
+    // and claim to deliver while no process exists at all. nut2 marks its devices
+    // unreachable on start for exactly this reason.
+    //
+    // The window is short: the first poll follows within seconds and writes the real
+    // state, success or failure.
+    void this.writeAccountStatus(runtime);
   }
 
   /** The totals skeleton (channel + states). */

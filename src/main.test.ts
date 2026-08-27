@@ -68,6 +68,7 @@ vi.mock("@iobroker/adapter-core", () => {
   };
 });
 
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { AiUsageAdapter } from "./main";
@@ -240,11 +241,57 @@ describe("object housekeeping", () => {
 });
 
 describe("shutdown", () => {
-  test("unload reports the disconnect and returns synchronously", () => {
+  test("the manifest must not declare stopInstance, or none of this runs at all", () => {
+    // Measured against the live js-controller 7.2.2 on 2026-08-27: with
+    // `supportedMessages.stopInstance` the host sends a message and then kills the
+    // process unconditionally (`terminated due to SIGKILL`) — `onUnload` never runs,
+    // and every state this adapter writes while shutting down is dead code. Without
+    // it the host signals through a state, the adapter ends itself
+    // (`ADAPTER_REQUESTED_TERMINATION`) and the writes arrive.
+    //
+    // This is a property of the MANIFEST, so no amount of shutdown code can defend
+    // it — only this test can.
+    const manifest = JSON.parse(readFileSync(join(__dirname, "..", "io-package.json"), "utf8")) as {
+      common: { supportedMessages?: Record<string, unknown> };
+    };
+    expect(manifest.common.supportedMessages?.stopInstance).toBeUndefined();
+  });
+
+  test("the disconnect is written BEFORE the controller is told we are done", async () => {
+    // Measured on the live server: writing fire-and-forget and calling back at once
+    // means the process is gone before the write lands, and every account keeps
+    // claiming to be online while the instance is switched off.
     const adapter = makeAdapter();
+    const order: string[] = [];
+    // Resolves on a LATER turn of the event loop, like a real database round trip —
+    // an `async () => push()` would record the write synchronously and the test
+    // would pass even with the callback fired first.
+    adapter.setState = vi.fn(
+      () =>
+        new Promise<string>(resolve =>
+          setImmediate(() => {
+            order.push("write");
+            resolve("");
+          }),
+        ),
+    ) as unknown as typeof adapter.setState;
+    const done = vi.fn(() => void order.push("callback"));
+    internals(adapter).onUnload(done);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(order).toEqual(["write", "callback"]);
+    expect(adapter.setState).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  test("a rejected write still lets the shutdown finish", async () => {
+    // The states database going down mid-shutdown must not leave the controller
+    // waiting for a callback that never comes.
+    const adapter = makeAdapter();
+    adapter.setState = vi.fn(() => Promise.reject(new Error("connection closed"))) as unknown as typeof adapter.setState;
     const done = vi.fn();
     internals(adapter).onUnload(done);
+    await new Promise(resolve => setTimeout(resolve, 10));
     expect(done).toHaveBeenCalledTimes(1);
-    expect(adapter.setState).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
+    expect(adapter.log.debug).toHaveBeenCalledWith(expect.stringContaining("rejected"));
   });
 });

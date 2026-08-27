@@ -3,6 +3,19 @@
     "name": "ai-usage",
     "version": "0.8.0",
     "news": {
+      "NEXT": {
+        "en": "Stopping the instance now really marks every account as offline, and an account no longer keeps claiming to deliver data after a crash",
+        "de": "Das Stoppen der Instanz kennzeichnet jetzt wirklich jedes Konto als offline, und nach einem Absturz behauptet kein Konto mehr, es liefere Daten",
+        "ru": "Остановка экземпляра теперь действительно помечает все аккаунты как офлайн, и после сбоя ни один аккаунт больше не утверждает, что передаёт данные",
+        "pt": "Parar a instância passa a marcar realmente todas as contas como offline, e após uma falha nenhuma conta continua a afirmar que fornece dados",
+        "nl": "Het stoppen van de instantie markeert nu echt elk account als offline, en na een crash beweert geen account meer dat het gegevens levert",
+        "fr": "L'arrêt de l'instance marque désormais réellement chaque compte hors ligne, et après un plantage aucun compte ne prétend plus fournir des données",
+        "it": "L'arresto dell'istanza contrassegna davvero ogni account come offline e dopo un crash nessun account continua a sostenere di fornire dati",
+        "es": "Detener la instancia ahora marca realmente todas las cuentas como sin conexión, y tras un fallo ninguna cuenta sigue afirmando que entrega datos",
+        "pl": "Zatrzymanie instancji naprawdę oznacza teraz każde konto jako offline, a po awarii żadne konto nie twierdzi już, że dostarcza dane",
+        "uk": "Зупинка екземпляра тепер справді позначає кожен обліковий запис як офлайн, а після збою жоден із них більше не стверджує, що передає дані",
+        "zh-cn": "停止实例现在会真正把每个账户标记为离线，崩溃之后账户也不再声称自己仍在提供数据"
+      },
       "0.8.0": {
         "en": "Signing out of a subscription really stops it now, accounts are no longer shown offline before their first answer, and queries stay spread out",
         "de": "Das Abmelden eines Abos wirkt jetzt wirklich, Konten gelten vor der ersten Antwort nicht mehr als offline, und die Abfragen bleiben entzerrt",
@@ -80,19 +93,6 @@
         "pl": "Limity pojedynczego modelu nie oznaczają już całego konta jako pełnego, każde konto pokazuje, czy usługa AI jest online, do tego raporty błędów Sentry i nowa ikona",
         "uk": "Ліміти окремої моделі більше не позначають весь акаунт як заповнений, кожен акаунт показує, чи сервіс ШІ онлайн, а також звіти про помилки Sentry і нова піктограма",
         "zh-cn": "单个模型的限额不再把整个账户标记为已满，每个账户都会显示 AI 服务本身是否在线，另有 Sentry 错误报告和新图标"
-      },
-      "0.3.0": {
-        "en": "Three subscriptions instead of one: Claude, ChatGPT and Google/Gemini each with their own guided sign-in; ChatGPT and Gemini could not be tested on a live account yet",
-        "de": "Drei Abos statt einem: Claude, ChatGPT und Google/Gemini mit je eigener geführter Anmeldung; ChatGPT und Gemini konnten noch an keinem echten Konto getestet werden",
-        "ru": "Три подписки вместо одной: Claude, ChatGPT и Google/Gemini, у каждой свой пошаговый вход; ChatGPT и Gemini пока не проверены на реальном аккаунте",
-        "pt": "Três subscrições em vez de uma: Claude, ChatGPT e Google/Gemini, cada uma com o seu início de sessão guiado; ChatGPT e Gemini ainda não foram testados numa conta real",
-        "nl": "Drie abonnementen in plaats van één: Claude, ChatGPT en Google/Gemini, elk met een eigen begeleide aanmelding; ChatGPT en Gemini zijn nog niet op een echt account getest",
-        "fr": "Trois abonnements au lieu d'un : Claude, ChatGPT et Google/Gemini, chacun avec sa connexion guidée ; ChatGPT et Gemini n'ont pas encore été testés sur un compte réel",
-        "it": "Tre abbonamenti invece di uno: Claude, ChatGPT e Google/Gemini, ognuno con il proprio accesso guidato; ChatGPT e Gemini non sono ancora stati testati su un account reale",
-        "es": "Tres suscripciones en lugar de una: Claude, ChatGPT y Google/Gemini, cada una con su inicio de sesión guiado; ChatGPT y Gemini aún no se han probado en una cuenta real",
-        "pl": "Trzy subskrypcje zamiast jednej: Claude, ChatGPT i Google/Gemini, każda z własnym prowadzonym logowaniem; ChatGPT i Gemini nie zostały jeszcze sprawdzone na prawdziwym koncie",
-        "uk": "Три підписки замість однієї: Claude, ChatGPT і Google/Gemini, кожна зі своїм покроковим входом; ChatGPT і Gemini ще не перевірені на справжньому обліковому записі",
-        "zh-cn": "三个订阅而不是一个：Claude、ChatGPT 和 Google/Gemini 各有自己的引导式登录；ChatGPT 和 Gemini 尚未在真实账户上测试"
       }
     },
     "plugins": {
@@ -161,9 +161,6 @@
     "dataSource": "poll",
     "adminUI": {
       "config": "json"
-    },
-    "supportedMessages": {
-      "stopInstance": true
     },
     "messagebox": true,
     "dependencies": [
