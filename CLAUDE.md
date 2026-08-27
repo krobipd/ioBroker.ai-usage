@@ -114,7 +114,8 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     VERALTET, deshalb sah man von den alten Datenpunkten nirgends ein Symbol. `info.error` trägt
     den Grund im Klartext. **Nicht** mit der Rolle `indicator.error`: die zwei offiziellen Quellen
     widersprechen sich (Typ-Erkenner: Text, Gültigkeits-Liste des Prüfbots: nur Ja/Nein → E1009) —
-    Gültigkeit gewinnt, der Text läuft auf `text`. Beide nur bei ÄNDERUNG geschrieben (govee-Lehre).
+    Gültigkeit gewinnt, der Text läuft auf `text`. Beide nur bei ÄNDERUNG geschrieben — seit 0.7.0 gilt das auch für `warning`, `limitReached`,
+    `total.limitReached` und `info.connection` (govee-Lehre, Muster in `CLAUDE_PATTERNS.md`).
     Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` — beim Start
     deterministisch gelöscht (feste Liste, kein Zustands-Raten), ioBroker räumt Verwaistes nie
     selbst weg, ein toter Datenpunkt lügt weiter.
