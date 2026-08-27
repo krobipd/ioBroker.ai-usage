@@ -125,6 +125,10 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.7.1 (2026-08-27)
+
+- Fixed: Restarting the adapter no longer writes one unchanged value into every status datapoint, so a recorded history stays free of restart noise
+
 ### 0.7.0 (2026-08-27)
 
 - New: One log line after a change tells you how many datapoints the object tree gained and lost, instead of leaving you to click through the tree
@@ -147,14 +151,6 @@ After a successful sign-in the account is queried immediately, so values appear 
 - New: Each account shows whether the AI service itself is online, telling a service outage apart from a rejected sign-in or a missing internet connection
 - New: Error reporting via Sentry — crashes reach the developer automatically, but only if you enabled diagnostics and error reporting in the ioBroker system settings
 - Changed: New adapter icon — a network of nodes instead of the dark tile, so it reads as AI at a glance and sits cleanly in both the light and the dark admin
-
-### 0.3.0 (2026-08-26)
-
-- New: ChatGPT and Google/Gemini subscriptions can now be monitored like the Claude one — each with its own guided sign-in that the settings page walks you through step by step
-- New: The ChatGPT and Gemini readouts use the same endpoints the providers' own tools use, but no live subscription was available to test them on — please report anything that looks wrong
-- Changed: Each account now owns exactly one node in the object tree (`claude`, `chatgpt`, `gemini`, `<name>-api`); the separate sign-in branch is gone and old nodes are cleaned up automatically
-- Fixed: After signing in, the account is queried immediately instead of waiting for the next poll — no restart needed
-- Fixed: OpenAI and Anthropic rows now state that they need an organisation admin key, instead of failing with an unexplained rejection
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
