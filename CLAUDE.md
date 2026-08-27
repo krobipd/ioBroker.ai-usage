@@ -169,6 +169,12 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     c) **Start-Stempel im Skelett-Aufbau** — jedes Konto steht auf „liefert nicht", bis die erste
        Antwort da ist. Der tragende Teil: Absturz, Stromausfall und harter Abschuss lassen keinen
        Abschalt-Code laufen. nut2 macht dasselbe mit `markAllUnreachable()`.
+    d) **Der Grund-Text ist `REASON_UNKNOWN` = `Unknown`** (0.9.1, krobi-Vorgabe: „da muss eine rote
+       linie her in allen adaptern") — an EINER Stelle definiert, benutzt beim Start und beim
+       Beenden. Leer im Normalbetrieb, sonst der Text des Anbieters. Vorher stand dort ein Satz,
+       den ich mir ausgedacht hatte („The adapter is stopped — nothing is being read"); der
+       angehängte Halbsatz war die Rechtfertigung, an der krobi sich gestoßen hat. Ein Gate im
+       Konsistenz-Audit fängt jeden adapter-eigenen Wortlaut.
 
 ## Tests
 
