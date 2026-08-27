@@ -125,10 +125,10 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     `total.limitReached` und `info.connection` (govee-Lehre, Muster in `CLAUDE_PATTERNS.md`).
     Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` — beim Start
     deterministisch gelöscht (feste Liste, kein Zustands-Raten; welche davon es noch gibt, sagt der
-    Start-Schnappschuss aus Punkt 14, nicht 35 Einzelabfragen pro Start). **Vor der ersten Antwort
-    wird KEIN Status geschrieben** (0.8.0): ein frischer Start hatte sonst jedes Konto
-    durchgestrichen und rot bebadgt, bevor überhaupt gefragt war — ohne Wert zeigen Objektbaum und
-    Konfig-Seite von selbst nichts, und das ist das ehrliche Bild.
+    Start-Schnappschuss aus Punkt 14, nicht 35 Einzelabfragen pro Start).
+    ⚠️ **0.8.0 hatte hier „vor der ersten Antwort wird KEIN Status geschrieben" — das war mein
+    Fehler und ist in 0.9.0 zurückgenommen** (siehe Punkt 19): der Weglassen-Ansatz lässt nach
+    einem Absturz ein totes Konto grün stehen. Der Start-Stempel ist wieder drin.
 14. **Datenpunkt-Bilanz beim Start** (Flotten-Standard, beszel-Vorbild): EINE `info`-Zeile
     „Object tree updated: created N, removed M datapoint(s)", still bei 0/0. Damit sie nicht nach
     jedem Neustart alles als neu meldet, wird VOR Aufräumen und Engine ein Schnappschuss aller
@@ -155,6 +155,20 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     daneben: nebeneinander angelegt zählen alle Konten ab derselben Sekunde und feuern ab der
     zweiten Runde gemeinsam — genau das Bündel, gegen das die Entzerrung und die Mindestwartezeit
     aus Punkt 5 gebaut sind.
+19. **Offline-Kennzeichnung an DREI Stellen** (0.9.0, live gemessen — allgemeine Regel jetzt in
+    `Entwicklung/CLAUDE_CODING.md`):
+    a) **Kein `supportedMessages.stopInstance` im Manifest.** Mit dem Eintrag beendet der Host den
+       Prozess bedingungslos hart, `onUnload` läuft NIE — jeder Abschalt-Schreibvorgang war toter
+       Code, auch das `info.connection` seit 0.1.0. Ein Test nagelt fest, dass der Eintrag draußen
+       bleibt; es ist eine Manifest-Eigenschaft, die kein Code verteidigen kann.
+    b) **`onUnload` meldet erst nach den Schreibvorgängen fertig** (`.finally(callback)`) —
+       fire-and-forget kommt nicht an. `markAllOffline()` schreibt `info.unreach`, `info.error`,
+       `total.accountsReachable` und `info.connection`; dauert ~100 ms, Frist des Hosts ist 1 s.
+       Keine eigene Notbremse: die Adapter-Zeitschaltung verweigert beim Beenden, eine nackte
+       meldet der Prüfbot (E5005).
+    c) **Start-Stempel im Skelett-Aufbau** — jedes Konto steht auf „liefert nicht", bis die erste
+       Antwort da ist. Der tragende Teil: Absturz, Stromausfall und harter Abschuss lassen keinen
+       Abschalt-Code laufen. nut2 macht dasselbe mit `markAllUnreachable()`.
 
 ## Tests
 
