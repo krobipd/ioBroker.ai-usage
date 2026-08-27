@@ -153,32 +153,36 @@ function applyExtraUsage(raw: Record<string, unknown>, snapshot: UsageSnapshot):
  * The Claude subscription provider: keeps the access token fresh (refresh 60 s
  * before expiry, persisted via the store) and reads the usage meters.
  *
+ * The tokens are read from the store on every round and never kept here. Holding
+ * them would survive a sign-out — the file would be gone, the adapter would keep
+ * polling with what it still had, and the next refresh would write the file back.
+ * The store owns the tokens and their cache; this module only uses them.
+ *
  * @param store the token storage
- * @param fetchJson the JSON-GET seam
  * @param postJson the JSON-POST seam (token refresh)
+ * @param fetchJson the JSON-GET seam
  * @param now clock (ms) — injected for tests
  * @returns the provider
  */
 export function claudeSubProvider(
   store: TokenStore,
-  fetchJson: JsonFetch = getJson,
   postJson: JsonPost,
+  fetchJson: JsonFetch = getJson,
   now: () => number = Date.now,
 ): UsageProvider {
-  let cached: TokenSet | null = null;
   return {
     kind: "claude-sub",
     fetch: async (): Promise<UsageSnapshot> => {
-      cached ??= await store.load();
-      if (!cached) {
+      let tokens: TokenSet | null = await store.load();
+      if (!tokens) {
         throw new FetchError("auth", "not signed in — run the Claude sign-in in the instance settings");
       }
-      if (now() >= cached.expiresAt - 60_000) {
-        cached = await refreshTokens(cached, postJson, now());
-        await store.save(cached);
+      if (now() >= tokens.expiresAt - 60_000) {
+        tokens = await refreshTokens(tokens, postJson, now());
+        await store.save(tokens);
       }
       const body = await fetchJson(CLAUDE_OAUTH.usageUrl, {
-        Authorization: `Bearer ${cached.accessToken}`,
+        Authorization: `Bearer ${tokens.accessToken}`,
         "anthropic-beta": CLAUDE_OAUTH.betaHeader,
         // Identify ourselves — an unset/odd user agent lands in a harder-throttled
         // bucket of this endpoint (community-measured; sources in the concept doc).

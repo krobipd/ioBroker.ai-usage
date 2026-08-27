@@ -24,6 +24,7 @@ __export(openrouter_exports, {
 module.exports = __toCommonJS(openrouter_exports);
 var import_http = require("../http");
 var import_provider = require("../provider");
+var import_pure_helpers = require("../pure-helpers");
 function parseOpenRouterKeyInfo(body) {
   var _a, _b, _c;
   const data = body == null ? void 0 : body.data;
@@ -31,15 +32,15 @@ function parseOpenRouterKeyInfo(body) {
     throw new import_provider.FetchError("network", "unexpected response shape (no data object)");
   }
   const info = data;
-  const used = numberOrUndefined((_a = info.usage) != null ? _a : info.credits_used);
-  const limit = numberOrUndefined((_b = info.limit) != null ? _b : info.credit_limit);
-  const remaining = (_c = numberOrUndefined(info.limit_remaining)) != null ? _c : used !== void 0 && limit !== void 0 ? round2(limit - used) : void 0;
+  const used = (0, import_pure_helpers.finiteNumber)((_a = info.usage) != null ? _a : info.credits_used);
+  const limit = (0, import_pure_helpers.finiteNumber)((_b = info.limit) != null ? _b : info.credit_limit);
+  const remaining = (_c = (0, import_pure_helpers.finiteNumber)(info.limit_remaining)) != null ? _c : used !== void 0 && limit !== void 0 ? (0, import_pure_helpers.round2)(limit - used) : void 0;
   const snapshot = {
     credits: {
       used,
       limit,
       remaining,
-      percent: used !== void 0 && limit !== void 0 && limit > 0 ? round2(used / limit * 100) : void 0,
+      percent: used !== void 0 && limit !== void 0 && limit > 0 ? (0, import_pure_helpers.round2)(used / limit * 100) : void 0,
       currency: "USD"
     }
   };
@@ -55,13 +56,6 @@ function openRouterProvider(apiKey, fetchJson = import_http.getJson) {
       await fetchJson("https://openrouter.ai/api/v1/auth/key", { Authorization: `Bearer ${apiKey}` })
     )
   };
-}
-function numberOrUndefined(value) {
-  const num = Number(value);
-  return value !== null && value !== void 0 && value !== "" && Number.isFinite(num) ? num : void 0;
-}
-function round2(value) {
-  return Math.round(value * 100) / 100;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

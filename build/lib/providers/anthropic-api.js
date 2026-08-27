@@ -23,23 +23,9 @@ __export(anthropic_api_exports, {
 });
 module.exports = __toCommonJS(anthropic_api_exports);
 var import_http = require("../http");
+var import_pure_helpers = require("../pure-helpers");
 var import_report_utils = require("./report-utils");
 const BASE = "https://api.anthropic.com/v1/organizations";
-async function fetchAllPages(url, headers, fetchJson) {
-  const buckets = [];
-  let page;
-  for (let i = 0; i < 12; i++) {
-    const body = await fetchJson(page ? `${url}&page=${encodeURIComponent(page)}` : url, headers);
-    if (Array.isArray(body == null ? void 0 : body.data)) {
-      buckets.push(...body.data);
-    }
-    if ((body == null ? void 0 : body.has_more) !== true || typeof (body == null ? void 0 : body.next_page) !== "string" || !body.next_page) {
-      break;
-    }
-    page = body.next_page;
-  }
-  return buckets;
-}
 function parseAnthropicReports(usageBuckets, costBuckets, nowMs) {
   var _a, _b;
   let costMonth = 0;
@@ -82,11 +68,10 @@ function parseAnthropicReports(usageBuckets, costBuckets, nowMs) {
       }
     }
   }
-  const round = (value) => Math.round(value * 100) / 100;
   const snapshot = {
     costs: {
-      today: round(costToday),
-      month: round(costMonth),
+      today: (0, import_pure_helpers.round2)(costToday),
+      month: (0, import_pure_helpers.round2)(costMonth),
       projectedMonth: (0, import_report_utils.projectMonth)(costMonth, nowMs),
       currency: "USD"
     }
@@ -102,12 +87,12 @@ function anthropicApiProvider(adminKey, fetchJson = import_http.getJson, now = D
     fetch: async () => {
       const headers = { "x-api-key": adminKey, "anthropic-version": "2023-06-01" };
       const start = encodeURIComponent((0, import_report_utils.monthStartIso)(now()));
-      const usage = await fetchAllPages(
+      const usage = await (0, import_report_utils.fetchAllPages)(
         `${BASE}/usage_report/messages?starting_at=${start}&bucket_width=1d`,
         headers,
         fetchJson
       );
-      const costs = await fetchAllPages(`${BASE}/cost_report?starting_at=${start}&bucket_width=1d`, headers, fetchJson);
+      const costs = await (0, import_report_utils.fetchAllPages)(`${BASE}/cost_report?starting_at=${start}&bucket_width=1d`, headers, fetchJson);
       return parseAnthropicReports(usage, costs, now());
     }
   };

@@ -21,9 +21,10 @@ __export(totals_exports, {
   computeTotals: () => computeTotals
 });
 module.exports = __toCommonJS(totals_exports);
+var import_pure_helpers = require("./pure-helpers");
 var import_snapshot_tree = require("./snapshot-tree");
 const TOTAL_CURRENCY = "USD";
-function computeTotals(statuses) {
+function computeTotals(statuses, configured) {
   var _a, _b, _c, _d;
   let costsToday = 0;
   let costsMonth = 0;
@@ -58,19 +59,16 @@ function computeTotals(statuses) {
     }
   }
   return {
-    costsToday: round2(costsToday),
-    costsMonth: round2(costsMonth),
-    costsProjectedMonth: round2(costsProjectedMonth),
+    costsToday: (0, import_pure_helpers.round2)(costsToday),
+    costsMonth: (0, import_pure_helpers.round2)(costsMonth),
+    costsProjectedMonth: (0, import_pure_helpers.round2)(costsProjectedMonth),
     currency: TOTAL_CURRENCY,
-    maxLimitPercent: round2(maxPercent),
+    maxLimitPercent: (0, import_pure_helpers.round2)(maxPercent),
     warningsActive,
     limitReached,
     accountsReachable: reachable,
-    accounts: statuses.length
+    accounts: configured
   };
-}
-function round2(value) {
-  return Math.round(value * 100) / 100;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

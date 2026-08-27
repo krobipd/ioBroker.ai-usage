@@ -38,6 +38,7 @@ class PollEngine {
   constructor(accounts, providers, intervalSec, deps) {
     this.intervalSec = intervalSec;
     this.deps = deps;
+    this.configuredAccounts = accounts.length;
     for (const config of accounts) {
       const provider = providers.get(config.id);
       if (!provider) {
@@ -56,7 +57,11 @@ class PollEngine {
         state: "no-connection",
         error: "waiting for the first query",
         createdObjects: /* @__PURE__ */ new Set(),
-        firstPollDone: false
+        firstPollDone: false,
+        polling: false,
+        pollAgain: false,
+        deliveredIds: null,
+        staticIds: []
       });
     }
   }
@@ -66,21 +71,32 @@ class PollEngine {
   handles = [];
   stopped = false;
   firstRoundReported = false;
+  /**
+   * How many accounts the user switched on — including those the adapter cannot
+   * poll because their credential is missing. `total.accounts` is what the user
+   * configured, not what happened to work out.
+   */
+  configuredAccounts;
   /** Create the static per-account and totals objects, then arm the poll cycles. */
   async start() {
     for (const runtime of this.runtimes) {
       await this.createAccountSkeleton(runtime);
     }
     await this.createTotalsSkeleton();
-    await this.writeTotals();
+    this.writeTotals();
     if (this.runtimes.length === 0) {
       this.reportFirstRoundOnce();
       return;
     }
     this.runtimes.forEach((runtime, index) => {
       this.handles.push(
-        this.deps.scheduleOnce(() => void this.pollAccount(runtime), index * STAGGER_MS),
-        this.deps.schedule(() => void this.pollAccount(runtime), this.intervalSec * 1e3)
+        this.deps.scheduleOnce(() => {
+          if (this.stopped) {
+            return;
+          }
+          this.handles.push(this.deps.schedule(() => void this.pollAccount(runtime), this.intervalSec * 1e3));
+          void this.pollAccount(runtime);
+        }, index * STAGGER_MS)
       );
     });
   }
@@ -91,10 +107,6 @@ class PollEngine {
       this.deps.cancel(handle);
     }
     this.handles.length = 0;
-  }
-  /** The account ids the engine drives (for the stale-object cleanup). */
-  get accountIds() {
-    return this.runtimes.map((runtime) => runtime.config.id);
   }
   /**
    * Poll one account immediately, by id. Used after a successful sign-in: waiting
@@ -113,12 +125,38 @@ class PollEngine {
   /**
    * Poll one account now (also used by the staggered first run).
    *
+   * Never two at once for the same account: a sign-in triggers an immediate poll,
+   * which can land on top of a scheduled one — and two token refreshes in parallel
+   * on a rotating refresh token sign each other out. A request that arrives while
+   * one is running is remembered and runs right after, so nothing is lost.
+   *
    * @param runtime the account's runtime
    */
   async pollAccount(runtime) {
     if (this.stopped) {
       return;
     }
+    if (runtime.polling) {
+      runtime.pollAgain = true;
+      return;
+    }
+    runtime.polling = true;
+    try {
+      await this.pollOnce(runtime);
+    } finally {
+      runtime.polling = false;
+    }
+    if (runtime.pollAgain && !this.stopped) {
+      runtime.pollAgain = false;
+      await this.pollAccount(runtime);
+    }
+  }
+  /**
+   * One poll of one account: fetch, classify, write.
+   *
+   * @param runtime the account's runtime
+   */
+  async pollOnce(runtime) {
     const { config } = runtime;
     if (this.deps.now() < runtime.skipUntil) {
       this.deps.log.debug(`${config.name}: in rate-limit backoff \u2014 poll skipped`);
@@ -141,7 +179,7 @@ class PollEngine {
       this.handleFailure(runtime, e);
     }
     this.writeAccountInfo(runtime);
-    await this.writeTotals();
+    this.writeTotals();
     runtime.firstPollDone = true;
     this.reportFirstRoundOnce();
   }
@@ -164,7 +202,7 @@ class PollEngine {
   async applySnapshot(runtime, snapshot) {
     var _a, _b, _c;
     const { config } = runtime;
-    const { objects, writes } = (0, import_snapshot_tree.mapSnapshot)(config.id, config.name, config.provider, snapshot);
+    const { objects, writes } = (0, import_snapshot_tree.mapSnapshot)(config.id, snapshot);
     for (const object of objects) {
       if (!runtime.createdObjects.has(object.id)) {
         await this.deps.upsertObject(object);
@@ -174,6 +212,10 @@ class PollEngine {
     for (const write of writes) {
       this.deps.setState(write.id, write.value);
     }
+    await this.removeVanished(
+      runtime,
+      writes.map((write) => write.id)
+    );
     const driver = (0, import_snapshot_tree.limitingWindow)(snapshot);
     const percent = (_a = driver == null ? void 0 : driver.percent) != null ? _a : 0;
     const wasWarning = runtime.status.warning;
@@ -186,6 +228,26 @@ class PollEngine {
       this.deps.log.warn(message);
       (_c = (_b = this.deps).notify) == null ? void 0 : _c.call(_b, config.name, message);
     }
+  }
+  /**
+   * Delete what this account no longer delivers.
+   *
+   * The first round after a start compares against the DATABASE, so a window or
+   * model that disappeared while the adapter was stopped is caught as well; every
+   * round after that compares against the previous snapshot, which costs nothing.
+   *
+   * @param runtime the account's runtime
+   * @param delivered the state ids this snapshot wrote
+   */
+  async removeVanished(runtime, delivered) {
+    var _a;
+    const known = (_a = runtime.deliveredIds) != null ? _a : await this.deps.listStateIds(runtime.config.id);
+    for (const id of (0, import_snapshot_tree.orphanObjectIds)(known, delivered, runtime.staticIds)) {
+      await this.deps.deleteObject(id);
+      runtime.createdObjects.delete(id);
+      this.deps.log.info(`${runtime.config.name}: removed "${id}" \u2014 the provider no longer reports it`);
+    }
+    runtime.deliveredIds = delivered;
   }
   /**
    * Classify a fetch failure.
@@ -282,8 +344,11 @@ class PollEngine {
     this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
   }
   /** Recompute and write the totals + info.connection. */
-  async writeTotals() {
-    const totals = (0, import_totals.computeTotals)(this.runtimes.map((runtime) => runtime.status));
+  writeTotals() {
+    const totals = (0, import_totals.computeTotals)(
+      this.runtimes.map((runtime) => runtime.status),
+      this.configuredAccounts
+    );
     this.deps.setState("total.costs.today", totals.costsToday);
     this.deps.setState("total.costs.month", totals.costsMonth);
     this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
@@ -291,9 +356,8 @@ class PollEngine {
     this.deps.setState("total.warningsActive", totals.warningsActive);
     this.deps.setStateChanged("total.limitReached", totals.limitReached);
     this.deps.setState("total.accountsReachable", totals.accountsReachable);
-    this.deps.setState("total.accounts", totals.accounts);
+    this.deps.setStateChanged("total.accounts", totals.accounts);
     this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
-    return Promise.resolve();
   }
   /**
    * The static per-account objects that exist regardless of what the source delivers.
@@ -363,7 +427,7 @@ class PollEngine {
       await this.deps.upsertObject(def);
       runtime.createdObjects.add(def.id);
     }
-    this.writeAccountStatus(runtime);
+    runtime.staticIds = defs.filter((def) => def.type === "state").map((def) => def.id);
   }
   /** The totals skeleton (channel + states). */
   async createTotalsSkeleton() {

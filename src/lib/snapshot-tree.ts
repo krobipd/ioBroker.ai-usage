@@ -75,18 +75,16 @@ export interface TreeResult {
  * `costs.*`, `tokens.*` (+ `models.*`) — only what the snapshot carries is created,
  * so the tree mirrors exactly what the provider's source delivers.
  *
+ * The account's own device object is NOT part of this — the poll engine's skeleton
+ * owns it, together with the link that draws the connection icon. Building it here
+ * as well would mean two definitions of one object, and the one without the link
+ * would be the one that silently wins after a cache reset.
+ *
  * @param accountId the id-safe account id (device node)
- * @param accountName the display name for the device object
- * @param provider the provider kind (device object name suffix)
  * @param snapshot the fetched snapshot
  * @returns objects (parents first) and state writes
  */
-export function mapSnapshot(
-  accountId: string,
-  accountName: string,
-  provider: string,
-  snapshot: UsageSnapshot,
-): TreeResult {
+export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeResult {
   const objects: ObjectDef[] = [];
   const writes: StateWrite[] = [];
   const add = (pair: { def: ObjectDef; write: StateWrite }): void => {
@@ -96,8 +94,6 @@ export function mapSnapshot(
   const channel = (id: string, name: string): void => {
     objects.push({ id, type: "channel", common: { name } });
   };
-
-  objects.push({ id: accountId, type: "device", common: { name: `${accountName} (${provider})` } });
 
   if (snapshot.limits && snapshot.limits.length > 0) {
     channel(`${accountId}.limits`, "Limit windows");
@@ -223,20 +219,24 @@ export function mapSnapshot(
  * The window that decides how full an account is: the highest PLAN-WIDE limit, or
  * the granted budget when the account has no windows at all.
  *
- * Windows marked `scoped` are left out on purpose — they cover a single model and
- * may sit at 100 % permanently for a model the user never touches, which would
- * pin the account's warning on forever. Their datapoints still exist; they just
- * do not speak for the account.
+ * Windows marked `scoped` cover a single model and are left out as long as a
+ * plan-wide window exists — a model the user never touches may sit at 100 %
+ * permanently and would pin the account's warning on forever. Their datapoints
+ * still exist; they just do not speak for the account.
+ *
+ * When an account has ONLY model windows (Google reports no plan-wide bucket at
+ * all), the fullest of them speaks instead — an account whose warning could never
+ * fire would be no better than one whose warning never clears. The label carries
+ * the model name, so the warning says which model it came from.
  *
  * @param snapshot the snapshot
  * @returns percent plus the label that produced it, or undefined when nothing applies
  */
 export function limitingWindow(snapshot: UsageSnapshot): { percent: number; label: string } | undefined {
+  const limits = snapshot.limits ?? [];
+  const planWide = limits.filter(limit => !limit.scoped);
   let best: { percent: number; label: string } | undefined;
-  for (const limit of snapshot.limits ?? []) {
-    if (limit.scoped) {
-      continue;
-    }
+  for (const limit of planWide.length > 0 ? planWide : limits) {
     if (!best || limit.percent > best.percent) {
       best = { percent: limit.percent, label: limit.label };
     }
@@ -246,6 +246,44 @@ export function limitingWindow(snapshot: UsageSnapshot): { percent: number; labe
     best = { percent: credits, label: "Credits" };
   }
   return best;
+}
+
+/**
+ * What has to be deleted after a snapshot no longer carries datapoints it used to.
+ *
+ * ioBroker never removes an object on its own: a limit window that a provider stops
+ * reporting, or a model that got renamed, would sit in the tree frozen on its last
+ * percentage and keep saying it forever. So every round compares what the account
+ * delivers now against what it had, and what fell out goes.
+ *
+ * Channels are included: a window's node is worthless once its values are gone, and
+ * the deepest ones come first so a parent is never deleted before its children.
+ *
+ * @param known every state id the account had before (relative to the instance)
+ * @param current the state ids this snapshot delivers
+ * @param keep the static state ids of the skeleton, which never expire
+ * @returns object ids to delete, children before parents
+ */
+export function orphanObjectIds(
+  known: readonly string[],
+  current: readonly string[],
+  keep: readonly string[],
+): string[] {
+  const surviving = new Set([...current, ...keep]);
+  const goneStates = known.filter(id => !surviving.has(id));
+  const emptyChannels = new Set<string>();
+  for (const id of goneStates) {
+    const parts = id.split(".");
+    // Walk up from the state's own channel; the account node itself (one segment)
+    // belongs to the skeleton and is never touched here.
+    for (let depth = parts.length - 1; depth >= 2; depth--) {
+      const parent = parts.slice(0, depth).join(".");
+      if (![...surviving].some(alive => alive.startsWith(`${parent}.`))) {
+        emptyChannels.add(parent);
+      }
+    }
+  }
+  return [...goneStates, ...[...emptyChannels].sort((a, b) => b.split(".").length - a.split(".").length)];
 }
 
 /**

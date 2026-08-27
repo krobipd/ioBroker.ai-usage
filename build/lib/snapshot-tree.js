@@ -20,7 +20,8 @@ var snapshot_tree_exports = {};
 __export(snapshot_tree_exports, {
   limitingWindow: () => limitingWindow,
   mapSnapshot: () => mapSnapshot,
-  maxLimitPercent: () => maxLimitPercent
+  maxLimitPercent: () => maxLimitPercent,
+  orphanObjectIds: () => orphanObjectIds
 });
 module.exports = __toCommonJS(snapshot_tree_exports);
 var import_pure_helpers = require("./pure-helpers");
@@ -31,7 +32,7 @@ function state(id, name, type, role, value, unit) {
   }
   return { def: { id, type: "state", common }, write: { id, value } };
 }
-function mapSnapshot(accountId, accountName, provider, snapshot) {
+function mapSnapshot(accountId, snapshot) {
   var _a, _b;
   const objects = [];
   const writes = [];
@@ -42,7 +43,6 @@ function mapSnapshot(accountId, accountName, provider, snapshot) {
   const channel = (id, name) => {
     objects.push({ id, type: "channel", common: { name } });
   };
-  objects.push({ id: accountId, type: "device", common: { name: `${accountName} (${provider})` } });
   if (snapshot.limits && snapshot.limits.length > 0) {
     channel(`${accountId}.limits`, "Limit windows");
     for (const limit of snapshot.limits) {
@@ -159,11 +159,10 @@ function mapSnapshot(accountId, accountName, provider, snapshot) {
 }
 function limitingWindow(snapshot) {
   var _a, _b;
+  const limits = (_a = snapshot.limits) != null ? _a : [];
+  const planWide = limits.filter((limit) => !limit.scoped);
   let best;
-  for (const limit of (_a = snapshot.limits) != null ? _a : []) {
-    if (limit.scoped) {
-      continue;
-    }
+  for (const limit of planWide.length > 0 ? planWide : limits) {
     if (!best || limit.percent > best.percent) {
       best = { percent: limit.percent, label: limit.label };
     }
@@ -174,6 +173,21 @@ function limitingWindow(snapshot) {
   }
   return best;
 }
+function orphanObjectIds(known, current, keep) {
+  const surviving = /* @__PURE__ */ new Set([...current, ...keep]);
+  const goneStates = known.filter((id) => !surviving.has(id));
+  const emptyChannels = /* @__PURE__ */ new Set();
+  for (const id of goneStates) {
+    const parts = id.split(".");
+    for (let depth = parts.length - 1; depth >= 2; depth--) {
+      const parent = parts.slice(0, depth).join(".");
+      if (![...surviving].some((alive) => alive.startsWith(`${parent}.`))) {
+        emptyChannels.add(parent);
+      }
+    }
+  }
+  return [...goneStates, ...[...emptyChannels].sort((a, b) => b.split(".").length - a.split(".").length)];
+}
 function maxLimitPercent(snapshot) {
   var _a;
   return (_a = limitingWindow(snapshot)) == null ? void 0 : _a.percent;
@@ -182,6 +196,7 @@ function maxLimitPercent(snapshot) {
 0 && (module.exports = {
   limitingWindow,
   mapSnapshot,
-  maxLimitPercent
+  maxLimitPercent,
+  orphanObjectIds
 });
 //# sourceMappingURL=snapshot-tree.js.map

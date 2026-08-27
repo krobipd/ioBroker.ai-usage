@@ -14,7 +14,6 @@ declare global {
         /** Warn threshold in percent (default 80). */
         warnThreshold: number;
         /** Whether this account is polled. */
-        enabled: boolean;
       }[];
       /** Poll interval in seconds (min 60, default 300). */
       pollInterval: number;

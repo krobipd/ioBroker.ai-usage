@@ -54,7 +54,7 @@ interface PanelState extends ConfigGenericState {
   drafts: Record<string, string>;
   /** Provider chosen manually for a credential whose name gives nothing away. */
   providerChoice: Record<string, string>;
-  /** Live `<account>.info.state` per account id — drives the status badge in the row. */
+  /** Live `info.unreach` + `info.error` per account id — drives the status badge in the row. */
   serviceState: Record<string, unknown>;
   busy: string;
 }
@@ -139,7 +139,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   }
 
   /**
-   * Read `<account>.info.state` for every switched-on row.
+   * Read the two status states of every switched-on row.
    *
    * This is what makes the online indicator visible where the user actually looks —
    * the datapoints alone answer the question only for someone who browses the object
@@ -259,7 +259,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   }
 
   /**
-   * The threshold input of one enabled row (committed on blur).
+   * The threshold input of one switched-on row (committed on blur).
    *
    * @param key react key
    * @param row the row

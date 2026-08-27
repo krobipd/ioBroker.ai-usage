@@ -37,9 +37,6 @@ export const PROVIDER_KINDS = [
   "anthropic-api",
 ];
 
-/** The subscription kinds: signed in with the user's account, no key involved. */
-export const SUBSCRIPTION_KINDS = ["claude-sub", "chatgpt-sub", "gemini-sub"];
-
 /** Fixed object id per subscription — adapter-owned, never derived from a display name. */
 export const SUBSCRIPTION_IDS: Record<string, string> = {
   "claude-sub": "claude",
@@ -71,11 +68,14 @@ export function accountId(provider: string, credentialId: string): string {
 
 /**
  * Parse and validate the admin accounts table. Rows without a usable name or with an
- * unknown provider are skipped (type-guarded — the table is external input); disabled
- * rows are skipped too. Duplicate ids keep the first row.
+ * unknown provider are skipped (type-guarded — the table is external input).
+ * Duplicate ids keep the first row.
+ *
+ * A row exists exactly as long as its switch is on: switching an account off removes
+ * the row, which is also what lets the stale-object cleanup work off this one list.
  *
  * @param raw the native.accounts value
- * @returns the validated, enabled accounts
+ * @returns the validated accounts
  */
 export function parseAccounts(raw: unknown): AccountConfig[] {
   if (!Array.isArray(raw)) {
@@ -88,9 +88,6 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
       continue;
     }
     const row = entry as Record<string, unknown>;
-    if (row.enabled === false) {
-      continue;
-    }
     const provider = typeof row.provider === "string" ? row.provider : "";
     const credentialId = typeof row.credentialId === "string" ? row.credentialId : "";
     const id = accountId(provider, credentialId);
@@ -112,32 +109,31 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
 }
 
 /**
- * The ids of ALL valid table rows — including disabled ones. Used by the stale-object
- * cleanup: a disabled account is paused, not deleted; only rows removed from the
- * table lose their tree.
+ * Round to two decimals — money and percent are displayed, not calculated with.
  *
- * @param raw the native.accounts value
- * @returns the id-safe ids of every valid row
+ * @param value the value
+ * @returns the rounded value
  */
-export function validAccountIds(raw: unknown): string[] {
-  if (!Array.isArray(raw)) {
-    return [];
+export function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * A finite number out of untrusted input, or undefined for anything else.
+ *
+ * Providers deliver amounts as strings ("110.00"), as numbers, as null for
+ * "unlimited" and occasionally as an empty string — all of which `Number()` alone
+ * turns into 0 or NaN. Only a real number gets through here.
+ *
+ * @param value the raw value
+ * @returns the number, or undefined
+ */
+export function finiteNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
   }
-  const ids: string[] = [];
-  for (const entry of raw) {
-    if (typeof entry !== "object" || entry === null) {
-      continue;
-    }
-    const row = entry as Record<string, unknown>;
-    const id = accountId(
-      typeof row.provider === "string" ? row.provider : "",
-      typeof row.credentialId === "string" ? row.credentialId : "",
-    );
-    if (id && !RESERVED_ROOT_IDS.includes(id) && !ids.includes(id)) {
-      ids.push(id);
-    }
-  }
-  return ids;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
 }
 
 /**

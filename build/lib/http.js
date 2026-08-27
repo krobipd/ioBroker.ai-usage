@@ -25,68 +25,14 @@ __export(http_exports, {
 module.exports = __toCommonJS(http_exports);
 var import_provider = require("./provider");
 const REQUEST_TIMEOUT_MS = 15e3;
-async function getJson(url, headers) {
+async function request(url, init, authOn400 = false) {
   let response;
   try {
-    response = await fetch(url, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (e) {
     throw new import_provider.FetchError("network", e instanceof Error ? e.message : String(e));
   }
-  if (response.status === 401 || response.status === 403) {
-    throw new import_provider.FetchError("auth", `HTTP ${response.status}`);
-  }
-  if (response.status === 429) {
-    throw new import_provider.FetchError("rate-limit", "HTTP 429");
-  }
-  if (!response.ok) {
-    throw new import_provider.FetchError("service", `HTTP ${response.status}`);
-  }
-  try {
-    return await response.json();
-  } catch {
-    throw new import_provider.FetchError("service", "invalid JSON response");
-  }
-}
-async function postJson(url, body) {
-  let response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-    });
-  } catch (e) {
-    throw new import_provider.FetchError("network", e instanceof Error ? e.message : String(e));
-  }
-  if (response.status === 401 || response.status === 403 || response.status === 400) {
-    throw new import_provider.FetchError("auth", `HTTP ${response.status}`);
-  }
-  if (response.status === 429) {
-    throw new import_provider.FetchError("rate-limit", "HTTP 429");
-  }
-  if (!response.ok) {
-    throw new import_provider.FetchError("service", `HTTP ${response.status}`);
-  }
-  try {
-    return await response.json();
-  } catch {
-    throw new import_provider.FetchError("service", "invalid JSON response");
-  }
-}
-async function postForm(url, form, headers = {}) {
-  let response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
-      body: new URLSearchParams(form).toString(),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-    });
-  } catch (e) {
-    throw new import_provider.FetchError("network", e instanceof Error ? e.message : String(e));
-  }
-  if (response.status === 400 || response.status === 401 || response.status === 403) {
+  if (response.status === 401 || response.status === 403 || authOn400 && response.status === 400) {
     throw new import_provider.FetchError("auth", `HTTP ${response.status}`);
   }
   if (response.status === 429) {
@@ -100,6 +46,27 @@ async function postForm(url, form, headers = {}) {
   } catch (e) {
     throw new import_provider.FetchError("service", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+async function getJson(url, headers) {
+  return request(url, { headers });
+}
+async function postJson(url, body) {
+  return request(
+    url,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    true
+  );
+}
+async function postForm(url, form, headers = {}) {
+  return request(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
+      body: new URLSearchParams(form).toString()
+    },
+    true
+  );
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

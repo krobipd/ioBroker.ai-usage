@@ -1,4 +1,5 @@
 import type { UsageSnapshot } from "./provider";
+import { round2 } from "./pure-helpers";
 import { maxLimitPercent } from "./snapshot-tree";
 
 /** One account's contribution to the totals. */
@@ -41,10 +42,13 @@ const TOTAL_CURRENCY = "USD";
  * include only real-money costs in {@link TOTAL_CURRENCY}; piece-counters and
  * foreign currencies are excluded by design.
  *
- * @param statuses each account's status
+ * @param statuses each POLLED account's status
+ * @param configured how many accounts the user switched on — including the ones the
+ *   adapter cannot poll (missing credential). The user counts what they configured,
+ *   so a number smaller than their own list would just look broken.
  * @returns the totals
  */
-export function computeTotals(statuses: readonly AccountStatus[]): Totals {
+export function computeTotals(statuses: readonly AccountStatus[], configured: number): Totals {
   let costsToday = 0;
   let costsMonth = 0;
   let costsProjectedMonth = 0;
@@ -86,16 +90,6 @@ export function computeTotals(statuses: readonly AccountStatus[]): Totals {
     warningsActive,
     limitReached,
     accountsReachable: reachable,
-    accounts: statuses.length,
+    accounts: configured,
   };
-}
-
-/**
- * Round to two decimals (money/percent display).
- *
- * @param value the value
- * @returns the rounded value
- */
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }

@@ -88,25 +88,24 @@ function parseChatgptUsage(body) {
   }
   return snapshot;
 }
-function chatgptSubProvider(store, fetchJson = import_http.getJson, postJson, now = Date.now) {
-  let cached = null;
+function chatgptSubProvider(store, postJson, fetchJson = import_http.getJson, now = Date.now) {
   return {
     kind: "chatgpt-sub",
     fetch: async () => {
-      cached != null ? cached : cached = await store.load();
-      if (!cached) {
+      let tokens = await store.load();
+      if (!tokens) {
         throw new import_provider.FetchError("auth", "not signed in \u2014 start the ChatGPT sign-in in the instance settings");
       }
-      if (now() >= cached.expiresAt - 6e4) {
-        cached = await (0, import_chatgpt_auth.refreshChatgptTokens)(cached, postJson, now());
-        await store.save(cached);
+      if (now() >= tokens.expiresAt - 6e4) {
+        tokens = await (0, import_chatgpt_auth.refreshChatgptTokens)(tokens, postJson, now());
+        await store.save(tokens);
       }
       const headers = {
-        Authorization: `Bearer ${cached.accessToken}`,
+        Authorization: `Bearer ${tokens.accessToken}`,
         "User-Agent": "ioBroker.ai-usage"
       };
-      if (cached.accountRef) {
-        headers["ChatGPT-Account-Id"] = cached.accountRef;
+      if (tokens.accountRef) {
+        headers["ChatGPT-Account-Id"] = tokens.accountRef;
       }
       return parseChatgptUsage(await fetchJson(CHATGPT_USAGE_URL, headers));
     }

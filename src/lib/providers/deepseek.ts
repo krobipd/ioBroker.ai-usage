@@ -1,5 +1,6 @@
 import { getJson, type JsonFetch } from "../http";
 import { FetchError, type UsageProvider, type UsageSnapshot } from "../provider";
+import { finiteNumber } from "../pure-helpers";
 
 /**
  * Parse a DeepSeek `GET /user/balance` response into a snapshot. Capture-verified
@@ -23,9 +24,9 @@ export function parseDeepSeekBalance(body: unknown): UsageSnapshot {
   }
   if (first) {
     snapshot.credits = {
-      remaining: parseAmount(first.total_balance),
-      granted: parseAmount(first.granted_balance),
-      toppedUp: parseAmount(first.topped_up_balance),
+      remaining: finiteNumber(first.total_balance),
+      granted: finiteNumber(first.granted_balance),
+      toppedUp: finiteNumber(first.topped_up_balance),
       currency: typeof first.currency === "string" ? first.currency : "USD",
     };
   }
@@ -50,15 +51,4 @@ export function deepSeekProvider(apiKey: string, fetchJson: JsonFetch = getJson)
         }),
       ),
   };
-}
-
-/**
- * Parse a string/number amount to a finite number, or undefined.
- *
- * @param value the raw value ("110.00")
- * @returns the number or undefined
- */
-function parseAmount(value: unknown): number | undefined {
-  const num = Number(value);
-  return value !== null && value !== undefined && value !== "" && Number.isFinite(num) ? num : undefined;
 }

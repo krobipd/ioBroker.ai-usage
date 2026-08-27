@@ -108,37 +108,39 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
 /**
  * The ChatGPT/Codex subscription provider.
  *
+ * The tokens come from the store on every round and are never held here — see
+ * {@link claudeSubProvider} for why that matters when the user signs out.
+ *
  * @param store where the tokens live (keyed by provider, shared by no one else)
- * @param fetchJson the JSON-GET seam
  * @param postJson the JSON-POST seam (token refresh)
+ * @param fetchJson the JSON-GET seam
  * @param now clock (ms)
  * @returns the provider
  */
 export function chatgptSubProvider(
   store: TokenStore,
-  fetchJson: JsonFetch = getJson,
   postJson: JsonPost,
+  fetchJson: JsonFetch = getJson,
   now: () => number = Date.now,
 ): UsageProvider {
-  let cached: TokenSet | null = null;
   return {
     kind: "chatgpt-sub",
     fetch: async (): Promise<UsageSnapshot> => {
-      cached ??= await store.load();
-      if (!cached) {
+      let tokens: TokenSet | null = await store.load();
+      if (!tokens) {
         throw new FetchError("auth", "not signed in — start the ChatGPT sign-in in the instance settings");
       }
-      if (now() >= cached.expiresAt - 60_000) {
-        cached = await refreshChatgptTokens(cached, postJson, now());
-        await store.save(cached);
+      if (now() >= tokens.expiresAt - 60_000) {
+        tokens = await refreshChatgptTokens(tokens, postJson, now());
+        await store.save(tokens);
       }
       const headers: Record<string, string> = {
-        Authorization: `Bearer ${cached.accessToken}`,
+        Authorization: `Bearer ${tokens.accessToken}`,
         "User-Agent": "ioBroker.ai-usage",
       };
       // Only send the account id when we have one — an empty header is rejected.
-      if (cached.accountRef) {
-        headers["ChatGPT-Account-Id"] = cached.accountRef;
+      if (tokens.accountRef) {
+        headers["ChatGPT-Account-Id"] = tokens.accountRef;
       }
       return parseChatgptUsage(await fetchJson(CHATGPT_USAGE_URL, headers));
     },

@@ -21,13 +21,13 @@ __export(pure_helpers_exports, {
   PROVIDER_KINDS: () => PROVIDER_KINDS,
   RESERVED_ROOT_IDS: () => RESERVED_ROOT_IDS,
   SUBSCRIPTION_IDS: () => SUBSCRIPTION_IDS,
-  SUBSCRIPTION_KINDS: () => SUBSCRIPTION_KINDS,
   accountId: () => accountId,
   clampPollInterval: () => clampPollInterval,
   datapointBalanceLine: () => datapointBalanceLine,
+  finiteNumber: () => finiteNumber,
   parseAccounts: () => parseAccounts,
-  sanitizeId: () => sanitizeId,
-  validAccountIds: () => validAccountIds
+  round2: () => round2,
+  sanitizeId: () => sanitizeId
 });
 module.exports = __toCommonJS(pure_helpers_exports);
 function sanitizeId(name) {
@@ -42,7 +42,6 @@ const PROVIDER_KINDS = [
   "openai",
   "anthropic-api"
 ];
-const SUBSCRIPTION_KINDS = ["claude-sub", "chatgpt-sub", "gemini-sub"];
 const SUBSCRIPTION_IDS = {
   "claude-sub": "claude",
   "chatgpt-sub": "chatgpt",
@@ -68,9 +67,6 @@ function parseAccounts(raw) {
       continue;
     }
     const row = entry;
-    if (row.enabled === false) {
-      continue;
-    }
     const provider = typeof row.provider === "string" ? row.provider : "";
     const credentialId = typeof row.credentialId === "string" ? row.credentialId : "";
     const id = accountId(provider, credentialId);
@@ -90,25 +86,15 @@ function parseAccounts(raw) {
   }
   return accounts;
 }
-function validAccountIds(raw) {
-  if (!Array.isArray(raw)) {
-    return [];
+function round2(value) {
+  return Math.round(value * 100) / 100;
+}
+function finiteNumber(value) {
+  if (value === null || value === void 0 || value === "") {
+    return void 0;
   }
-  const ids = [];
-  for (const entry of raw) {
-    if (typeof entry !== "object" || entry === null) {
-      continue;
-    }
-    const row = entry;
-    const id = accountId(
-      typeof row.provider === "string" ? row.provider : "",
-      typeof row.credentialId === "string" ? row.credentialId : ""
-    );
-    if (id && !RESERVED_ROOT_IDS.includes(id) && !ids.includes(id)) {
-      ids.push(id);
-    }
-  }
-  return ids;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : void 0;
 }
 function clampPollInterval(raw) {
   const value = Number(raw);
@@ -132,12 +118,12 @@ function datapointBalanceLine(created, removed) {
   PROVIDER_KINDS,
   RESERVED_ROOT_IDS,
   SUBSCRIPTION_IDS,
-  SUBSCRIPTION_KINDS,
   accountId,
   clampPollInterval,
   datapointBalanceLine,
+  finiteNumber,
   parseAccounts,
-  sanitizeId,
-  validAccountIds
+  round2,
+  sanitizeId
 });
 //# sourceMappingURL=pure-helpers.js.map

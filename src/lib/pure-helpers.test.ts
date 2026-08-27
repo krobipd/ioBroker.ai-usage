@@ -4,7 +4,6 @@ import {
   datapointBalanceLine,
   parseAccounts,
   sanitizeId,
-  validAccountIds,
 } from "./pure-helpers";
 
 describe("sanitizeId", () => {
@@ -54,9 +53,8 @@ describe("parseAccounts", () => {
     ]);
   });
 
-  test("skips disabled rows, unknown providers, credential-less key rows and duplicates", () => {
+  test("skips unknown providers, credential-less key rows and duplicates", () => {
     const accounts = parseAccounts([
-      { name: "Off", provider: "openrouter", credentialId: "system.credentials.off", enabled: false },
       { name: "What", provider: "not-a-provider", credentialId: "system.credentials.x", enabled: true },
       { name: "No credential", provider: "openrouter", credentialId: "", enabled: true },
       { name: "Twice", provider: "openrouter", credentialId: "system.credentials.twice", enabled: true },
@@ -99,21 +97,6 @@ describe("clampPollInterval", () => {
   });
 });
 
-describe("validAccountIds", () => {
-  test("includes disabled rows (paused, not deleted) and skips unusable/duplicate ones", () => {
-    expect(
-      validAccountIds([
-        { name: "Claude Max", provider: "claude-sub", enabled: true },
-        { name: "Paused", provider: "openrouter", credentialId: "system.credentials.paused", enabled: false },
-        { name: "No credential", provider: "openrouter", credentialId: "" },
-        { name: "Claude again", provider: "claude-sub" },
-        null,
-      ]),
-    ).toEqual(["claude", "paused-api"]);
-    expect(validAccountIds(undefined)).toEqual([]);
-  });
-});
-
 describe("datapointBalanceLine", () => {
   test("stays silent when nothing changed — a normal restart must write nothing", () => {
     expect(datapointBalanceLine(0, 0)).toBeNull();
@@ -126,5 +109,28 @@ describe("datapointBalanceLine", () => {
 
   test("reports both sides in one line", () => {
     expect(datapointBalanceLine(12, 3)).toBe("Object tree updated: created 12 datapoint(s), removed 3 datapoint(s)");
+  });
+});
+
+describe("the admin panel's copy of the id rule", () => {
+  test("produces the same id as the adapter, for every shape that matters", async () => {
+    // The settings page is its own bundle and carries a second copy of this rule.
+    // Nothing forced the two to agree — this does. A drift would move a whole
+    // object tree the moment the panel and the adapter disagree on one id.
+    const panel = (await import("../../src-admin/src/rows.js")) as { accountId: typeof accountId };
+    const cases: [string, string][] = [
+      ["claude-sub", ""],
+      ["chatgpt-sub", "system.credentials.ignored"],
+      ["gemini-sub", ""],
+      ["openrouter", "system.credentials.My Router"],
+      ["deepseek", "system.credentials.deep_seek"],
+      ["openai", "system.credentials.öäü"],
+      ["anthropic-api", "system.credentials."],
+      ["openrouter", ""],
+      ["not-a-provider", "system.credentials.x"],
+    ];
+    for (const [provider, credentialId] of cases) {
+      expect(panel.accountId(provider, credentialId)).toBe(accountId(provider, credentialId));
+    }
   });
 });

@@ -126,13 +126,15 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
       continue;
     }
     seen.add(name);
-    // NOT marked as `scoped`: Google reports no plan-wide bucket at all, so these
-    // per-model buckets ARE the user's quota. Marking them would leave the account
-    // without any window that can raise a warning.
+    // Marked `scoped` like every other per-model bucket: Google reports NO plan-wide
+    // window, so `limitingWindow` falls back to the fullest of these and names the
+    // model in the warning. Without the mark, every single model could raise the
+    // account's warning — the "Fable at 100 %" case that made the alarm meaningless.
     const window: LimitWindow = {
       name,
       label: model || kind || "Quota",
       percent: Math.round((1 - Math.min(Math.max(fraction, 0), 1)) * 1000) / 10,
+      scoped: true,
     };
     if (typeof bucket.resetTime === "string" && bucket.resetTime) {
       window.resetAt = bucket.resetTime;
@@ -157,25 +159,25 @@ export function geminiSubProvider(
   postForm: FormPost,
   now: () => number = Date.now,
 ): UsageProvider {
-  let cached: TokenSet | null = null;
   return {
     kind: "gemini-sub",
     fetch: async (): Promise<UsageSnapshot> => {
-      cached ??= await store.load();
-      if (!cached) {
+      let tokens: TokenSet | null = await store.load();
+      if (!tokens) {
         throw new FetchError("auth", "not signed in — start the Google sign-in in the instance settings");
       }
-      if (now() >= cached.expiresAt - 60_000) {
-        cached = await refreshGeminiTokens(cached, postForm, now());
-        await store.save(cached);
+      if (now() >= tokens.expiresAt - 60_000) {
+        tokens = await refreshGeminiTokens(tokens, postForm, now());
+        await store.save(tokens);
       }
-      // The project id is stable per account — look it up once, then reuse it.
-      if (!cached.accountRef) {
+      // The project id is stable per account — look it up once, then reuse it. It
+      // is stored with the tokens, so the store's cache keeps it for us.
+      if (!tokens.accountRef) {
         const info = parseCodeAssist(
           await callCodeAssist(
             "loadCodeAssist",
             { metadata: { ideType: GEMINI_IDENTITY.ideType } },
-            cached.accessToken,
+            tokens.accessToken,
             post,
           ),
         );
@@ -185,11 +187,11 @@ export function geminiSubProvider(
             "Google returned no project for this account — a Google AI subscription (Pro/Ultra) is required",
           );
         }
-        cached = { ...cached, accountRef: info.project };
-        await store.save(cached);
+        tokens = { ...tokens, accountRef: info.project };
+        await store.save(tokens);
       }
       return parseGeminiQuota(
-        await callCodeAssist("retrieveUserQuota", { project: cached.accountRef }, cached.accessToken, post),
+        await callCodeAssist("retrieveUserQuota", { project: tokens.accountRef }, tokens.accessToken, post),
       );
     },
   };

@@ -1,4 +1,41 @@
 /** Shared date/aggregation helpers for the daily-bucket report providers (OpenAI, Anthropic API). */
+import type { JsonFetch } from "../http";
+
+/**
+ * Fetch all pages of a bucketed report.
+ *
+ * Both report APIs page the same way (`has_more` + `next_page`, appended as `page`).
+ * The loop is bounded as a backstop: a month holds at most 31 daily buckets, so a
+ * server that kept saying "more" could otherwise spin forever.
+ *
+ * @param url the report URL without the page parameter
+ * @param headers request headers
+ * @param fetchJson the JSON-GET seam
+ * @returns all bucket entries
+ */
+export async function fetchAllPages(
+  url: string,
+  headers: Record<string, string>,
+  fetchJson: JsonFetch,
+): Promise<unknown[]> {
+  const buckets: unknown[] = [];
+  let page: string | undefined;
+  for (let i = 0; i < 12; i++) {
+    const body = (await fetchJson(page ? `${url}&page=${encodeURIComponent(page)}` : url, headers)) as {
+      data?: unknown;
+      has_more?: unknown;
+      next_page?: unknown;
+    } | null;
+    if (Array.isArray(body?.data)) {
+      buckets.push(...body.data);
+    }
+    if (body?.has_more !== true || typeof body?.next_page !== "string" || !body.next_page) {
+      break;
+    }
+    page = body.next_page;
+  }
+  return buckets;
+}
 
 /**
  * Start of the current month (UTC) as unix seconds.

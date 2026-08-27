@@ -1,5 +1,6 @@
 import { getJson, type JsonFetch } from "../http";
 import { FetchError, type UsageProvider, type UsageSnapshot } from "../provider";
+import { finiteNumber, round2 } from "../pure-helpers";
 
 /**
  * Parse an OpenRouter `GET /api/v1/auth/key` response into a snapshot. The key info
@@ -16,10 +17,10 @@ export function parseOpenRouterKeyInfo(body: unknown): UsageSnapshot {
     throw new FetchError("network", "unexpected response shape (no data object)");
   }
   const info = data as Record<string, unknown>;
-  const used = numberOrUndefined(info.usage ?? info.credits_used);
-  const limit = numberOrUndefined(info.limit ?? info.credit_limit);
+  const used = finiteNumber(info.usage ?? info.credits_used);
+  const limit = finiteNumber(info.limit ?? info.credit_limit);
   const remaining =
-    numberOrUndefined(info.limit_remaining) ??
+    finiteNumber(info.limit_remaining) ??
     (used !== undefined && limit !== undefined ? round2(limit - used) : undefined);
   const snapshot: UsageSnapshot = {
     credits: {
@@ -51,25 +52,4 @@ export function openRouterProvider(apiKey: string, fetchJson: JsonFetch = getJso
         await fetchJson("https://openrouter.ai/api/v1/auth/key", { Authorization: `Bearer ${apiKey}` }),
       ),
   };
-}
-
-/**
- * A finite number, or undefined for anything else (null = unlimited stays undefined).
- *
- * @param value the raw value
- * @returns the number or undefined
- */
-function numberOrUndefined(value: unknown): number | undefined {
-  const num = Number(value);
-  return value !== null && value !== undefined && value !== "" && Number.isFinite(num) ? num : undefined;
-}
-
-/**
- * Round to two decimals.
- *
- * @param value the value
- * @returns the rounded value
- */
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }

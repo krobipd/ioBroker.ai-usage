@@ -57,6 +57,8 @@ class AiUsageAdapter extends utils.Adapter {
   signInErrors = /* @__PURE__ */ new Map();
   /** Device-code pollers, so they can be stopped on unload. */
   devicePollers = /* @__PURE__ */ new Map();
+  /** One token store per subscription — see {@link tokenStore} for why it is shared. */
+  tokenStores = /* @__PURE__ */ new Map();
   /**
    * Every state id that already existed when this process started.
    *
@@ -195,7 +197,7 @@ class AiUsageAdapter extends utils.Adapter {
       return {
         status: "awaiting-device",
         userCode: start.userCode,
-        verificationUrl: "https://auth.openai.com/codex/device",
+        verificationUrl: import_chatgpt_auth.CHATGPT_OAUTH.verificationUrl,
         expiresAt: start.expiresAt
       };
     } catch (e) {
@@ -250,7 +252,9 @@ class AiUsageAdapter extends utils.Adapter {
     this.stopDevicePoller(provider);
     const id = import_pure_helpers.SUBSCRIPTION_IDS[provider];
     if (id) {
-      await ((_a = this.engine) == null ? void 0 : _a.pollNow(id));
+      void ((_a = this.engine) == null ? void 0 : _a.pollNow(id).catch((e) => {
+        this.log.debug(`First query after sign-in failed: ${e instanceof Error ? e.message : String(e)}`);
+      }));
     }
     this.log.info(`${(_b = import_sign_in.SIGN_IN_LABELS[provider]) != null ? _b : provider}: signed in`);
   }
@@ -313,7 +317,7 @@ class AiUsageAdapter extends utils.Adapter {
       return {
         status: "awaiting-device",
         userCode: attempt.start.userCode,
-        verificationUrl: "https://auth.openai.com/codex/device",
+        verificationUrl: import_chatgpt_auth.CHATGPT_OAUTH.verificationUrl,
         expiresAt: attempt.start.expiresAt
       };
     }
@@ -344,42 +348,99 @@ class AiUsageAdapter extends utils.Adapter {
   }
   // ------------------------------------------------------------ token files
   /**
-   * Where one subscription's tokens live: an encrypted file in the instance data
+   * The token store of one subscription — created ONCE per provider.
+   *
+   * The identity matters: the store holds the in-memory copy of the tokens, so
+   * signing out really takes effect. When each provider module kept its own copy,
+   * a sign-out deleted the file while the adapter kept polling with what it still
+   * had — and the next token refresh wrote the deleted file back.
+   *
+   * @param provider the subscription kind
+   * @returns the store
+   */
+  tokenStore(provider) {
+    let store = this.tokenStores.get(provider);
+    if (!store) {
+      store = this.makeTokenStore(provider);
+      this.tokenStores.set(provider, store);
+    }
+    return store;
+  }
+  /**
+   * Build the store for one subscription: an encrypted file in the instance data
    * directory, named after the PROVIDER. Keying by provider (not by account name)
    * keeps a sign-in alive when an account is renamed — the previous scheme lost it.
    *
    * @param provider the subscription kind
    * @returns the store
    */
-  tokenStore(provider) {
+  makeTokenStore(provider) {
     const dir = utils.getAbsoluteInstanceDataDir(this);
     const file = (0, import_node_path.join)(dir, `tokens-${provider}.json`);
+    let cached = null;
+    let read = false;
     return {
       load: async () => {
-        try {
-          const parsed = JSON.parse(this.decrypt(await (0, import_promises.readFile)(file, "utf8")));
-          if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
-            return null;
-          }
-          return {
-            accessToken: parsed.accessToken,
-            refreshToken: parsed.refreshToken,
-            expiresAt: Number(parsed.expiresAt) || 0,
-            accountRef: typeof parsed.accountRef === "string" ? parsed.accountRef : void 0
-          };
-        } catch {
-          return null;
+        if (!read) {
+          cached = await this.readTokenFile(file, provider);
+          read = true;
         }
+        return cached;
       },
       save: async (tokens) => {
         await (0, import_promises.mkdir)(dir, { recursive: true });
         await (0, import_promises.writeFile)(file, this.encrypt(JSON.stringify(tokens)), "utf8");
+        cached = tokens;
+        read = true;
       },
       clear: async () => {
+        cached = null;
+        read = true;
         await (0, import_promises.unlink)(file).catch(() => {
         });
       }
     };
+  }
+  /**
+   * Read one token file.
+   *
+   * A missing file means "never signed in" and is silent. A file that is there but
+   * cannot be read — damaged, or encrypted with a different instance secret — is
+   * NOT the same thing: without a word in the log, signing in would look like it
+   * simply does nothing.
+   *
+   * @param file the file path
+   * @param provider the subscription kind (for the log line)
+   * @returns the tokens, or null
+   */
+  async readTokenFile(file, provider) {
+    var _a, _b;
+    let raw;
+    try {
+      raw = await (0, import_promises.readFile)(file, "utf8");
+    } catch (e) {
+      if ((e == null ? void 0 : e.code) !== "ENOENT") {
+        this.log.warn(`${(_a = import_sign_in.SIGN_IN_LABELS[provider]) != null ? _a : provider}: cannot open the stored sign-in (${String(e)})`);
+      }
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(this.decrypt(raw));
+      if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
+        throw new Error("the file carries no tokens");
+      }
+      return {
+        accessToken: parsed.accessToken,
+        refreshToken: parsed.refreshToken,
+        expiresAt: Number(parsed.expiresAt) || 0,
+        accountRef: typeof parsed.accountRef === "string" ? parsed.accountRef : void 0
+      };
+    } catch (e) {
+      this.log.warn(
+        `${(_b = import_sign_in.SIGN_IN_LABELS[provider]) != null ? _b : provider}: the stored sign-in cannot be read (${e instanceof Error ? e.message : String(e)}) \u2014 sign in again in the instance settings`
+      );
+      return null;
+    }
   }
   /**
    * Carry a sign-in from the pre-0.3.0 layout over: tokens used to be stored per
@@ -444,6 +505,25 @@ class AiUsageAdapter extends utils.Adapter {
           void this.setStateChangedAsync(id, { val: value, ack: true }).catch(() => {
           });
         },
+        deleteObject: async (id) => {
+          try {
+            await this.delObjectAsync(id, { recursive: true });
+            if (this.knownStateIds.delete(id)) {
+              this.removedStates++;
+            }
+          } catch (e) {
+            this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        },
+        listStateIds: async (prefix) => {
+          var _a;
+          const start = `${this.namespace}.${prefix}.`;
+          const view = await this.getObjectViewAsync("system", "state", {
+            startkey: start,
+            endkey: `${start}\uFFFF`
+          });
+          return ((_a = view == null ? void 0 : view.rows) != null ? _a : []).map((row) => row.id.substring(this.namespace.length + 1));
+        },
         schedule: (cb, ms) => ({ kind: "interval", handle: this.setInterval(cb, ms) }),
         scheduleOnce: (cb, ms) => ({ kind: "timeout", handle: this.setTimeout(cb, ms) }),
         cancel: (handle) => {
@@ -481,9 +561,9 @@ class AiUsageAdapter extends utils.Adapter {
   async makeProvider(account) {
     switch (account.provider) {
       case "claude-sub":
-        return (0, import_claude_sub.claudeSubProvider)(this.tokenStore(account.provider), void 0, import_http.postJson);
+        return (0, import_claude_sub.claudeSubProvider)(this.tokenStore(account.provider), import_http.postJson);
       case "chatgpt-sub":
-        return (0, import_chatgpt_sub.chatgptSubProvider)(this.tokenStore(account.provider), void 0, import_http.postJson);
+        return (0, import_chatgpt_sub.chatgptSubProvider)(this.tokenStore(account.provider), import_http.postJson);
       case "gemini-sub":
         return (0, import_gemini_sub.geminiSubProvider)(this.tokenStore(account.provider), import_http.postJson, import_http.postForm);
       case "openrouter": {
@@ -539,7 +619,7 @@ class AiUsageAdapter extends utils.Adapter {
    *
    * ioBroker never garbage-collects an object whose id the adapter stopped writing:
    * it would sit there frozen on its last value and keep lying. So the old ids are
-   * deleted from a fixed list on every start — no state reading, no heuristics.
+   * deleted from a fixed list — no state reading, no heuristics.
    */
   static RETIRED_INFO_STATES = [
     "info.provider",
@@ -551,6 +631,10 @@ class AiUsageAdapter extends utils.Adapter {
   /**
    * Remove the retired status states of every configured account.
    *
+   * Which of them still exist is answered by the startup snapshot that was read a
+   * moment earlier — asking the database for every id on every start would keep
+   * costing 35 lookups forever for a migration that is done after the first one.
+   *
    * @param accounts the configured accounts
    * @returns how many objects were actually deleted
    */
@@ -559,12 +643,13 @@ class AiUsageAdapter extends utils.Adapter {
     for (const account of accounts) {
       for (const suffix of AiUsageAdapter.RETIRED_INFO_STATES) {
         const id = `${account.id}.${suffix}`;
+        if (!this.knownStateIds.has(id)) {
+          continue;
+        }
         try {
-          if (await this.getObjectAsync(id)) {
-            await this.delObjectAsync(id);
-            removed++;
-            this.knownStateIds.delete(id);
-          }
+          await this.delObjectAsync(id);
+          removed++;
+          this.knownStateIds.delete(id);
         } catch (e) {
           this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -578,7 +663,7 @@ class AiUsageAdapter extends utils.Adapter {
    * guard against wiping everything through an accidental clear.
    */
   async cleanupStaleObjects() {
-    const keepIds = (0, import_pure_helpers.validAccountIds)(this.config.accounts);
+    const keepIds = (0, import_pure_helpers.parseAccounts)(this.config.accounts).map((account) => account.id);
     if (keepIds.length === 0) {
       return;
     }

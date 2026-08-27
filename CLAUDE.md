@@ -27,8 +27,9 @@ src/lib/poll-engine.ts         → Orchestrierung (pur, IO injiziert): Zyklen je
                                  network=3 Versuche), Dienst-Status je Konto,
                                  Warnschwellen-Übergänge, totals
 src/lib/provider.ts            → UsageProvider-Vertrag + UsageSnapshot + FetchError-Klassen
-src/lib/http.ts                → getJson/postJson/postForm (natives fetch, Status→eine von VIER
-                                 Fehlerklassen: auth · rate-limit · service · network)
+src/lib/http.ts                → getJson/postJson/postForm über EINE `request`-Funktion (natives
+                                 fetch, Status→eine von VIER Fehlerklassen: auth · rate-limit ·
+                                 service · network)
 src/lib/providers/claude-auth.ts   → OAuth-Konstanten/PKCE/Tausch/Auffrischung (HA-Vorbild-verifiziert)
 src/lib/providers/claude-sub.ts    → Abo-Abfrage: limits[]-Auswertung, Extra-Guthaben beide Schemata
 src/lib/providers/chatgpt-auth.ts   → Geräte-Code-Anmeldung (Start/Poll/Einlösen/Erneuern)
@@ -38,10 +39,13 @@ src/lib/providers/gemini-sub.ts    → loadCodeAssist (Projekt) + retrieveUserQu
 src/lib/providers/openrouter|deepseek|openai|anthropic-api.ts → je Anbieter fetch+parse (pur)
 src/lib/sign-in.ts             → welcher Anmelde-Fluss je Anbieter + Zeilen-Zustände
 src/lib/jwt.ts                 → Ablaufzeit + ChatGPT-Konto-Kennung aus dem Token lesen
-src/lib/providers/report-utils.ts  → Monatsstart/heute/Hochrechnung für die Report-Anbieter
-src/lib/snapshot-tree.ts       → Snapshot → Objekt-Definitionen + Werte (capability-driven)
+src/lib/providers/report-utils.ts  → Monatsstart/heute/Hochrechnung + Seiten-Blättern für die
+                                 beiden Report-Anbieter (OpenAI, Anthropic)
+src/lib/snapshot-tree.ts       → Snapshot → Objekt-Definitionen + Werte (capability-driven),
+                                 limitingWindow (wer spricht fürs Konto), orphanObjectIds (was weg muss)
 src/lib/totals.ts              → total.* aus den Snapshots im Speicher
-src/lib/pure-helpers.ts        → Konten-Tabelle parsen (API-Boundary), sanitizeId, Cleanup-Ids
+src/lib/pure-helpers.ts        → Konten-Tabelle parsen (API-Boundary), sanitizeId, Konto-Kennung,
+                                 round2/finiteNumber (von allen Anbieter-Modulen benutzt)
 src/types/adapter-config.d.ts  → native-Typen
 src-admin/                     → React-Konfig-Panel (Module-Federation, Admin-8-only, guiApi 2):
                                  EINE Liste — 3 Abo-Zeilen + je eine Zeile pro gespeichertem
@@ -93,8 +97,11 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     lösen aber nie `warning`/`limitReached` aus — ein Modell, das der Nutzer nie anfasst, kann
     dauerhaft auf 100 % stehen, und ein Alarm, der nie ausgeht, ist schlimmer als keiner
     (dieselbe Regel wie bei der Gemini-Kennung). Wer scoped setzt, entscheidet der Anbieter-Parser:
-    Claude alles außer `session`/`weekly_all`, ChatGPT die `additional_rate_limits`, Google GAR
-    NICHTS — dort sind die Modell-Eimer das ganze Kontingent. Jede Warnmeldung nennt das Fenster.
+    Claude alles außer `session`/`weekly_all`, ChatGPT die `additional_rate_limits`, **Google seit
+    0.8.0 ALLE** — Google liefert überhaupt kein plan-weites Fenster, deshalb greift dort die
+    Ausnahme in `limitingWindow`: hat ein Konto NUR Modell-Fenster, spricht das vollste von ihnen
+    fürs Konto (vorher sprach jedes einzelne, also wieder der Fable-Fall). Jede Warnmeldung nennt
+    das Fenster, bei Google also das Modell.
 11. **Vier Fehlerklassen, damit „offline" etwas bedeutet**: `auth` und `rate-limit` heißen, der
     Dienst hat GEANTWORTET (er ist online, er sagt nur nein), `service` = er meldet eigenen Defekt
     (sofort offline, er hat es uns ja gesagt), `network` = nie erreicht (erst nach 3 Versuchen,
@@ -117,8 +124,11 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     Gültigkeit gewinnt, der Text läuft auf `text`. Beide nur bei ÄNDERUNG geschrieben — seit 0.7.0 gilt das auch für `warning`, `limitReached`,
     `total.limitReached` und `info.connection` (govee-Lehre, Muster in `CLAUDE_PATTERNS.md`).
     Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` — beim Start
-    deterministisch gelöscht (feste Liste, kein Zustands-Raten), ioBroker räumt Verwaistes nie
-    selbst weg, ein toter Datenpunkt lügt weiter.
+    deterministisch gelöscht (feste Liste, kein Zustands-Raten; welche davon es noch gibt, sagt der
+    Start-Schnappschuss aus Punkt 14, nicht 35 Einzelabfragen pro Start). **Vor der ersten Antwort
+    wird KEIN Status geschrieben** (0.8.0): ein frischer Start hatte sonst jedes Konto
+    durchgestrichen und rot bebadgt, bevor überhaupt gefragt war — ohne Wert zeigen Objektbaum und
+    Konfig-Seite von selbst nichts, und das ist das ehrliche Bild.
 14. **Datenpunkt-Bilanz beim Start** (Flotten-Standard, beszel-Vorbild): EINE `info`-Zeile
     „Object tree updated: created N, removed M datapoint(s)", still bei 0/0. Damit sie nicht nach
     jedem Neustart alles als neu meldet, wird VOR Aufräumen und Engine ein Schnappschuss aller
@@ -127,6 +137,24 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     zählt NICHT mit, sie meldet ihre eigene Summe. Ausgelöst wird die Zeile, wenn das LETZTE Konto
     seine erste Abfrage hinter sich hat (`afterFirstRound`) — die erste Runde ist bewusst versetzt,
     und ein Konfig-Wechsel startet die Instanz ohnehin neu.
+15. **Waisen der DYNAMISCHEN Baumhälfte werden jede Runde entfernt** (0.8.0): was ein Anbieter
+    nicht mehr liefert (umbenanntes Modell, weggefallenes Fenster), stünde sonst für immer mit
+    seinem letzten Prozentwert im Baum — dieselbe Regel wie bei den abgeschafften Status-Punkten,
+    vorher nur auf die feste Liste angewandt. Die ERSTE Runde vergleicht gegen die Datenbank
+    (`listStateIds`), damit auch zählt, was im Stillstand verschwand; danach gegen den vorherigen
+    Schnappschuss. Leere Fenster-/Modell-Kanäle gehen mit, Kinder vor Eltern (`orphanObjectIds`).
+16. **Zugangsdaten liegen NUR in der Ablage, nie im Anbieter-Modul** (0.8.0): `tokenStore(provider)`
+    gibt pro Anbieter dieselbe Instanz zurück, die den Speicher-Zwischenstand hält. Vorher hatte
+    jedes Anbieter-Modul seine eigene Kopie — Abmelden löschte die Datei, der Adapter fragte mit der
+    Kopie munter weiter, und die nächste Ticket-Erneuerung schrieb die gelöschte Datei zurück.
+17. **Eine Abfrage pro Konto, nie zwei gleichzeitig** (0.8.0): eine Anmeldung stößt sofort eine
+    Abfrage an und kann auf eine laufende treffen — zwei Ticket-Erneuerungen parallel melden sich
+    auf einem rotierenden Schlüssel gegenseitig ab (Punkt 3). Wer während einer laufenden Abfrage
+    anklopft, wird gemerkt und läuft direkt danach.
+18. **Der wiederkehrende Takt wird IN der versetzten Erstabfrage scharfgeschaltet** (0.8.0), nicht
+    daneben: nebeneinander angelegt zählen alle Konten ab derselben Sekunde und feuern ab der
+    zweiten Runde gemeinsam — genau das Bündel, gegen das die Entzerrung und die Mindestwartezeit
+    aus Punkt 5 gebaut sind.
 
 ## Tests
 
@@ -136,6 +164,14 @@ src/**/*.test.ts               → vitest: Anbieter-Parser gegen echte Antwort-F
 test/package.js                → standard: @iobroker/testing packageFiles
 test/integration.js            → standard: @iobroker/testing integration (CI)
 test/standards/                → iobroker-adapter-checks (Repo-Standards)
+```
+
+`src/main.test.ts` (seit 0.8.0) deckt die Adapter-Schicht ab — Zugangsdaten-Ablage, Anmelde-Wege,
+Aufräumen, Start-Schnappschuss, Abschalten; ai-usage war der einzige Adapter der Flotte ohne, und
+genau dort saßen vier der acht Fehler des 0.8.0-Audits. Ein Test in `pure-helpers.test.ts` nagelt
+die ZWEITE Kopie der Kennungs-Regel im Konfig-Panel an die des Adapters.
+
+```
 ```
 
 **Test-Oberfläche krobi:** NUR das Claude-Abo (Max). ChatGPT-Abo, Gemini-Abo, OpenRouter, DeepSeek,

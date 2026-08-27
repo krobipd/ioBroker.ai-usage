@@ -4,7 +4,6 @@ export interface AccountRow {
     provider: string;
     credentialId: string;
     warnThreshold: number;
-    enabled: boolean;
 }
 
 /** One entry of the admin's central credential storage (category "AI"). */
@@ -168,7 +167,7 @@ export function toggleSubscription(rows: AccountRow[], provider: string, on: boo
     if (!on) {
         return rest;
     }
-    return [...rest, { name: label, provider, credentialId: '', warnThreshold: 80, enabled: true }];
+    return [...rest, { name: label, provider, credentialId: '', warnThreshold: 80 }];
 }
 
 /**
@@ -190,7 +189,7 @@ export function toggleCredential(
     if (!on || !provider) {
         return rest;
     }
-    return [...rest, { name: credential.name, provider, credentialId: credential.id, warnThreshold: 80, enabled: true }];
+    return [...rest, { name: credential.name, provider, credentialId: credential.id, warnThreshold: 80 }];
 }
 
 /**

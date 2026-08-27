@@ -1,6 +1,7 @@
 import { getJson, type JsonFetch } from "../http";
 import type { UsageProvider, UsageSnapshot } from "../provider";
-import { isToday, monthStartUnix, projectMonth } from "./report-utils";
+import { round2 } from "../pure-helpers";
+import { fetchAllPages, isToday, monthStartUnix, projectMonth } from "./report-utils";
 
 /**
  * OpenAI organization Usage + Costs API (official; needs an ADMIN key, not a normal
@@ -10,35 +11,6 @@ import { isToday, monthStartUnix, projectMonth } from "./report-utils";
  * for costs). Pagination via `has_more`/`next_page`.
  */
 const BASE = "https://api.openai.com/v1/organization";
-
-/**
- * Fetch all pages of a bucketed report.
- *
- * @param url the report URL without the page parameter
- * @param headers request headers
- * @param fetchJson the JSON-GET seam
- * @returns all bucket entries
- */
-async function fetchAllPages(url: string, headers: Record<string, string>, fetchJson: JsonFetch): Promise<unknown[]> {
-  const buckets: unknown[] = [];
-  let page: string | undefined;
-  // The month yields at most 31 daily buckets — the loop is bounded by has_more.
-  for (let i = 0; i < 12; i++) {
-    const body = (await fetchJson(page ? `${url}&page=${encodeURIComponent(page)}` : url, headers)) as {
-      data?: unknown;
-      has_more?: unknown;
-      next_page?: unknown;
-    } | null;
-    if (Array.isArray(body?.data)) {
-      buckets.push(...body.data);
-    }
-    if (body?.has_more !== true || typeof body?.next_page !== "string" || !body.next_page) {
-      break;
-    }
-    page = body.next_page;
-  }
-  return buckets;
-}
 
 /**
  * Parse the two bucket lists into a snapshot: month/today costs (+ projection) and
@@ -104,11 +76,10 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
     }
   }
 
-  const round = (value: number): number => Math.round(value * 100) / 100;
   const snapshot: UsageSnapshot = {
     costs: {
-      today: round(costToday),
-      month: round(costMonth),
+      today: round2(costToday),
+      month: round2(costMonth),
       projectedMonth: projectMonth(costMonth, nowMs),
       currency,
     },

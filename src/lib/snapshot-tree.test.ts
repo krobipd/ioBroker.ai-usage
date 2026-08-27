@@ -10,8 +10,10 @@ describe("mapSnapshot", () => {
         { name: "fable-4x", label: "Fable weekly", percent: 71 },
       ],
     };
-    const { objects, writes } = mapSnapshot("claude", "Claude Max", "claude-sub", snapshot);
-    expect(objects[0]).toMatchObject({ id: "claude", type: "device" });
+    const { objects, writes } = mapSnapshot("claude", snapshot);
+    // The account's own device object belongs to the engine's skeleton, which is the
+    // only place that carries the link drawing the connection icon.
+    expect(objects.some(o => o.id === "claude")).toBe(false);
     const ids = objects.map(o => o.id);
     expect(ids).toEqual(
       expect.arrayContaining([
@@ -33,7 +35,7 @@ describe("mapSnapshot", () => {
   });
 
   test("credits and costs land in their folders with the currency as unit", () => {
-    const { objects, writes } = mapSnapshot("router", "Router", "openrouter", {
+    const { objects, writes } = mapSnapshot("router", {
       credits: { used: 41.2, limit: 100, remaining: 58.8, percent: 41.2, currency: "USD" },
       costs: { total: 41.2, currency: "USD" },
     });
@@ -45,14 +47,14 @@ describe("mapSnapshot", () => {
   });
 
   test("piece-credits carry no currency unit", () => {
-    const { objects } = mapSnapshot("pieces", "Pieces", "deepseek", {
+    const { objects } = mapSnapshot("pieces", {
       credits: { used: 165, limit: 300, remaining: 135, percent: 55, currency: "requests", pieces: true },
     });
     expect(objects.find(o => o.id === "pieces.credits.used")?.common.unit).toBe("");
   });
 
   test("tokens with per-model breakdown create the models channel", () => {
-    const { objects, writes } = mapSnapshot("oai", "OpenAI", "openai", {
+    const { objects, writes } = mapSnapshot("oai", {
       costs: { today: 0.8, month: 14.6, projectedMonth: 22, currency: "USD" },
       tokens: {
         inputToday: 210000,
@@ -73,14 +75,14 @@ describe("mapSnapshot", () => {
     expect(writes).toContainEqual({ id: "oai.costs.projectedMonth", value: 22 });
   });
 
-  test("an empty snapshot yields only the device node", () => {
-    const { objects, writes } = mapSnapshot("empty", "Empty", "deepseek", {});
-    expect(objects).toHaveLength(1);
+  test("an empty snapshot yields nothing at all", () => {
+    const { objects, writes } = mapSnapshot("empty", {});
+    expect(objects).toHaveLength(0);
     expect(writes).toHaveLength(0);
   });
 
   test("the DeepSeek availability flag becomes a read-only indicator", () => {
-    const { objects } = mapSnapshot("ds", "DeepSeek", "deepseek", {
+    const { objects } = mapSnapshot("ds", {
       credits: { remaining: 12.5, currency: "USD" },
       available: true,
     });
@@ -115,8 +117,28 @@ describe("maxLimitPercent", () => {
     expect(limitingWindow(snapshot)).toEqual({ percent: 72, label: "Session (5 h)" });
   });
 
-  test("an account whose windows are ALL scoped reports none rather than the wrong one", () => {
-    expect(maxLimitPercent({ limits: [{ name: "m", label: "M", percent: 100, scoped: true }] })).toBeUndefined();
+  test("a model window stays out as long as a plan-wide one exists", () => {
+    expect(
+      maxLimitPercent({
+        limits: [
+          { name: "week", label: "Week", percent: 40 },
+          { name: "fable", label: "Fable weekly", percent: 100, scoped: true },
+        ],
+      }),
+    ).toBe(40);
+  });
+
+  test("an account with ONLY model windows is spoken for by the fullest of them", () => {
+    // Google reports no plan-wide bucket at all — leaving the account without any
+    // window would mean its warning could never fire.
+    expect(
+      limitingWindow({
+        limits: [
+          { name: "pro", label: "gemini-2.5-pro", percent: 25, scoped: true },
+          { name: "flash", label: "gemini-2.5-flash", percent: 80, scoped: true },
+        ],
+      }),
+    ).toEqual({ percent: 80, label: "gemini-2.5-flash" });
   });
 
   test("the label of the deciding window comes back for the warning message", () => {

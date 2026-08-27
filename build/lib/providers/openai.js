@@ -23,23 +23,9 @@ __export(openai_exports, {
 });
 module.exports = __toCommonJS(openai_exports);
 var import_http = require("../http");
+var import_pure_helpers = require("../pure-helpers");
 var import_report_utils = require("./report-utils");
 const BASE = "https://api.openai.com/v1/organization";
-async function fetchAllPages(url, headers, fetchJson) {
-  const buckets = [];
-  let page;
-  for (let i = 0; i < 12; i++) {
-    const body = await fetchJson(page ? `${url}&page=${encodeURIComponent(page)}` : url, headers);
-    if (Array.isArray(body == null ? void 0 : body.data)) {
-      buckets.push(...body.data);
-    }
-    if ((body == null ? void 0 : body.has_more) !== true || typeof (body == null ? void 0 : body.next_page) !== "string" || !body.next_page) {
-      break;
-    }
-    page = body.next_page;
-  }
-  return buckets;
-}
 function parseOpenAiReports(usageBuckets, costBuckets, nowMs) {
   var _a;
   let costMonth = 0;
@@ -94,11 +80,10 @@ function parseOpenAiReports(usageBuckets, costBuckets, nowMs) {
       }
     }
   }
-  const round = (value) => Math.round(value * 100) / 100;
   const snapshot = {
     costs: {
-      today: round(costToday),
-      month: round(costMonth),
+      today: (0, import_pure_helpers.round2)(costToday),
+      month: (0, import_pure_helpers.round2)(costMonth),
       projectedMonth: (0, import_report_utils.projectMonth)(costMonth, nowMs),
       currency
     }
@@ -118,12 +103,12 @@ function openAiProvider(adminKey, fetchJson = import_http.getJson, now = Date.no
     fetch: async () => {
       const headers = { Authorization: `Bearer ${adminKey}` };
       const start = (0, import_report_utils.monthStartUnix)(now());
-      const usage = await fetchAllPages(
+      const usage = await (0, import_report_utils.fetchAllPages)(
         `${BASE}/usage/completions?start_time=${start}&bucket_width=1d&limit=31&group_by=model`,
         headers,
         fetchJson
       );
-      const costs = await fetchAllPages(`${BASE}/costs?start_time=${start}&limit=31`, headers, fetchJson);
+      const costs = await (0, import_report_utils.fetchAllPages)(`${BASE}/costs?start_time=${start}&limit=31`, headers, fetchJson);
       return parseOpenAiReports(usage, costs, now());
     }
   };

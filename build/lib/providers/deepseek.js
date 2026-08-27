@@ -24,6 +24,7 @@ __export(deepseek_exports, {
 module.exports = __toCommonJS(deepseek_exports);
 var import_http = require("../http");
 var import_provider = require("../provider");
+var import_pure_helpers = require("../pure-helpers");
 function parseDeepSeekBalance(body) {
   const obj = body;
   if (typeof obj !== "object" || obj === null || !Array.isArray(obj.balance_infos)) {
@@ -36,9 +37,9 @@ function parseDeepSeekBalance(body) {
   }
   if (first) {
     snapshot.credits = {
-      remaining: parseAmount(first.total_balance),
-      granted: parseAmount(first.granted_balance),
-      toppedUp: parseAmount(first.topped_up_balance),
+      remaining: (0, import_pure_helpers.finiteNumber)(first.total_balance),
+      granted: (0, import_pure_helpers.finiteNumber)(first.granted_balance),
+      toppedUp: (0, import_pure_helpers.finiteNumber)(first.topped_up_balance),
       currency: typeof first.currency === "string" ? first.currency : "USD"
     };
   }
@@ -54,10 +55,6 @@ function deepSeekProvider(apiKey, fetchJson = import_http.getJson) {
       })
     )
   };
-}
-function parseAmount(value) {
-  const num = Number(value);
-  return value !== null && value !== void 0 && value !== "" && Number.isFinite(num) ? num : void 0;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

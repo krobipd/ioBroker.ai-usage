@@ -117,11 +117,11 @@ describe("chatgptSubProvider", () => {
     const tokens: TokenSet = { accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000, accountRef: "acc-1" };
     const provider = chatgptSubProvider(
       memoryStore(tokens),
+      () => Promise.resolve({}),
       (_url, headers) => {
         seen.push(headers);
         return Promise.resolve({ rate_limit: { primary_window: { used_percent: 1 } } });
       },
-      () => Promise.resolve({}),
       () => 0,
     );
     await provider.fetch();
@@ -129,11 +129,11 @@ describe("chatgptSubProvider", () => {
 
     const withoutAccount = chatgptSubProvider(
       memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
+      () => Promise.resolve({}),
       (_url, headers) => {
         seen.push(headers);
         return Promise.resolve({});
       },
-      () => Promise.resolve({}),
       () => 0,
     );
     await withoutAccount.fetch();

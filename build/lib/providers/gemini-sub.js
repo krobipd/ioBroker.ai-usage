@@ -90,7 +90,8 @@ function parseGeminiQuota(body) {
     const window = {
       name,
       label: model || kind || "Quota",
-      percent: Math.round((1 - Math.min(Math.max(fraction, 0), 1)) * 1e3) / 10
+      percent: Math.round((1 - Math.min(Math.max(fraction, 0), 1)) * 1e3) / 10,
+      scoped: true
     };
     if (typeof bucket.resetTime === "string" && bucket.resetTime) {
       window.resetAt = bucket.resetTime;
@@ -100,24 +101,23 @@ function parseGeminiQuota(body) {
   return limits.length ? { limits } : {};
 }
 function geminiSubProvider(store, post, postForm, now = Date.now) {
-  let cached = null;
   return {
     kind: "gemini-sub",
     fetch: async () => {
-      cached != null ? cached : cached = await store.load();
-      if (!cached) {
+      let tokens = await store.load();
+      if (!tokens) {
         throw new import_provider.FetchError("auth", "not signed in \u2014 start the Google sign-in in the instance settings");
       }
-      if (now() >= cached.expiresAt - 6e4) {
-        cached = await (0, import_gemini_auth.refreshGeminiTokens)(cached, postForm, now());
-        await store.save(cached);
+      if (now() >= tokens.expiresAt - 6e4) {
+        tokens = await (0, import_gemini_auth.refreshGeminiTokens)(tokens, postForm, now());
+        await store.save(tokens);
       }
-      if (!cached.accountRef) {
+      if (!tokens.accountRef) {
         const info = parseCodeAssist(
           await callCodeAssist(
             "loadCodeAssist",
             { metadata: { ideType: GEMINI_IDENTITY.ideType } },
-            cached.accessToken,
+            tokens.accessToken,
             post
           )
         );
@@ -127,11 +127,11 @@ function geminiSubProvider(store, post, postForm, now = Date.now) {
             "Google returned no project for this account \u2014 a Google AI subscription (Pro/Ultra) is required"
           );
         }
-        cached = { ...cached, accountRef: info.project };
-        await store.save(cached);
+        tokens = { ...tokens, accountRef: info.project };
+        await store.save(tokens);
       }
       return parseGeminiQuota(
-        await callCodeAssist("retrieveUserQuota", { project: cached.accountRef }, cached.accessToken, post)
+        await callCodeAssist("retrieveUserQuota", { project: tokens.accountRef }, tokens.accessToken, post)
       );
     }
   };

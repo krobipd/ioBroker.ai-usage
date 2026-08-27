@@ -29,9 +29,15 @@ interface Harness {
   /** Ids written through the changed-write seam (indicators). */
   changedWrites: string[];
   objects: string[];
+  /** Object ids the engine deleted. */
+  deleted: string[];
+  /** What `listStateIds` hands back — the database as the test wants to stage it. */
+  existing: string[];
   /** The full definition per upserted id — for assertions on `common`. */
   upserted: Map<string, ObjectDef>;
   notifications: string[];
+  /** How many repeating timers are armed right now. */
+  intervalCount(): number;
   /** Fire every scheduled one-shot immediately queued and each interval once. */
   tick(): Promise<void>;
   clock: { now: number };
@@ -41,6 +47,8 @@ function makeHarness(): Harness {
   const states = new Map<string, boolean | number | string>();
   const changedWrites: string[] = [];
   const objects: string[] = [];
+  const deleted: string[] = [];
+  const existing: string[] = [];
   const upserted = new Map<string, ObjectDef>();
   const notifications: string[] = [];
   const pending: (() => void)[] = [];
@@ -52,6 +60,11 @@ function makeHarness(): Harness {
       upserted.set(def.id, def);
       return Promise.resolve();
     },
+    deleteObject: id => {
+      deleted.push(id);
+      return Promise.resolve();
+    },
+    listStateIds: () => Promise.resolve([...existing]),
     setState: (id, value) => void states.set(id, value),
     setStateChanged: (id, value) => {
       changedWrites.push(id);
@@ -73,11 +86,14 @@ function makeHarness(): Harness {
   return {
     deps,
     states,
+    deleted,
+    existing,
     changedWrites,
     objects,
     upserted,
     notifications,
     clock,
+    intervalCount: () => intervals.length,
     tick: async () => {
       // First tick(s) drain the staggered one-shots; afterwards each tick is one interval round.
       if (pending.length > 0) {
@@ -270,7 +286,9 @@ describe("PollEngine", () => {
     const engine = new PollEngine([account()], new Map(), 300, h.deps);
     await engine.start();
     expect(warnings.some(w => w.includes("skipped"))).toBe(true);
-    expect(engine.accountIds).toEqual([]);
+    // Nothing is polled, but the user still configured one account.
+    await h.tick();
+    expect(h.states.get("total.accounts")).toBe(1);
   });
 
   test("a full window raises limitReached on account and totals", async () => {
@@ -417,5 +435,109 @@ describe("PollEngine", () => {
       expect(plain).toContain(id);
       expect(h.changedWrites).not.toContain(id);
     }
+  });
+
+  test("the repeating timer is armed by the staggered first poll, not next to it", async () => {
+    // Armed together, all accounts would fire in the same instant from the second
+    // round on — the burst the stagger exists to prevent.
+    const h = makeHarness();
+    const providers = new Map([
+      ["a", scriptedProvider([{}, {}])],
+      ["b", scriptedProvider([{}, {}])],
+      ["c", scriptedProvider([{}, {}])],
+    ]);
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" }), account({ id: "b", name: "B" }), account({ id: "c", name: "C" })],
+      providers,
+      300,
+      h.deps,
+    );
+    await engine.start();
+    expect(h.intervalCount()).toBe(0);
+    await h.tick();
+    expect(h.intervalCount()).toBe(3);
+  });
+
+  test("nothing is reported as offline before the account was ever asked", async () => {
+    // A fresh start used to strike every account through in the object tree and
+    // paint a red badge in the settings, for a full interval, over nothing.
+    const h = makeHarness();
+    const provider = scriptedProvider([{}]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    expect(h.states.has("a.info.unreach")).toBe(false);
+    expect(h.states.has("a.info.error")).toBe(false);
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(false);
+  });
+
+  test("a window the provider stopped reporting is removed, its channel with it", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      {
+        limits: [
+          { name: "week", label: "Week", percent: 10 },
+          { name: "gone", label: "Gone", percent: 20 },
+        ],
+      },
+      { limits: [{ name: "week", label: "Week", percent: 12 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.deleted).toEqual([]);
+    await h.tick();
+    expect(h.deleted).toContain("a.limits.gone.percent");
+    expect(h.deleted).toContain("a.limits.gone");
+    // The surviving window and the skeleton stay untouched.
+    expect(h.deleted).not.toContain("a.limits.week.percent");
+    expect(h.deleted).not.toContain("a.limits");
+    expect(h.deleted.some(id => id.startsWith("a.info"))).toBe(false);
+  });
+
+  test("the first round compares against the database, so a restart catches leftovers", async () => {
+    const h = makeHarness();
+    // Left behind while the adapter was stopped — the in-memory list knows nothing of it.
+    h.existing.push("a.limits.old.percent", "a.limits.week.percent");
+    const provider = scriptedProvider([{ limits: [{ name: "week", label: "Week", percent: 10 }] }]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.deleted).toContain("a.limits.old.percent");
+  });
+
+  test("a poll requested while one runs does not overlap it, and still happens", async () => {
+    // Two token refreshes in parallel sign each other out on a rotating refresh token.
+    const h = makeHarness();
+    let inFlight = 0;
+    let overlapped = false;
+    let calls = 0;
+    // Each fetch parks on a gate the test opens by hand, so two polls can be made
+    // to overlap if the engine lets them.
+    const gate: (() => void)[] = [];
+    const provider = {
+      kind: "deepseek" as const,
+      fetch: async (): Promise<UsageSnapshot> => {
+        calls++;
+        inFlight++;
+        overlapped ||= inFlight > 1;
+        await new Promise<void>(resolve => gate.push(resolve));
+        inFlight--;
+        return {};
+      },
+    };
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    const first = engine.pollNow("a");
+    await new Promise(resolve => setImmediate(resolve));
+    const second = engine.pollNow("a");
+    await new Promise(resolve => setImmediate(resolve));
+    expect(calls).toBe(1);
+    gate.shift()?.();
+    await new Promise(resolve => setImmediate(resolve));
+    gate.shift()?.();
+    await Promise.all([first, second]);
+    expect(overlapped).toBe(false);
+    expect(calls).toBe(2);
   });
 });

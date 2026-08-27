@@ -7,24 +7,26 @@ const REQUEST_TIMEOUT_MS = 15000;
 export type JsonFetch = (url: string, headers: Record<string, string>) => Promise<unknown>;
 
 /**
- * GET a JSON document with the shared failure classification: 401/403 become an
+ * Run one request and turn its outcome into the shared failure classification:
+ * 401/403 (and 400 where the provider answers a rejected grant that way) become an
  * auth error, 429 a rate-limit error, any other bad status or unparsable body a
  * SERVICE error (the service answered and is broken), and only a throw — refused
  * connection, DNS failure, timeout — a network error. The poll engine turns that
  * split into "the AI service is down" versus "this host has no connection".
  *
  * @param url the request URL
- * @param headers request headers (Authorization etc.)
+ * @param init the request options (method, headers, body)
+ * @param authOn400 true when a 400 means a rejected grant rather than a service fault
  * @returns the parsed JSON body
  */
-export async function getJson(url: string, headers: Record<string, string>): Promise<unknown> {
+async function request(url: string, init: RequestInit, authOn400 = false): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(url, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (e) {
     throw new FetchError("network", e instanceof Error ? e.message : String(e));
   }
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401 || response.status === 403 || (authOn400 && response.status === 400)) {
     throw new FetchError("auth", `HTTP ${response.status}`);
   }
   if (response.status === 429) {
@@ -38,47 +40,36 @@ export async function getJson(url: string, headers: Record<string, string>): Pro
   }
   try {
     return await response.json();
-  } catch {
-    throw new FetchError("service", "invalid JSON response");
+  } catch (e) {
+    throw new FetchError("service", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
 /**
- * POST a JSON document with the same failure classification as {@link getJson}.
+ * GET a JSON document.
+ *
+ * @param url the request URL
+ * @param headers request headers (Authorization etc.)
+ * @returns the parsed JSON body
+ */
+export async function getJson(url: string, headers: Record<string, string>): Promise<unknown> {
+  return request(url, { headers });
+}
+
+/**
+ * POST a JSON document. A 400 counts as an auth failure here: the OAuth token
+ * endpoints answer a dead code or refresh token with exactly that.
  *
  * @param url the request URL
  * @param body the JSON body
  * @returns the parsed JSON response
  */
 export async function postJson(url: string, body: Record<string, unknown>): Promise<unknown> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-  } catch (e) {
-    throw new FetchError("network", e instanceof Error ? e.message : String(e));
-  }
-  if (response.status === 401 || response.status === 403 || response.status === 400) {
-    throw new FetchError("auth", `HTTP ${response.status}`);
-  }
-  if (response.status === 429) {
-    throw new FetchError("rate-limit", "HTTP 429");
-  }
-  if (!response.ok) {
-    // 5xx = the service answered and is broken; anything else unexpected is treated
-    // the same way, because the service DID answer — only a throw above means we
-    // never reached it.
-    throw new FetchError("service", `HTTP ${response.status}`);
-  }
-  try {
-    return await response.json();
-  } catch {
-    throw new FetchError("service", "invalid JSON response");
-  }
+  return request(
+    url,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    true,
+  );
 }
 
 /**
@@ -98,32 +89,13 @@ export async function postForm(
   form: Record<string, string>,
   headers: Record<string, string> = {},
 ): Promise<unknown> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
+  return request(
+    url,
+    {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
       body: new URLSearchParams(form).toString(),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-  } catch (e) {
-    throw new FetchError("network", e instanceof Error ? e.message : String(e));
-  }
-  if (response.status === 400 || response.status === 401 || response.status === 403) {
-    throw new FetchError("auth", `HTTP ${response.status}`);
-  }
-  if (response.status === 429) {
-    throw new FetchError("rate-limit", "HTTP 429");
-  }
-  if (!response.ok) {
-    // 5xx = the service answered and is broken; anything else unexpected is treated
-    // the same way, because the service DID answer — only a throw above means we
-    // never reached it.
-    throw new FetchError("service", `HTTP ${response.status}`);
-  }
-  try {
-    return await response.json();
-  } catch (e) {
-    throw new FetchError("service", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
-  }
+    },
+    true,
+  );
 }

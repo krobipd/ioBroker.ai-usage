@@ -9,7 +9,6 @@ import {
   datapointBalanceLine,
   parseAccounts,
   SUBSCRIPTION_IDS,
-  validAccountIds,
   type AccountConfig,
 } from "./lib/pure-helpers";
 import type { TokenSet, TokenStore, UsageProvider } from "./lib/provider";
@@ -17,6 +16,7 @@ import { SIGN_IN_FLOWS, SIGN_IN_LABELS, attemptExpired, type SignInState } from 
 import { buildAuthorizeUrl, exchangeCode, generatePkce, type PkcePair } from "./lib/providers/claude-auth";
 import { claudeSubProvider } from "./lib/providers/claude-sub";
 import {
+  CHATGPT_OAUTH,
   exchangeDeviceCode,
   pollDeviceCode,
   startDeviceCode,
@@ -62,6 +62,8 @@ export class AiUsageAdapter extends utils.Adapter {
   private readonly signInErrors = new Map<string, string>();
   /** Device-code pollers, so they can be stopped on unload. */
   private readonly devicePollers = new Map<string, TimerHandle>();
+  /** One token store per subscription — see {@link tokenStore} for why it is shared. */
+  private readonly tokenStores = new Map<string, TokenStore>();
 
   /**
    * Every state id that already existed when this process started.
@@ -212,7 +214,7 @@ export class AiUsageAdapter extends utils.Adapter {
       return {
         status: "awaiting-device",
         userCode: start.userCode,
-        verificationUrl: "https://auth.openai.com/codex/device",
+        verificationUrl: CHATGPT_OAUTH.verificationUrl,
         expiresAt: start.expiresAt,
       };
     } catch (e) {
@@ -274,7 +276,12 @@ export class AiUsageAdapter extends utils.Adapter {
     this.stopDevicePoller(provider);
     const id = SUBSCRIPTION_IDS[provider];
     if (id) {
-      await this.engine?.pollNow(id);
+      // Started, not awaited: the settings page must confirm the sign-in at once,
+      // and a first query that has to wait for a provider can take up to the full
+      // request timeout. The values arrive a moment later on their own.
+      void this.engine?.pollNow(id).catch(e => {
+        this.log.debug(`First query after sign-in failed: ${e instanceof Error ? e.message : String(e)}`);
+      });
     }
     this.log.info(`${SIGN_IN_LABELS[provider] ?? provider}: signed in`);
   }
@@ -340,7 +347,7 @@ export class AiUsageAdapter extends utils.Adapter {
       return {
         status: "awaiting-device",
         userCode: attempt.start.userCode,
-        verificationUrl: "https://auth.openai.com/codex/device",
+        verificationUrl: CHATGPT_OAUTH.verificationUrl,
         expiresAt: attempt.start.expiresAt,
       };
     }
@@ -374,43 +381,103 @@ export class AiUsageAdapter extends utils.Adapter {
   // ------------------------------------------------------------ token files
 
   /**
-   * Where one subscription's tokens live: an encrypted file in the instance data
+   * The token store of one subscription — created ONCE per provider.
+   *
+   * The identity matters: the store holds the in-memory copy of the tokens, so
+   * signing out really takes effect. When each provider module kept its own copy,
+   * a sign-out deleted the file while the adapter kept polling with what it still
+   * had — and the next token refresh wrote the deleted file back.
+   *
+   * @param provider the subscription kind
+   * @returns the store
+   */
+  private tokenStore(provider: string): TokenStore {
+    let store = this.tokenStores.get(provider);
+    if (!store) {
+      store = this.makeTokenStore(provider);
+      this.tokenStores.set(provider, store);
+    }
+    return store;
+  }
+
+  /**
+   * Build the store for one subscription: an encrypted file in the instance data
    * directory, named after the PROVIDER. Keying by provider (not by account name)
    * keeps a sign-in alive when an account is renamed — the previous scheme lost it.
    *
    * @param provider the subscription kind
    * @returns the store
    */
-  private tokenStore(provider: string): TokenStore {
+  private makeTokenStore(provider: string): TokenStore {
     const dir = utils.getAbsoluteInstanceDataDir(this);
     const file = join(dir, `tokens-${provider}.json`);
+    let cached: TokenSet | null = null;
+    let read = false;
     return {
       load: async (): Promise<TokenSet | null> => {
-        try {
-          const parsed = JSON.parse(this.decrypt(await readFile(file, "utf8"))) as Partial<TokenSet>;
-          if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
-            return null;
-          }
-          return {
-            accessToken: parsed.accessToken,
-            refreshToken: parsed.refreshToken,
-            expiresAt: Number(parsed.expiresAt) || 0,
-            accountRef: typeof parsed.accountRef === "string" ? parsed.accountRef : undefined,
-          };
-        } catch {
-          return null; // never signed in (or unreadable) — the provider reports auth-required
+        if (!read) {
+          cached = await this.readTokenFile(file, provider);
+          read = true;
         }
+        return cached;
       },
       save: async (tokens: TokenSet): Promise<void> => {
         await mkdir(dir, { recursive: true });
         await writeFile(file, this.encrypt(JSON.stringify(tokens)), "utf8");
+        cached = tokens;
+        read = true;
       },
       clear: async (): Promise<void> => {
+        cached = null;
+        read = true;
         await unlink(file).catch(() => {
           /* already gone */
         });
       },
     };
+  }
+
+  /**
+   * Read one token file.
+   *
+   * A missing file means "never signed in" and is silent. A file that is there but
+   * cannot be read — damaged, or encrypted with a different instance secret — is
+   * NOT the same thing: without a word in the log, signing in would look like it
+   * simply does nothing.
+   *
+   * @param file the file path
+   * @param provider the subscription kind (for the log line)
+   * @returns the tokens, or null
+   */
+  private async readTokenFile(file: string, provider: string): Promise<TokenSet | null> {
+    let raw: string;
+    try {
+      raw = await readFile(file, "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") {
+        this.log.warn(`${SIGN_IN_LABELS[provider] ?? provider}: cannot open the stored sign-in (${String(e)})`);
+      }
+      return null; // never signed in — the provider reports auth-required
+    }
+    try {
+      const parsed = JSON.parse(this.decrypt(raw)) as Partial<TokenSet>;
+      if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
+        throw new Error("the file carries no tokens");
+      }
+      return {
+        accessToken: parsed.accessToken,
+        refreshToken: parsed.refreshToken,
+        expiresAt: Number(parsed.expiresAt) || 0,
+        accountRef: typeof parsed.accountRef === "string" ? parsed.accountRef : undefined,
+      };
+    } catch (e) {
+      this.log.warn(
+        `${SIGN_IN_LABELS[provider] ?? provider}: the stored sign-in cannot be read (${
+          e instanceof Error ? e.message : String(e)
+        }) — sign in again in the instance settings`,
+      );
+      return null;
+    }
   }
 
   /**
@@ -484,6 +551,24 @@ export class AiUsageAdapter extends utils.Adapter {
             /* states DB going down — never crash the poll loop */
           });
         },
+        deleteObject: async id => {
+          try {
+            await this.delObjectAsync(id, { recursive: true });
+            if (this.knownStateIds.delete(id)) {
+              this.removedStates++;
+            }
+          } catch (e) {
+            this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        },
+        listStateIds: async prefix => {
+          const start = `${this.namespace}.${prefix}.`;
+          const view = await this.getObjectViewAsync("system", "state", {
+            startkey: start,
+            endkey: `${start}￿`,
+          });
+          return (view?.rows ?? []).map(row => row.id.substring(this.namespace.length + 1));
+        },
         schedule: (cb, ms): TimerHandle => ({ kind: "interval", handle: this.setInterval(cb, ms) }),
         scheduleOnce: (cb, ms): TimerHandle => ({ kind: "timeout", handle: this.setTimeout(cb, ms) }),
         cancel: handle => {
@@ -525,9 +610,9 @@ export class AiUsageAdapter extends utils.Adapter {
   private async makeProvider(account: AccountConfig): Promise<UsageProvider | undefined> {
     switch (account.provider) {
       case "claude-sub":
-        return claudeSubProvider(this.tokenStore(account.provider), undefined, postJson);
+        return claudeSubProvider(this.tokenStore(account.provider), postJson);
       case "chatgpt-sub":
-        return chatgptSubProvider(this.tokenStore(account.provider), undefined, postJson);
+        return chatgptSubProvider(this.tokenStore(account.provider), postJson);
       case "gemini-sub":
         return geminiSubProvider(this.tokenStore(account.provider), postJson, postForm);
       case "openrouter": {
@@ -585,7 +670,7 @@ export class AiUsageAdapter extends utils.Adapter {
    *
    * ioBroker never garbage-collects an object whose id the adapter stopped writing:
    * it would sit there frozen on its last value and keep lying. So the old ids are
-   * deleted from a fixed list on every start — no state reading, no heuristics.
+   * deleted from a fixed list — no state reading, no heuristics.
    */
   private static readonly RETIRED_INFO_STATES = [
     "info.provider",
@@ -598,6 +683,10 @@ export class AiUsageAdapter extends utils.Adapter {
   /**
    * Remove the retired status states of every configured account.
    *
+   * Which of them still exist is answered by the startup snapshot that was read a
+   * moment earlier — asking the database for every id on every start would keep
+   * costing 35 lookups forever for a migration that is done after the first one.
+   *
    * @param accounts the configured accounts
    * @returns how many objects were actually deleted
    */
@@ -606,17 +695,16 @@ export class AiUsageAdapter extends utils.Adapter {
     for (const account of accounts) {
       for (const suffix of AiUsageAdapter.RETIRED_INFO_STATES) {
         const id = `${account.id}.${suffix}`;
+        if (!this.knownStateIds.has(id)) {
+          continue;
+        }
         try {
-          // Existence-checked so the log line can report a real number; these are
-          // stable dead orphans, never touched concurrently.
-          if (await this.getObjectAsync(id)) {
-            await this.delObjectAsync(id);
-            removed++;
-            // Deliberately NOT counted in the startup balance: this one-shot migration
-            // reports its own sum, and the same deletion must not appear in two lines
-            // that mean different things.
-            this.knownStateIds.delete(id);
-          }
+          await this.delObjectAsync(id);
+          removed++;
+          // Deliberately NOT counted in the startup balance: this one-shot migration
+          // reports its own sum, and the same deletion must not appear in two lines
+          // that mean different things.
+          this.knownStateIds.delete(id);
         } catch (e) {
           this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -631,7 +719,7 @@ export class AiUsageAdapter extends utils.Adapter {
    * guard against wiping everything through an accidental clear.
    */
   private async cleanupStaleObjects(): Promise<void> {
-    const keepIds = validAccountIds(this.config.accounts);
+    const keepIds = parseAccounts(this.config.accounts).map(account => account.id);
     if (keepIds.length === 0) {
       return;
     }

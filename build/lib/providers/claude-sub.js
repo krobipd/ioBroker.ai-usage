@@ -137,21 +137,20 @@ function applyExtraUsage(raw, snapshot) {
     }
   }
 }
-function claudeSubProvider(store, fetchJson = import_http.getJson, postJson, now = Date.now) {
-  let cached = null;
+function claudeSubProvider(store, postJson, fetchJson = import_http.getJson, now = Date.now) {
   return {
     kind: "claude-sub",
     fetch: async () => {
-      cached != null ? cached : cached = await store.load();
-      if (!cached) {
+      let tokens = await store.load();
+      if (!tokens) {
         throw new import_provider.FetchError("auth", "not signed in \u2014 run the Claude sign-in in the instance settings");
       }
-      if (now() >= cached.expiresAt - 6e4) {
-        cached = await (0, import_claude_auth.refreshTokens)(cached, postJson, now());
-        await store.save(cached);
+      if (now() >= tokens.expiresAt - 6e4) {
+        tokens = await (0, import_claude_auth.refreshTokens)(tokens, postJson, now());
+        await store.save(tokens);
       }
       const body = await fetchJson(import_claude_auth.CLAUDE_OAUTH.usageUrl, {
-        Authorization: `Bearer ${cached.accessToken}`,
+        Authorization: `Bearer ${tokens.accessToken}`,
         "anthropic-beta": import_claude_auth.CLAUDE_OAUTH.betaHeader,
         // Identify ourselves — an unset/odd user agent lands in a harder-throttled
         // bucket of this endpoint (community-measured; sources in the concept doc).

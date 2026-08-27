@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.7.1",
+    "version": "0.8.0",
     "news": {
+      "0.8.0": {
+        "en": "Signing out of a subscription really stops it now, accounts are no longer shown offline before their first answer, and queries stay spread out",
+        "de": "Das Abmelden eines Abos wirkt jetzt wirklich, Konten gelten vor der ersten Antwort nicht mehr als offline, und die Abfragen bleiben entzerrt",
+        "ru": "Выход из подписки теперь действительно срабатывает, аккаунты не считаются офлайн до первого ответа, а запросы остаются разнесёнными во времени",
+        "pt": "Terminar sessão numa subscrição passa a ter efeito real, as contas já não aparecem offline antes da primeira resposta e as consultas mantêm-se espaçadas",
+        "nl": "Uitloggen bij een abonnement werkt nu echt, accounts gelden niet meer als offline vóór hun eerste antwoord en de opvragingen blijven gespreid",
+        "fr": "La déconnexion d'un abonnement prend enfin effet, les comptes ne sont plus affichés hors ligne avant leur première réponse et les requêtes restent échelonnées",
+        "it": "La disconnessione da un abbonamento ora ha davvero effetto, gli account non risultano più offline prima della prima risposta e le richieste restano scaglionate",
+        "es": "Cerrar sesión en una suscripción ya surte efecto real, las cuentas dejan de aparecer sin conexión antes de su primera respuesta y las consultas siguen escalonadas",
+        "pl": "Wylogowanie z subskrypcji naprawdę działa, konta nie są już pokazywane jako offline przed pierwszą odpowiedzią, a zapytania pozostają rozłożone w czasie",
+        "uk": "Вихід із підписки тепер справді спрацьовує, облікові записи не вважаються офлайн до першої відповіді, а запити лишаються рознесеними в часі",
+        "zh-cn": "退出订阅登录现在真正生效，账户在首次响应前不再显示为离线，各账户的查询也保持错开进行"
+      },
       "0.7.1": {
         "en": "Restarting the adapter no longer writes one unchanged value into every status datapoint — a recorded history now stays free of restart noise",
         "de": "Ein Neustart des Adapters schreibt nicht mehr einmalig einen unveränderten Wert in jeden Status-Datenpunkt — eine Aufzeichnung bleibt frei von Neustart-Rauschen",
@@ -80,19 +93,6 @@
         "pl": "Trzy subskrypcje zamiast jednej: Claude, ChatGPT i Google/Gemini, każda z własnym prowadzonym logowaniem; ChatGPT i Gemini nie zostały jeszcze sprawdzone na prawdziwym koncie",
         "uk": "Три підписки замість однієї: Claude, ChatGPT і Google/Gemini, кожна зі своїм покроковим входом; ChatGPT і Gemini ще не перевірені на справжньому обліковому записі",
         "zh-cn": "三个订阅而不是一个：Claude、ChatGPT 和 Google/Gemini 各有自己的引导式登录；ChatGPT 和 Gemini 尚未在真实账户上测试"
-      },
-      "0.2.0": {
-        "en": "Completely new settings page: your stored AI credentials as simple on/off switches, and a reliable guided Claude sign-in",
-        "de": "Komplett neue Einstellungs-Seite: gespeicherte KI-Zugänge als einfache An/Aus-Schalter und eine zuverlässige geführte Claude-Anmeldung",
-        "ru": "Полностью новая страница настроек: сохранённые данные доступа ИИ как простые переключатели и надёжный пошаговый вход Claude",
-        "pt": "Página de definições totalmente nova: credenciais de IA guardadas como interruptores simples e um início de sessão Claude guiado e fiável",
-        "nl": "Volledig nieuwe instellingenpagina: opgeslagen AI-toegangsgegevens als eenvoudige aan/uit-schakelaars en een betrouwbare begeleide Claude-aanmelding",
-        "fr": "Page de réglages entièrement nouvelle : identifiants IA enregistrés comme simples interrupteurs et une connexion Claude guidée et fiable",
-        "it": "Pagina delle impostazioni completamente nuova: credenziali IA salvate come semplici interruttori e un accesso Claude guidato e affidabile",
-        "es": "Página de ajustes completamente nueva: credenciales de IA guardadas como simples interruptores y un inicio de sesión Claude guiado y fiable",
-        "pl": "Całkowicie nowa strona ustawień: zapisane dane dostępu AI jako proste przełączniki i niezawodne prowadzone logowanie Claude",
-        "uk": "Повністю нова сторінка налаштувань: збережені дані доступу ШІ як прості перемикачі та надійний покроковий вхід Claude",
-        "zh-cn": "全新的设置页面：已保存的 AI 凭据变为简单的开关，并提供可靠的引导式 Claude 登录"
       }
     },
     "plugins": {

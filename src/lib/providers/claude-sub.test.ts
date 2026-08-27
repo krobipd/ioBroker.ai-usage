@@ -132,11 +132,11 @@ describe("claudeSubProvider", () => {
     const calls: { url: string; headers: Record<string, string> }[] = [];
     const provider = claudeSubProvider(
       memoryStore(validTokens),
+      () => Promise.reject(new Error("refresh must not run")),
       (url, headers) => {
         calls.push({ url, headers });
         return Promise.resolve({ limits: [{ kind: "session", percent: 5 }] });
       },
-      () => Promise.reject(new Error("refresh must not run")),
       () => 1000,
     );
     const snapshot = await provider.fetch();
@@ -151,11 +151,11 @@ describe("claudeSubProvider", () => {
     const usedTokens: string[] = [];
     const provider = claudeSubProvider(
       store,
+      () => Promise.resolve({ access_token: "fresh", refresh_token: "rt2", expires_in: 3600 }),
       (_url, headers) => {
         usedTokens.push(headers.Authorization);
         return Promise.resolve({ limits: [] });
       },
-      () => Promise.resolve({ access_token: "fresh", refresh_token: "rt2", expires_in: 3600 }),
       () => 5000, // past expiresAt - 60 s
     );
     await provider.fetch();
