@@ -128,6 +128,7 @@ After a successful sign-in the account is queried immediately, so values appear 
 -->
 ### 0.8.0 (2026-08-27)
 
+- Fixed: A switched-off instance no longer leaves its accounts standing green in the object tree — every account is marked as not delivering when the adapter stops
 - Fixed: Signing out of a subscription now really stops it — the adapter kept polling with what it still held in memory, and the next token refresh even restored the deleted sign-in
 - Fixed: A restarted adapter no longer shows every account as offline until its first answer arrives, complete with struck-through icon and a red badge in the settings
 - Fixed: From the second round on, all accounts queried at the same moment instead of spread out, which is exactly what makes a provider throttle or lock an account

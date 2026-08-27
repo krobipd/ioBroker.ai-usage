@@ -700,12 +700,13 @@ class AiUsageAdapter extends utils.Adapter {
    * @param callback invoked when cleanup is done
    */
   onUnload(callback) {
-    var _a;
+    var _a, _b;
     try {
       for (const provider of [...this.devicePollers.keys()]) {
         this.stopDevicePoller(provider);
       }
       (_a = this.engine) == null ? void 0 : _a.stop();
+      (_b = this.engine) == null ? void 0 : _b.markAllOffline();
       this.engine = null;
       void this.setState("info.connection", { val: false, ack: true });
     } catch {

@@ -109,6 +109,24 @@ class PollEngine {
     this.handles.length = 0;
   }
   /**
+   * Say that no account is delivering any more — for shutdown.
+   *
+   * A stopped adapter reads nothing, so it must not leave every account claiming to
+   * be online: `info.unreach` is what colours the account in the admin's object tree
+   * and the badge in the settings, and on its last value it stays green for as long
+   * as the instance is switched off (nut2 does the same on its devices).
+   *
+   * Synchronous, like {@link stop} — the writes go out fire-and-forget, because
+   * `onUnload` must not await anything.
+   */
+  markAllOffline() {
+    for (const runtime of this.runtimes) {
+      this.deps.setStateChanged(`${runtime.config.id}.info.unreach`, true);
+      this.deps.setStateChanged(`${runtime.config.id}.info.error`, "The adapter is stopped \u2014 nothing is being read");
+    }
+    this.deps.setStateChanged("total.accountsReachable", 0);
+  }
+  /**
    * Poll one account immediately, by id. Used after a successful sign-in: waiting
    * up to a full interval there reads as "the sign-in did not work".
    *
