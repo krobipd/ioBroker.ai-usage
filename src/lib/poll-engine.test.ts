@@ -506,6 +506,33 @@ describe("PollEngine", () => {
     expect(h.deleted).toContain("a.limits.old.percent");
   });
 
+  test("shutting down marks every account as not delivering", async () => {
+    // A switched-off instance reads nothing — leaving the accounts on their last
+    // value keeps them green in the object tree for as long as it stays off.
+    const h = makeHarness();
+    const providers = new Map([
+      ["a", scriptedProvider([{}])],
+      ["b", scriptedProvider([{}])],
+    ]);
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" }), account({ id: "b", name: "B" })],
+      providers,
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(false);
+    expect(h.states.get("total.accountsReachable")).toBe(2);
+
+    engine.stop();
+    engine.markAllOffline();
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(h.states.get("b.info.unreach")).toBe(true);
+    expect(String(h.states.get("a.info.error"))).toContain("stopped");
+    expect(h.states.get("total.accountsReachable")).toBe(0);
+  });
+
   test("a poll requested while one runs does not overlap it, and still happens", async () => {
     // Two token refreshes in parallel sign each other out on a rotating refresh token.
     const h = makeHarness();

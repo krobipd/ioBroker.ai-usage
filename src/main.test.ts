@@ -68,6 +68,8 @@ vi.mock("@iobroker/adapter-core", () => {
   };
 });
 
+import { join } from "node:path";
+
 import { AiUsageAdapter } from "./main";
 import type { TokenSet, TokenStore } from "./lib/provider";
 
@@ -89,7 +91,9 @@ interface Internals {
 
 const internals = (adapter: AiUsageAdapter): Internals => adapter as unknown as Internals;
 
-const CLAUDE_FILE = "/data/ai-usage.0/tokens-claude-sub.json";
+// Built the same way the adapter builds it — a hard-coded path with forward
+// slashes matches on Linux and macOS and silently misses on Windows.
+const CLAUDE_FILE = join("/data/ai-usage.0", "tokens-claude-sub.json");
 const tokens: TokenSet = { accessToken: "at", refreshToken: "rt", expiresAt: 9_999_999_999_999 };
 
 function makeAdapter(): AiUsageAdapter {

@@ -765,6 +765,9 @@ export class AiUsageAdapter extends utils.Adapter {
         this.stopDevicePoller(provider);
       }
       this.engine?.stop();
+      // Before letting go: a switched-off instance must not leave its accounts
+      // standing green in the object tree.
+      this.engine?.markAllOffline();
       this.engine = null;
       void this.setState("info.connection", { val: false, ack: true });
     } catch {
