@@ -28,6 +28,7 @@ const MAX_NETWORK_FAILURES = 3;
 const BACKOFF_START_MS = 10 * 60 * 1e3;
 const BACKOFF_MAX_MS = 60 * 60 * 1e3;
 const STAGGER_MS = 3e3;
+const REASON_UNKNOWN = "Unknown";
 class PollEngine {
   /**
    * @param accounts the validated account configs
@@ -55,7 +56,9 @@ class PollEngine {
         authNotified: false,
         serviceOnline: false,
         state: "no-connection",
-        error: "waiting for the first query",
+        // Nothing known until the service says something; the skeleton writes
+        // REASON_UNKNOWN, and the first answer replaces it.
+        error: REASON_UNKNOWN,
         createdObjects: /* @__PURE__ */ new Set(),
         firstPollDone: false,
         polling: false,
@@ -116,6 +119,11 @@ class PollEngine {
    * and the badge in the settings, and on its last value it stays green for as long
    * as the instance is switched off.
    *
+   * `info.error` is deliberately NOT touched. That datapoint answers "what did the AI
+   * service say", and the adapter being switched off is not something the service
+   * said — a sentence about our own operating state in there reads as if the provider
+   * had reported it. Whatever the last real reason was stays readable.
+   *
    * The returned promise is what makes this WORK. Measured on the live server
    * 2026-08-27: issued fire-and-forget and followed by an immediate `callback()`,
    * not one of these writes ever reached the database — the process was gone first.
@@ -125,13 +133,10 @@ class PollEngine {
    * @returns resolves once every write has been acknowledged
    */
   async markAllOffline() {
-    const writes = [];
-    for (const runtime of this.runtimes) {
-      writes.push(this.deps.setStateChanged(`${runtime.config.id}.info.unreach`, true));
-      writes.push(
-        this.deps.setStateChanged(`${runtime.config.id}.info.error`, "The adapter is stopped \u2014 nothing is being read")
-      );
-    }
+    const writes = this.runtimes.flatMap((runtime) => [
+      this.deps.setStateChanged(`${runtime.config.id}.info.unreach`, true),
+      this.deps.setStateChanged(`${runtime.config.id}.info.error`, REASON_UNKNOWN)
+    ]);
     writes.push(this.deps.setStateChanged("total.accountsReachable", 0));
     writes.push(this.deps.setStateChanged("info.connection", false));
     await Promise.all(writes);
@@ -458,7 +463,8 @@ class PollEngine {
       runtime.createdObjects.add(def.id);
     }
     runtime.staticIds = defs.filter((def) => def.type === "state").map((def) => def.id);
-    void this.writeAccountStatus(runtime);
+    void this.deps.setStateChanged(`${config.id}.info.unreach`, true);
+    void this.deps.setStateChanged(`${config.id}.info.error`, REASON_UNKNOWN);
   }
   /** The totals skeleton (channel + states). */
   async createTotalsSkeleton() {

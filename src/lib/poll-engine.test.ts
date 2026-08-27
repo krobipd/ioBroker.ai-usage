@@ -469,7 +469,9 @@ describe("PollEngine", () => {
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     expect(h.states.get("a.info.unreach")).toBe(true);
-    expect(String(h.states.get("a.info.error"))).toContain("first query");
+    // One fleet-wide wording while the adapter has nothing to report — never an
+    // adapter-specific sentence.
+    expect(h.states.get("a.info.error")).toBe("Unknown");
     await h.tick();
     expect(h.states.get("a.info.unreach")).toBe(false);
     expect(h.states.get("a.info.error")).toBe("");
@@ -510,6 +512,22 @@ describe("PollEngine", () => {
     expect(h.deleted).toContain("a.limits.old.percent");
   });
 
+  test("a first poll that fails writes no invented reason into info.error", async () => {
+    // A network failure under the tolerance threshold reports nothing yet — and
+    // "nothing yet" must not become a sentence about the adapter's own state. The
+    // datapoint answers what the SERVICE said.
+    const h = makeHarness();
+    const boom = (): never => {
+      throw new FetchError("network", "ETIMEDOUT");
+    };
+    const provider = scriptedProvider([boom]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(h.states.get("a.info.error")).toBe("Unknown");
+  });
+
   test("shutting down marks every account as not delivering", async () => {
     // A switched-off instance reads nothing — leaving the accounts on their last
     // value keeps them green in the object tree for as long as it stays off.
@@ -533,7 +551,8 @@ describe("PollEngine", () => {
     await engine.markAllOffline();
     expect(h.states.get("a.info.unreach")).toBe(true);
     expect(h.states.get("b.info.unreach")).toBe(true);
-    expect(String(h.states.get("a.info.error"))).toContain("stopped");
+    // Same single wording as at startup — one word, no explanation appended.
+    expect(h.states.get("a.info.error")).toBe("Unknown");
     expect(h.states.get("total.accountsReachable")).toBe(0);
     expect(h.states.get("info.connection")).toBe(false);
   });

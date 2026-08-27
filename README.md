@@ -126,6 +126,10 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.9.1 (2026-08-27)
+
+- Changed: While an account has nothing to report — the adapter switched off, or started and not asked yet — the reason now reads "Unknown" instead of a sentence about the adapter
+
 ### 0.9.0 (2026-08-27)
 
 - Fixed: Switching the instance off now shows every account as offline in the object tree and the settings, instead of leaving them green for as long as the adapter is not running
@@ -152,10 +156,6 @@ After a successful sign-in the account is queried immediately, so values appear 
 - New: One log line after a change tells you how many datapoints the object tree gained and lost, instead of leaving you to click through the tree
 - Fixed: A started sign-in that sat unused for a quarter of an hour now says so plainly instead of failing later with the provider's own cryptic answer
 - Fixed: Datapoints that only repeat their previous value are no longer rewritten every cycle, which kept flooding the history of anyone recording them
-
-### 0.6.0 (2026-08-26)
-
-- New: Each account now shows the connection icon in the object tree — green while it delivers, struck through when it does not, exactly like every other ioBroker device
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
