@@ -1,6 +1,12 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.5.0 (2026-08-26)
+
+- Changed: Each account now has two status datapoints instead of six — an offline marker and the reason in plain text. The retired ones are deleted on start
+- New: The settings page shows every switched-on account as online, limited or offline at a glance, with the full reason in plain text when you hover the badge
+- Changed: The names of the total and per-account limit datapoints now say "plan-wide", matching what they have actually counted since 0.4.0
+
 ## 0.4.0 (2026-08-26)
 
 - Fixed: A limit that belongs to a single model no longer reports the whole account as full, and the warning names the window it came from instead of just "usage"

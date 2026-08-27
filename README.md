@@ -126,7 +126,7 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.9.0 (2026-08-27)
 
 - Fixed: Switching the instance off now shows every account as offline in the object tree and the settings, instead of leaving them green for as long as the adapter is not running
 - Fixed: After a crash or a hard kill an account no longer keeps claiming to deliver data; every account starts as "not delivering" until its first answer arrives
@@ -156,12 +156,6 @@ After a successful sign-in the account is queried immediately, so values appear 
 ### 0.6.0 (2026-08-26)
 
 - New: Each account now shows the connection icon in the object tree — green while it delivers, struck through when it does not, exactly like every other ioBroker device
-
-### 0.5.0 (2026-08-26)
-
-- Changed: Each account now has two status datapoints instead of six — an offline marker and the reason in plain text. The retired ones are deleted on start
-- New: The settings page shows every switched-on account as online, limited or offline at a glance, with the full reason in plain text when you hover the badge
-- Changed: The names of the total and per-account limit datapoints now say "plan-wide", matching what they have actually counted since 0.4.0
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

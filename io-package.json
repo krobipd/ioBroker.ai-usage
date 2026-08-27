@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "news": {
-      "NEXT": {
+      "0.9.0": {
         "en": "Stopping the instance now really marks every account as offline, and an account no longer keeps claiming to deliver data after a crash",
         "de": "Das Stoppen der Instanz kennzeichnet jetzt wirklich jedes Konto als offline, und nach einem Absturz behauptet kein Konto mehr, es liefere Daten",
         "ru": "Остановка экземпляра теперь действительно помечает все аккаунты как офлайн, и после сбоя ни один аккаунт больше не утверждает, что передаёт данные",
