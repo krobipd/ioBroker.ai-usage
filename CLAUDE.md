@@ -161,6 +161,11 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
        Prozess bedingungslos hart, `onUnload` läuft NIE — jeder Abschalt-Schreibvorgang war toter
        Code, auch das `info.connection` seit 0.1.0. Ein Test nagelt fest, dass der Eintrag draußen
        bleibt; es ist eine Manifest-Eigenschaft, die kein Code verteidigen kann.
+    a2) **`clearStopInstanceFlag()` ganz am Anfang von `onReady`** (0.9.2/0.9.3): der Eintrag lebt
+       als Kopie im Instanzobjekt weiter und überlebt jedes Update — ohne diese Einmal-Korrektur
+       war (a) auf bestehenden Installationen wirkungslos. Nur bei gesetztem Feld schreiben (sonst
+       Neustart-Schleife, jede Objekt-Änderung startet die Instanz neu) und den Start danach SOFORT
+       verlassen (sonst Zeitgeber-Warnung im Protokoll). Vorbild: public-holidays.
     b) **`onUnload` meldet erst nach den Schreibvorgängen fertig** (`.finally(callback)`) —
        fire-and-forget kommt nicht an. `markAllOffline()` schreibt `info.unreach`, `info.error`,
        `total.accountsReachable` und `info.connection`; dauert ~100 ms, Frist des Hosts ist 1 s.
