@@ -85,7 +85,7 @@ interface Internals {
   signInState(provider: string): Promise<{ status: string }>;
   onMessage(obj: unknown): Promise<void>;
   removeRetiredStates(accounts: { id: string }[]): Promise<number>;
-  clearStopInstanceFlag(): Promise<void>;
+  clearStopInstanceFlag(): Promise<boolean>;
   cleanupStaleObjects(): Promise<void>;
   snapshotExistingStates(): Promise<void>;
   knownStateIds: Set<string>;
@@ -226,9 +226,10 @@ describe("the leftover stopInstance flag", () => {
     expect(adapter.log.info).not.toHaveBeenCalled();
   });
 
-  test("the startup actually calls it, before anything else", async () => {
-    // Without this the correction exists but never runs — the fix would ship and
-    // change nothing on an updated installation.
+  test("the startup calls it first and then stops — the restart is coming", async () => {
+    // Without the call the correction would ship and change nothing. Without the
+    // stop the process would arm its poll timers while the host is already shutting
+    // it down — the timer API refuses that and warns in the user's log.
     const adapter = makeAdapter();
     adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
     const seen: string[] = [];
@@ -243,6 +244,19 @@ describe("the leftover stopInstance flag", () => {
 
     expect(seen).toContain("system.adapter.ai-usage.0");
     expect(extend).toHaveBeenCalledTimes(1);
+    // Nothing else was set up: no object snapshot, no state written.
+    expect(adapter.getObjectViewAsync).not.toHaveBeenCalled();
+    expect(adapter.setState).not.toHaveBeenCalled();
+  });
+
+  test("without a correction the startup carries on as usual", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
+    adapter.getForeignObjectAsync = vi.fn(async () => ({ common: {} })) as unknown as typeof adapter.getForeignObjectAsync;
+
+    await (adapter as unknown as { onReady(): Promise<void> }).onReady();
+
+    expect(adapter.getObjectViewAsync).toHaveBeenCalled();
   });
 
   test("an unreadable instance object does not stop the startup", async () => {
@@ -250,7 +264,8 @@ describe("the leftover stopInstance flag", () => {
     adapter.getForeignObjectAsync = vi.fn(async () => {
       throw new Error("objects db down");
     }) as unknown as typeof adapter.getForeignObjectAsync;
-    await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBeUndefined();
+    // Kein Abbruch des Starts, wenn die Objekt-Datenbank nicht antwortet.
+    await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(false);
   });
 });
 

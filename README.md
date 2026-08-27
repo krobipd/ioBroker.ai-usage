@@ -126,6 +126,10 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.9.3 (2026-08-27)
+
+- Fixed: The first start after updating no longer leaves a warning in the log
+
 ### 0.9.2 (2026-08-27)
 
 - Fixed: Stopping the instance now marks the accounts as offline on installations that were updated too, not only on fresh ones — the previous version left them showing as online
@@ -150,10 +154,6 @@ After a successful sign-in the account is queried immediately, so values appear 
 - Fixed: Google accounts are now spoken for by their fullest model quota, and the warning names that model — before, every single model could raise the account's alarm
 - Fixed: "Configured accounts" counts what you switched on, including accounts whose credential could not be read; the sign-in button no longer hangs for up to 15 seconds
 - Fixed: A damaged or unreadable stored sign-in now says so in the log instead of looking exactly like "never signed in"
-
-### 0.7.1 (2026-08-27)
-
-- Fixed: Restarting the adapter no longer writes one unchanged value into every status datapoint, so a recorded history stays free of restart noise
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

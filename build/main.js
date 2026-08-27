@@ -481,6 +481,11 @@ class AiUsageAdapter extends utils.Adapter {
    * the price, it happens on the first start after the update and never again —
    * afterwards the condition below is false. public-holidays corrects its own run
    * mode the same way.
+   *
+   * @returns true when the correction was written and the restart is coming — the
+   *   caller has to stop right there. Carrying on would arm the poll timers of a
+   *   process the host is already shutting down, which the adapter's timer API
+   *   refuses with a warning in the user's log (measured on the live server).
    */
   async clearStopInstanceFlag() {
     var _a;
@@ -489,17 +494,21 @@ class AiUsageAdapter extends utils.Adapter {
       const obj = await this.getForeignObjectAsync(id);
       const supported = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.supportedMessages;
       if (!(supported == null ? void 0 : supported.stopInstance)) {
-        return;
+        return false;
       }
       this.log.info("Correcting a leftover setting from an earlier version \u2014 this instance restarts once");
       await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      return true;
     } catch (e) {
       this.log.debug(`Could not check the instance object: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
     }
   }
   async onReady() {
     try {
-      await this.clearStopInstanceFlag();
+      if (await this.clearStopInstanceFlag()) {
+        return;
+      }
       const accounts = (0, import_pure_helpers.parseAccounts)(this.config.accounts);
       const interval = (0, import_pure_helpers.clampPollInterval)(this.config.pollInterval);
       await this.migrateTokenFiles();

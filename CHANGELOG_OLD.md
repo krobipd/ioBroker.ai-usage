@@ -1,6 +1,10 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.7.1 (2026-08-27)
+
+- Fixed: Restarting the adapter no longer writes one unchanged value into every status datapoint, so a recorded history stays free of restart noise
+
 ## 0.7.0 (2026-08-27)
 
 - New: One log line after a change tells you how many datapoints the object tree gained and lost, instead of leaving you to click through the tree
