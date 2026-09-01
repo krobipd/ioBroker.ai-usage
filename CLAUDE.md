@@ -30,10 +30,14 @@ src/lib/provider.ts            → UsageProvider-Vertrag + UsageSnapshot + Fetch
 src/lib/http.ts                → getJson/postJson/postForm über EINE `request`-Funktion (natives
                                  fetch, Status→eine von VIER Fehlerklassen: auth · rate-limit ·
                                  service · network)
-src/lib/providers/claude-auth.ts   → OAuth-Konstanten/PKCE/Tausch/Auffrischung (HA-Vorbild-verifiziert)
+src/lib/providers/claude-auth.ts   → OAuth-Konstanten/PKCE/Tausch/Auffrischung (HA-Vorbild-verifiziert);
+                                 Scope NUR user:profile (seit 0.10.0, Vorbild-bewiesen) + die
+                                 claude-code-Absender-Kennung (Drossel-Eimer, s. Entscheidung 20)
 src/lib/providers/claude-sub.ts    → Abo-Abfrage: limits[]-Auswertung, Extra-Guthaben beide Schemata
 src/lib/providers/chatgpt-auth.ts   → Geräte-Code-Anmeldung (Start/Poll/Einlösen/Erneuern)
-src/lib/providers/chatgpt-sub.ts   → /wham/usage: 5-h- + Wochen-Fenster, Guthaben
+src/lib/providers/chatgpt-sub.ts   → /wham/usage: 5-h- + Wochen-Fenster, Guthaben; seit 0.10.0 auch
+                                 /wham/rate-limit-reset-credits (Reset-Gutschein-Inventar,
+                                 CodexBar-quellverifiziert; Zweitabruf best-effort)
 src/lib/providers/gemini-auth.ts   → Google-Anmeldung (PKCE, Adresszeile auswerten, Erneuern)
 src/lib/providers/gemini-sub.ts    → loadCodeAssist (Projekt) + retrieveUserQuota (Kontingente)
 src/lib/providers/openrouter|deepseek|openai|anthropic-api.ts → je Anbieter fetch+parse (pur)
@@ -82,8 +86,14 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
 5. **Harte Intervall-Untergrenze 60 s + Backoff** — die Claude-Drossel sperrt das NUTZERKONTO
    ~24 h; für ChatGPT ist keine Kontosperre belegt, aber der Endpunkt ist IP-gedrosselt; für
    Google gibt es keinen belegten sicheren Takt (einziger Anker: deren eigenes Programm cacht 30 s).
-6. **Nur Geliefertes anlegen** (capability-driven); gleiche Sache = gleicher Pfad über alle
-   Anbieter. Ein Kontingent ohne brauchbaren Wert wird NICHT als 0 % erfunden.
+6. **Nur Geliefertes anlegen — aber einmal Angelegtes bleibt** (capability-driven); gleiche Sache =
+   gleicher Pfad über alle Anbieter. Ein Kontingent ohne brauchbaren Wert wird NICHT als 0 % erfunden.
+   ⚠️ Seit 0.10.0 gilt die zweite Hälfte hart (krobi-Fund live 2026-09-01, Klassenfehler wie
+   homeconnect-childLock): Anbieter lassen optionale Felder ZUSTANDSABHÄNGIG weg (Anthropic liefert
+   `resets_at: null`, solange kein Fenster läuft — gemessen genau in der Drossel-Situation). Ein
+   Datenpunkt darf mit dieser Laune nicht kommen und gehen. Deshalb: `resetAt` (und
+   `resetCreditsNextExpiry`) sind FESTER Teil ihres Fensters/Kanals — immer angelegt, aktiv mit ""
+   geschrieben, wenn gerade nichts läuft (das alte Datum stehen zu lassen wäre eine Lüge).
 7. **Gemini: Kennung ist Pflichtteil der Abfrage** — mit der falschen Kennung (User-Agent +
    `ideType`) antwortet Google trotzdem, liefert aber den stillgelegten Gratis-Satz mit dauerhaft
    100 %. Ein Zähler, der nie fällt, ist schlimmer als ein Fehler → beide Aufrufe tragen dieselbe
@@ -137,12 +147,15 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     zählt NICHT mit, sie meldet ihre eigene Summe. Ausgelöst wird die Zeile, wenn das LETZTE Konto
     seine erste Abfrage hinter sich hat (`afterFirstRound`) — die erste Runde ist bewusst versetzt,
     und ein Konfig-Wechsel startet die Instanz ohnehin neu.
-15. **Waisen der DYNAMISCHEN Baumhälfte werden jede Runde entfernt** (0.8.0): was ein Anbieter
-    nicht mehr liefert (umbenanntes Modell, weggefallenes Fenster), stünde sonst für immer mit
-    seinem letzten Prozentwert im Baum — dieselbe Regel wie bei den abgeschafften Status-Punkten,
-    vorher nur auf die feste Liste angewandt. Die ERSTE Runde vergleicht gegen die Datenbank
-    (`listStateIds`), damit auch zählt, was im Stillstand verschwand; danach gegen den vorherigen
-    Schnappschuss. Leere Fenster-/Modell-Kanäle gehen mit, Kinder vor Eltern (`orphanObjectIds`).
+15. **Der Waisen-Aufräumer entfernt nur STRUKTUR, nie Einzelwerte** (0.8.0, geschärft 0.10.0):
+    Gelöscht wird ein ganzer `limits.<fenster>`- oder `models.<modell>`-Teilbaum, dessen
+    Fenster/Modell die Antwort gar nicht mehr führt (umbenanntes Modell, weggefallenes Fenster) —
+    das stünde sonst für immer mit seinem letzten Prozentwert im Baum. Ein EINZELNER Wert in einem
+    weiterhin gelieferten Fenster ist NIE eine Waise (0.10.0, krobi-Fund: das Reset-Datum wurde
+    mitten in der Drossel gelöscht und nach dem Reset wieder angelegt — s. Entscheidung 6). Werte
+    unter credits/costs/tokens bleiben, einmal angelegt, grundsätzlich stehen. Die ERSTE Runde
+    vergleicht gegen die Datenbank (`listStateIds`), damit auch zählt, was im Stillstand verschwand;
+    danach gegen den vorherigen Schnappschuss. Kinder vor Eltern (`orphanObjectIds`).
 16. **Zugangsdaten liegen NUR in der Ablage, nie im Anbieter-Modul** (0.8.0): `tokenStore(provider)`
     gibt pro Anbieter dieselbe Instanz zurück, die den Speicher-Zwischenstand hält. Vorher hatte
     jedes Anbieter-Modul seine eigene Kopie — Abmelden löschte die Datei, der Adapter fragte mit der
@@ -180,6 +193,18 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
        den ich mir ausgedacht hatte („The adapter is stopped — nothing is being read"); der
        angehängte Halbsatz war die Rechtfertigung, an der krobi sich gestoßen hat. Ein Gate im
        Konsistenz-Audit fängt jeden adapter-eigenen Wortlaut.
+20. **Die Claude-Abfrage meldet sich als claude-code** (0.10.0): der Drossel-Eimer des
+    Abfrage-Endpunkts hängt an der Absender-Kennung — dreifach community-gemessen
+    (Claude-Code-Usage-Monitor #202, claude-code #31021/#31637): claude-code-Kennung = großzügiger
+    Eimer (sicher bei 3-Minuten-Takt), jede fremde Kennung — auch unser früheres
+    „ioBroker.ai-usage" — = aggressiver Eimer mit dauerhaften Ablehnungen. Versionsnummer =
+    npm-Stand zum Bau-Zeitpunkt; der Eimer hängt am Produktnamen, nicht an der exakten Nummer.
+    Gleiches Vorgehen wie govee-smart (Govee-App-Kennung). Die Drossel wirkt PRO Zugangs-Token,
+    nicht pro Konto (gleiche Quellen) — die 60-s-Untergrenze aus Entscheidung 5 bleibt trotzdem.
+21. **Fehlerklasse einer unlesbaren Antwort ist `service`, nicht `network`** (0.10.0): eine Antwort,
+    die ankam, aber nicht unserem Schema entspricht, heißt „der Dienst hat geantwortet und ist
+    defekt" — vorher lief sie als „keine Verbindung" mit drei tolerierten Versuchen und versteckte
+    einen echten Dienst-Defekt hinter der falschen Anzeige (alle fünf Parser betroffen).
 
 ## Tests
 
