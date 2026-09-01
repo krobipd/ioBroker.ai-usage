@@ -25,7 +25,10 @@ import { CLAUDE_OAUTH, refreshTokens, type JsonPost } from "./claude-auth";
  */
 export function parseClaudeUsage(body: unknown): UsageSnapshot {
   if (typeof body !== "object" || body === null) {
-    throw new FetchError("network", "unexpected usage response");
+    // "service", not "network": a body we could parse but cannot understand
+    // means the service ANSWERED and is broken — reporting it as "no
+    // connection" (with three tolerated attempts) hid a real fault.
+    throw new FetchError("service", "unexpected usage response");
   }
   const raw = body as Record<string, unknown>;
   const limits: LimitWindow[] = [];
@@ -184,9 +187,10 @@ export function claudeSubProvider(
       const body = await fetchJson(CLAUDE_OAUTH.usageUrl, {
         Authorization: `Bearer ${tokens.accessToken}`,
         "anthropic-beta": CLAUDE_OAUTH.betaHeader,
-        // Identify ourselves — an unset/odd user agent lands in a harder-throttled
-        // bucket of this endpoint (community-measured; sources in the concept doc).
-        "User-Agent": "ioBroker.ai-usage",
+        // The claude-code identity, NOT our own name: the endpoint's throttle
+        // bucket keys on this header, and our previous "ioBroker.ai-usage"
+        // identity sat in the aggressive bucket — see CLAUDE_OAUTH.userAgent.
+        "User-Agent": CLAUDE_OAUTH.userAgent,
       });
       return parseClaudeUsage(body);
     },

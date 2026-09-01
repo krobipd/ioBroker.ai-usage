@@ -28,7 +28,7 @@ var import_pure_helpers = require("../pure-helpers");
 function parseDeepSeekBalance(body) {
   const obj = body;
   if (typeof obj !== "object" || obj === null || !Array.isArray(obj.balance_infos)) {
-    throw new import_provider.FetchError("network", "unexpected response shape (no balance_infos)");
+    throw new import_provider.FetchError("service", "unexpected response shape (no balance_infos)");
   }
   const first = obj.balance_infos.find((entry) => typeof entry === "object" && entry !== null);
   const snapshot = {};

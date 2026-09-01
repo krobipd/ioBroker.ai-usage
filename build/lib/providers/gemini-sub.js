@@ -65,7 +65,7 @@ function parseCodeAssist(body) {
 }
 function parseGeminiQuota(body) {
   if (typeof body !== "object" || body === null) {
-    throw new import_provider.FetchError("network", "unexpected quota response");
+    throw new import_provider.FetchError("service", "unexpected quota response");
   }
   const raw = body;
   const buckets = Array.isArray(raw.buckets) ? raw.buckets : [];

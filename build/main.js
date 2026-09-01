@@ -49,6 +49,7 @@ var import_anthropic_api = require("./lib/providers/anthropic-api");
 var import_deepseek = require("./lib/providers/deepseek");
 var import_openai = require("./lib/providers/openai");
 var import_openrouter = require("./lib/providers/openrouter");
+const SORT_KEY_END = "\uFFFF";
 class AiUsageAdapter extends utils.Adapter {
   engine = null;
   /** Running sign-in attempts, keyed by provider kind. */
@@ -84,7 +85,7 @@ class AiUsageAdapter extends utils.Adapter {
     try {
       const view = await this.getObjectViewAsync("system", "state", {
         startkey: `${this.namespace}.`,
-        endkey: `${this.namespace}.\uFFFF`
+        endkey: `${this.namespace}.${SORT_KEY_END}`
       });
       for (const row of (_a = view == null ? void 0 : view.rows) != null ? _a : []) {
         this.knownStateIds.add(row.id.substring(this.namespace.length + 1));
@@ -328,10 +329,14 @@ class AiUsageAdapter extends utils.Adapter {
       }
       return { status: "awaiting-paste", url: attempt.url, flow: attempt.flow };
     }
+    if (await this.tokenStore(provider).load()) {
+      this.signInErrors.delete(provider);
+      return { status: "signed-in" };
+    }
     if (failure) {
       return { status: "failed", reason: failure };
     }
-    return await this.tokenStore(provider).load() ? { status: "signed-in" } : { status: "signed-out" };
+    return { status: "signed-out" };
   }
   /**
    * Forget the tokens of one subscription.
@@ -389,7 +394,7 @@ class AiUsageAdapter extends utils.Adapter {
       },
       save: async (tokens) => {
         await (0, import_promises.mkdir)(dir, { recursive: true });
-        await (0, import_promises.writeFile)(file, this.encrypt(JSON.stringify(tokens)), "utf8");
+        await (0, import_promises.writeFile)(file, this.encrypt(JSON.stringify(tokens)), { encoding: "utf8", mode: 384 });
         cached = tokens;
         read = true;
       },
@@ -561,7 +566,7 @@ class AiUsageAdapter extends utils.Adapter {
           const start = `${this.namespace}.${prefix}.`;
           const view = await this.getObjectViewAsync("system", "state", {
             startkey: start,
-            endkey: `${start}\uFFFF`
+            endkey: `${start}${SORT_KEY_END}`
           });
           return ((_a = view == null ? void 0 : view.rows) != null ? _a : []).map((row) => row.id.substring(this.namespace.length + 1));
         },

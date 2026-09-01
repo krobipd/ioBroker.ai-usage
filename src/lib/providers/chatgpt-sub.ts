@@ -13,6 +13,15 @@ import { CHATGPT_OAUTH, refreshChatgptTokens, type JsonPost } from "./chatgpt-au
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 
 /**
+ * The reset-voucher inventory ("rate limit reset credits" — purchasable vouchers
+ * that clear a full limit window). Shape source-verified against CodexBar
+ * (steipete/CodexBar, fetcher + test fixtures): `{ credits: [{ id, reset_type,
+ * status, granted_at, expires_at }], available_count }`; the two extra headers
+ * are what OpenAI's own desktop client sends on this route.
+ */
+export const CHATGPT_RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
+
+/**
  * Read one rate-limit window.
  *
  * Both windows may be null when they do not apply to the account, and `reset_at`
@@ -54,7 +63,9 @@ function readWindow(raw: unknown, name: string, label: string): LimitWindow | un
  */
 export function parseChatgptUsage(body: unknown): UsageSnapshot {
   if (typeof body !== "object" || body === null) {
-    throw new FetchError("network", "unexpected usage response");
+    // "service": the service answered with something we cannot read — that is a
+    // fault of its own, not a missing connection.
+    throw new FetchError("service", "unexpected usage response");
   }
   const raw = body as Record<string, unknown>;
   const limits: LimitWindow[] = [];
@@ -106,6 +117,51 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
 }
 
 /**
+ * Read the reset-voucher inventory: how many vouchers are usable right now and
+ * when the next one expires.
+ *
+ * Counted here rather than trusting the server's `available_count`: the answer can
+ * carry vouchers whose status still says "available" although their expiry has
+ * passed (CodexBar skips those for the same reason). A voucher without an expiry
+ * counts as usable. Falls back to the server count when no list is present.
+ *
+ * @param body the parsed answer
+ * @param nowMs current time (ms)
+ * @returns voucher count plus the next expiry (empty string while none is held)
+ */
+export function parseChatgptResetCredits(body: unknown, nowMs: number): { count: number; nextExpiry: string } {
+  const raw = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const list = Array.isArray(raw.credits) ? raw.credits : null;
+  if (!list) {
+    const serverCount = Number(raw.available_count);
+    return { count: Number.isFinite(serverCount) && serverCount >= 0 ? serverCount : 0, nextExpiry: "" };
+  }
+  let count = 0;
+  let nextExpiry = "";
+  for (const entry of list) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const voucher = entry as Record<string, unknown>;
+    if (voucher.status !== "available") {
+      continue;
+    }
+    const expiresAt = typeof voucher.expires_at === "string" ? voucher.expires_at : "";
+    if (expiresAt) {
+      const expiryMs = Date.parse(expiresAt);
+      if (Number.isFinite(expiryMs) && expiryMs <= nowMs) {
+        continue; // stale: still flagged available, but already expired
+      }
+      if (!nextExpiry || expiresAt < nextExpiry) {
+        nextExpiry = expiresAt;
+      }
+    }
+    count++;
+  }
+  return { count, nextExpiry };
+}
+
+/**
  * The ChatGPT/Codex subscription provider.
  *
  * The tokens come from the store on every round and are never held here — see
@@ -142,7 +198,29 @@ export function chatgptSubProvider(
       if (tokens.accountRef) {
         headers["ChatGPT-Account-Id"] = tokens.accountRef;
       }
-      return parseChatgptUsage(await fetchJson(CHATGPT_USAGE_URL, headers));
+      const snapshot = parseChatgptUsage(await fetchJson(CHATGPT_USAGE_URL, headers));
+      // Reset-voucher inventory — best-effort second call: its failure must not
+      // discard the usage snapshot that already succeeded. The datapoints keep
+      // their last value in that case (the orphan sweep no longer touches
+      // credit values), so a transient miss never makes them come and go.
+      try {
+        const vouchers = parseChatgptResetCredits(
+          await fetchJson(CHATGPT_RESET_CREDITS_URL, {
+            ...headers,
+            // What OpenAI's own desktop client sends on this route (CodexBar-verified).
+            "OpenAI-Beta": "codex-1",
+            originator: "Codex Desktop",
+          }),
+          now(),
+        );
+        const credits = snapshot.credits ?? { currency: "USD" };
+        credits.resetCredits = vouchers.count;
+        credits.resetCreditsNextExpiry = vouchers.nextExpiry;
+        snapshot.credits = credits;
+      } catch {
+        // inventory unavailable this round — the usage snapshot stands on its own
+      }
+      return snapshot;
     },
   };
 }

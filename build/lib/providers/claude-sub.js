@@ -29,7 +29,7 @@ var import_claude_auth = require("./claude-auth");
 function parseClaudeUsage(body) {
   var _a, _b;
   if (typeof body !== "object" || body === null) {
-    throw new import_provider.FetchError("network", "unexpected usage response");
+    throw new import_provider.FetchError("service", "unexpected usage response");
   }
   const raw = body;
   const limits = [];
@@ -152,9 +152,10 @@ function claudeSubProvider(store, postJson, fetchJson = import_http.getJson, now
       const body = await fetchJson(import_claude_auth.CLAUDE_OAUTH.usageUrl, {
         Authorization: `Bearer ${tokens.accessToken}`,
         "anthropic-beta": import_claude_auth.CLAUDE_OAUTH.betaHeader,
-        // Identify ourselves — an unset/odd user agent lands in a harder-throttled
-        // bucket of this endpoint (community-measured; sources in the concept doc).
-        "User-Agent": "ioBroker.ai-usage"
+        // The claude-code identity, NOT our own name: the endpoint's throttle
+        // bucket keys on this header, and our previous "ioBroker.ai-usage"
+        // identity sat in the aggressive bucket — see CLAUDE_OAUTH.userAgent.
+        "User-Agent": import_claude_auth.CLAUDE_OAUTH.userAgent
       });
       return parseClaudeUsage(body);
     }

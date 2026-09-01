@@ -1,5 +1,5 @@
 import type { UsageSnapshot } from "./provider";
-import { limitingWindow, mapSnapshot, maxLimitPercent } from "./snapshot-tree";
+import { limitingWindow, mapSnapshot, maxLimitPercent, orphanObjectIds } from "./snapshot-tree";
 
 describe("mapSnapshot", () => {
   test("a subscription snapshot yields device, limit channels and percent/reset states", () => {
@@ -25,8 +25,13 @@ describe("mapSnapshot", () => {
         "claude.limits.fable-4x.percent",
       ]),
     );
-    // No reset state for a window without a reset time.
-    expect(ids).not.toContain("claude.limits.week.resetAt");
+    // The reset state is a FIXED part of every window: it exists even while the
+    // provider reports no running window, and its value is then the empty string.
+    // Deleting it on a momentary omission made the datapoint come and go with the
+    // provider's mood (krobi, live 2026-09-01).
+    expect(ids).toContain("claude.limits.week.resetAt");
+    expect(writes).toContainEqual({ id: "claude.limits.week.resetAt", value: "" });
+    expect(writes).toContainEqual({ id: "claude.limits.session.resetAt", value: "2026-08-25T14:00:00Z" });
     expect(writes).toContainEqual({ id: "claude.limits.session.percent", value: 34 });
     // Everything is read-only.
     for (const object of objects.filter(o => o.type === "state")) {
@@ -81,6 +86,21 @@ describe("mapSnapshot", () => {
     expect(writes).toHaveLength(0);
   });
 
+  test("reset vouchers land under credits, with an always-present expiry companion", () => {
+    const withVoucher = mapSnapshot("gpt", {
+      credits: { remaining: 4, currency: "USD", resetCredits: 2, resetCreditsNextExpiry: "2026-10-01T00:00:00Z" },
+    });
+    expect(withVoucher.writes).toContainEqual({ id: "gpt.credits.resetCredits", value: 2 });
+    expect(withVoucher.writes).toContainEqual({
+      id: "gpt.credits.resetCreditsNextExpiry",
+      value: "2026-10-01T00:00:00Z",
+    });
+    // No voucher held: the count says 0 and the companion empties — neither leaves.
+    const without = mapSnapshot("gpt", { credits: { remaining: 4, currency: "USD", resetCredits: 0 } });
+    expect(without.writes).toContainEqual({ id: "gpt.credits.resetCredits", value: 0 });
+    expect(without.writes).toContainEqual({ id: "gpt.credits.resetCreditsNextExpiry", value: "" });
+  });
+
   test("the DeepSeek availability flag becomes a read-only indicator", () => {
     const { objects } = mapSnapshot("ds", {
       credits: { remaining: 12.5, currency: "USD" },
@@ -88,6 +108,49 @@ describe("mapSnapshot", () => {
     });
     const available = objects.find(o => o.id === "ds.available");
     expect(available?.common).toMatchObject({ type: "boolean", role: "indicator", write: false });
+  });
+});
+
+describe("orphanObjectIds", () => {
+  test("a value inside a still-delivered window is never an orphan", () => {
+    // The krobi case, live 2026-09-01: Anthropic omitted resets_at mid-throttle,
+    // the datapoint was deleted with "the provider no longer reports it" and came
+    // back after the reset. The window still delivered its percent — nothing goes.
+    const known = ["claude.limits.week.percent", "claude.limits.week.resetAt"];
+    const current = ["claude.limits.week.percent"];
+    expect(orphanObjectIds(known, current, [])).toEqual([]);
+  });
+
+  test("a whole window that fell out of the answer goes, channel after states", () => {
+    const known = ["claude.limits.week.percent", "claude.limits.week.resetAt", "claude.limits.session.percent"];
+    const current = ["claude.limits.session.percent"];
+    const gone = orphanObjectIds(known, current, []);
+    expect(gone).toContain("claude.limits.week.percent");
+    expect(gone).toContain("claude.limits.week.resetAt");
+    expect(gone).toContain("claude.limits.week");
+    expect(gone.indexOf("claude.limits.week")).toBeGreaterThan(gone.indexOf("claude.limits.week.resetAt"));
+    expect(gone).not.toContain("claude.limits");
+    expect(gone).not.toContain("claude.limits.session.percent");
+  });
+
+  test("a renamed model takes its subtree along, the surviving one stays", () => {
+    const known = ["oai.models.gpt-5.tokensToday", "oai.models.gpt-5-mini.tokensToday"];
+    const current = ["oai.models.gpt-5-mini.tokensToday"];
+    const gone = orphanObjectIds(known, current, []);
+    expect(gone).toContain("oai.models.gpt-5.tokensToday");
+    expect(gone).toContain("oai.models.gpt-5");
+    expect(gone).not.toContain("oai.models");
+  });
+
+  test("credits/costs/tokens values stay once created, whatever the round delivers", () => {
+    const known = ["ds.credits.granted", "ds.credits.toppedUp", "ds.available", "ds.costs.month"];
+    const current = ["ds.credits.remaining"];
+    expect(orphanObjectIds(known, current, [])).toEqual([]);
+  });
+
+  test("skeleton ids are always kept", () => {
+    const known = ["claude.info.unreach", "claude.limits.week.percent"];
+    expect(orphanObjectIds(known, ["claude.limits.week.percent"], ["claude.info.unreach"])).toEqual([]);
   });
 });
 

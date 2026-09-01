@@ -129,6 +129,15 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 0.10.0 (2026-09-01)
+
+- Fixed: The reset-time datapoint of a limit window no longer disappears and reappears — it stays and simply empties while no window is running
+- Fixed: The settings page no longer shows the sign-in screen to a signed-in account, and its rows load without waiting for the credential storage scan
+- Improved: Claude usage is read with far fewer rejections — the query now identifies itself the way the endpoint expects
+- Changed: New Claude sign-ins request only the profile permission — the stored access can no longer create API keys or run models
+- New: ChatGPT accounts show their purchasable limit-reset credits — how many are available and when the next one expires
+- Improved: An unreadable provider answer is now reported as a service fault instead of a missing connection
+
 ### 0.9.3 (2026-08-27)
 
 - Fixed: The first start after updating no longer leaves a warning in the log
@@ -145,18 +154,6 @@ After a successful sign-in the account is queried immediately, so values appear 
 
 - Fixed: Switching the instance off now shows every account as offline in the object tree and the settings, instead of leaving them green for as long as the adapter is not running
 - Fixed: After a crash or a hard kill an account no longer keeps claiming to deliver data; every account starts as "not delivering" until its first answer arrives
-
-### 0.8.0 (2026-08-27)
-
-- Fixed: A switched-off instance no longer leaves its accounts standing green in the object tree — every account is marked as not delivering when the adapter stops
-- Fixed: Signing out of a subscription now really stops it — the adapter kept polling with what it still held in memory, and the next token refresh even restored the deleted sign-in
-- Fixed: A restarted adapter no longer shows every account as offline until its first answer arrives, complete with struck-through icon and a red badge in the settings
-- Fixed: From the second round on, all accounts queried at the same moment instead of spread out, which is exactly what makes a provider throttle or lock an account
-- Fixed: Limit windows and models a provider stops reporting are now removed instead of staying in the object tree forever, frozen on their last value
-- Fixed: Signing in no longer risks signing the subscription straight back out, which could happen when the immediate first query collided with a scheduled one
-- Fixed: Google accounts are now spoken for by their fullest model quota, and the warning names that model — before, every single model could raise the account's alarm
-- Fixed: "Configured accounts" counts what you switched on, including accounts whose credential could not be read; the sign-in button no longer hangs for up to 15 seconds
-- Fixed: A damaged or unreadable stored sign-in now says so in the log instead of looking exactly like "never signed in"
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

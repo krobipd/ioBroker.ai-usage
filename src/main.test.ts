@@ -90,6 +90,7 @@ interface Internals {
   snapshotExistingStates(): Promise<void>;
   knownStateIds: Set<string>;
   attempts: Map<string, unknown>;
+  signInErrors: Map<string, string>;
   onUnload(cb: () => void): void;
 }
 
@@ -179,6 +180,17 @@ describe("sign-in flow", () => {
     expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-in");
     await internals(adapter).signOut("claude-sub");
     expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-out");
+  });
+
+  test("a valid sign-in wins over a remembered failure", async () => {
+    // The krobi case (2026-09-01): a stale error from an earlier attempt made the
+    // settings row show the sign-in screen although working tokens existed.
+    const adapter = makeAdapter();
+    await internals(adapter).tokenStore("claude-sub").save(tokens);
+    (internals(adapter).signInErrors as Map<string, string>).set("claude-sub", "old failure");
+    expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-in");
+    // The stale failure is dropped for good, not just outvoted.
+    expect((internals(adapter).signInErrors as Map<string, string>).has("claude-sub")).toBe(false);
   });
 
   test("every message is answered, including an unknown one", async () => {

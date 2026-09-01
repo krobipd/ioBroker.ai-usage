@@ -218,10 +218,10 @@ export class PollEngine {
    * and the badge in the settings, and on its last value it stays green for as long
    * as the instance is switched off.
    *
-   * `info.error` is deliberately NOT touched. That datapoint answers "what did the AI
-   * service say", and the adapter being switched off is not something the service
-   * said — a sentence about our own operating state in there reads as if the provider
-   * had reported it. Whatever the last real reason was stays readable.
+   * `info.error` goes back to {@link REASON_UNKNOWN}: while the instance is off the
+   * adapter has nothing to report, and the fleet-wide word for that is the single
+   * word "Unknown" (krobi 2026-08-27) — never a stale provider message, never an
+   * invented sentence about our own operating state.
    *
    * The returned promise is what makes this WORK. Measured on the live server
    * 2026-08-27: issued fire-and-forget and followed by an immediate `callback()`,

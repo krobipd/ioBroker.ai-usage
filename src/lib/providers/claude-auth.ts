@@ -12,10 +12,29 @@ export const CLAUDE_OAUTH = {
   authorizeUrl: "https://claude.ai/oauth/authorize",
   tokenUrl: "https://console.anthropic.com/v1/oauth/token",
   redirectUri: "https://console.anthropic.com/oauth/code/callback",
-  scopes: "org:create_api_key user:profile user:inference",
+  /**
+   * Least privilege: the usage endpoint works with the profile scope alone —
+   * proven by the HA reference integration, which narrowed to exactly this on
+   * 2026-08-28 (trickv/hass-claude-usage PR #14, released as v10). The broader
+   * set we started with (org:create_api_key + user:inference) let the stored
+   * token CREATE API keys and CALL models — powers a read-only monitor must not
+   * hold. Existing sign-ins keep working; the narrow scope applies from the
+   * next sign-in on.
+   */
+  scopes: "user:profile",
   usageUrl: "https://api.anthropic.com/api/oauth/usage",
   profileUrl: "https://api.anthropic.com/api/oauth/profile",
   betaHeader: "oauth-2025-04-20",
+  /**
+   * The user agent decides WHICH throttle bucket the usage endpoint applies —
+   * community-measured three times over (Claude-Code-Usage-Monitor #202,
+   * claude-code #31021/#31637): a claude-code identity is safe at 3-minute
+   * polls, any other identity lands in an aggressively limited bucket with
+   * persistent 429s. Version pinned to the npm release current at build time;
+   * the bucket keys on the product name, not the exact number. Same approach
+   * as govee-smart, which identifies as the Govee app for the same reason.
+   */
+  userAgent: "claude-code/2.1.252",
 } as const;
 
 /** A PKCE pair for one sign-in attempt. */

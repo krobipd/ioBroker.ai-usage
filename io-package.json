@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.9.3",
+    "version": "0.10.0",
     "news": {
+      "0.10.0": {
+        "en": "The reset-time datapoint no longer disappears and reappears. Claude is read with far fewer rejections, new sign-ins request only the profile permission, and ChatGPT shows its limit-reset credits.",
+        "de": "Der Reset-Zeitpunkt verschwindet nicht mehr, die Einstellungsseite zeigt Angemeldeten keinen Anmelde-Bildschirm mehr, Claude wird mit weniger Ablehnungen gelesen, ChatGPT zeigt Reset-Gutschriften.",
+        "ru": "Точка данных времени сброса больше не исчезает. Claude опрашивается с меньшим числом отказов, новые входы запрашивают только право профиля, ChatGPT показывает кредиты сброса лимита.",
+        "pt": "O momento de reposição já não desaparece. O Claude é lido com muito menos rejeições, novos inícios de sessão pedem apenas a permissão de perfil e o ChatGPT mostra os seus créditos de reposição.",
+        "nl": "De resettijd verdwijnt niet meer. Claude wordt met veel minder afwijzingen gelezen, nieuwe aanmeldingen vragen alleen het profielrecht en ChatGPT toont zijn reset-tegoeden.",
+        "fr": "L'heure de réinitialisation ne disparaît plus, les réglages ne montrent plus la connexion aux comptes connectés, Claude est lu avec moins de rejets, ChatGPT affiche ses crédits de réinitialisation.",
+        "it": "L'orario di reset non scompare più. Claude viene letto con molti meno rifiuti, i nuovi accessi richiedono solo il permesso del profilo e ChatGPT mostra i suoi crediti di reset.",
+        "es": "La hora de reinicio ya no desaparece. Claude se lee con muchos menos rechazos, los nuevos inicios de sesión solo piden el permiso de perfil y ChatGPT muestra sus créditos de reinicio.",
+        "pl": "Czas resetu już nie znika. Claude jest odczytywany ze znacznie mniejszą liczbą odrzuceń, nowe logowania proszą tylko o prawo profilu, a ChatGPT pokazuje swoje kredyty resetu.",
+        "uk": "Час скидання більше не зникає. Claude опитується зі значно меншою кількістю відмов, нові входи запитують лише право профілю, ChatGPT показує кредити скидання ліміту.",
+        "zh-cn": "重置时间数据点不再时隐时现。Claude 的读取被拒次数大幅减少，新登录只请求个人资料权限，ChatGPT 会显示其限额重置额度。"
+      },
       "0.9.3": {
         "en": "The first start after updating no longer leaves a warning in the log",
         "de": "Der erste Start nach einem Update hinterlässt keine Warnung mehr im Protokoll",
@@ -80,19 +93,6 @@
         "pl": "Ponowne uruchomienie adaptera nie zapisuje już jednorazowo niezmienionej wartości w każdym punkcie stanu — historia pozostaje wolna od szumu restartów",
         "uk": "Перезапуск адаптера більше не записує одноразово незмінене значення в кожну точку стану — історія лишається без шуму від перезапусків",
         "zh-cn": "重启适配器不再向每个状态数据点写入一次未变化的值，记录的历史不再出现重启噪声"
-      },
-      "0.7.0": {
-        "en": "After a change the log says in one line how many datapoints the object tree gained and lost — no clicking through the tree to find out",
-        "de": "Nach einer Änderung sagt das Protokoll in einer Zeile, wie viele Datenpunkte dazugekommen und weggefallen sind — kein Durchklicken des Objektbaums nötig",
-        "ru": "После изменения журнал одной строкой сообщает, сколько точек данных добавилось и исчезло — не нужно просматривать дерево объектов",
-        "pt": "Após uma alteração, o registo indica numa linha quantos pontos de dados foram criados e removidos — sem percorrer a árvore de objetos",
-        "nl": "Na een wijziging meldt het logboek in één regel hoeveel datapunten erbij kwamen en verdwenen — zonder de objectboom door te klikken",
-        "fr": "Après une modification, le journal indique en une ligne combien de points de données ont été créés et supprimés — sans parcourir l'arbre des objets",
-        "it": "Dopo una modifica il log indica in una riga quanti punti dati sono stati creati e rimossi — senza scorrere l'albero degli oggetti",
-        "es": "Tras un cambio, el registro indica en una línea cuántos puntos de datos se crearon y eliminaron — sin recorrer el árbol de objetos",
-        "pl": "Po zmianie dziennik podaje w jednej linii, ile punktów danych przybyło i ubyło — bez przeglądania drzewa obiektów",
-        "uk": "Після зміни журнал одним рядком повідомляє, скільки точок даних додалося та зникло — без перегляду дерева об'єктів",
-        "zh-cn": "更改后，日志用一行说明对象树新增和移除了多少数据点，无需逐层点开查看"
       }
     },
     "plugins": {

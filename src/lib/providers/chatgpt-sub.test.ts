@@ -1,6 +1,6 @@
 import { FetchError, type TokenSet, type TokenStore } from "../provider";
 import { pollDeviceCode, startDeviceCode, type DeviceCodeStart } from "./chatgpt-auth";
-import { chatgptSubProvider, parseChatgptUsage } from "./chatgpt-sub";
+import { chatgptSubProvider, parseChatgptResetCredits, parseChatgptUsage } from "./chatgpt-sub";
 
 /**
  * A token store backed by memory.
@@ -126,6 +126,11 @@ describe("chatgptSubProvider", () => {
     );
     await provider.fetch();
     expect(seen[0]["ChatGPT-Account-Id"]).toBe("acc-1");
+    // The second request of the SAME fetch is the reset-voucher inventory — it
+    // carries the account id too, plus the two headers OpenAI's own client sends.
+    expect(seen[1]["ChatGPT-Account-Id"]).toBe("acc-1");
+    expect(seen[1]["OpenAI-Beta"]).toBe("codex-1");
+    expect(seen[1].originator).toBe("Codex Desktop");
 
     const withoutAccount = chatgptSubProvider(
       memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
@@ -137,6 +142,91 @@ describe("chatgptSubProvider", () => {
       () => 0,
     );
     await withoutAccount.fetch();
-    expect(seen[1]["ChatGPT-Account-Id"]).toBeUndefined();
+    expect(seen[2]["ChatGPT-Account-Id"]).toBeUndefined();
+  });
+
+  test("a failing voucher call never discards the usage snapshot", async () => {
+    const tokens: TokenSet = { accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 };
+    const provider = chatgptSubProvider(
+      memoryStore(tokens),
+      () => Promise.resolve({}),
+      url =>
+        url.includes("rate-limit-reset-credits")
+          ? Promise.reject(new FetchError("service", "HTTP 500"))
+          : Promise.resolve({ rate_limit: { primary_window: { used_percent: 41 } } }),
+      () => 0,
+    );
+    const snapshot = await provider.fetch();
+    expect(snapshot.limits?.[0]?.percent).toBe(41);
+    expect(snapshot.credits?.resetCredits).toBeUndefined();
+  });
+
+  test("vouchers from the inventory land in the snapshot's credits", async () => {
+    // Expiry far beyond the test clock, or the provider would try a token refresh.
+    const tokens: TokenSet = { accessToken: "a", refreshToken: "r", expiresAt: Date.parse("2027-01-01T00:00:00Z") };
+    const provider = chatgptSubProvider(
+      memoryStore(tokens),
+      () => Promise.resolve({}),
+      url =>
+        url.includes("rate-limit-reset-credits")
+          ? Promise.resolve({
+              credits: [
+                { id: "c1", reset_type: "codex_rate_limits", status: "available", expires_at: "2026-10-01T00:00:00Z" },
+              ],
+              available_count: 1,
+            })
+          : Promise.resolve({ rate_limit: { primary_window: { used_percent: 41 } } }),
+      () => Date.parse("2026-09-01T00:00:00Z"),
+    );
+    const snapshot = await provider.fetch();
+    expect(snapshot.credits?.resetCredits).toBe(1);
+    expect(snapshot.credits?.resetCreditsNextExpiry).toBe("2026-10-01T00:00:00Z");
+  });
+});
+
+describe("parseChatgptResetCredits", () => {
+  const NOW = Date.parse("2026-09-01T12:00:00Z");
+
+  test("counts available vouchers and finds the earliest future expiry", () => {
+    const result = parseChatgptResetCredits(
+      {
+        credits: [
+          { id: "a", status: "available", expires_at: "2026-10-05T00:00:00Z" },
+          { id: "b", status: "available", expires_at: "2026-09-20T00:00:00Z" },
+          { id: "c", status: "redeemed", expires_at: "2026-12-01T00:00:00Z" },
+        ],
+        available_count: 3,
+      },
+      NOW,
+    );
+    expect(result).toEqual({ count: 2, nextExpiry: "2026-09-20T00:00:00Z" });
+  });
+
+  test("a stale voucher still flagged available is skipped (CodexBar-verified server quirk)", () => {
+    const result = parseChatgptResetCredits(
+      {
+        credits: [
+          { id: "old", status: "available", expires_at: "2026-08-01T00:00:00Z" },
+          { id: "new", status: "available", expires_at: "2026-09-30T00:00:00Z" },
+        ],
+        available_count: 2,
+      },
+      NOW,
+    );
+    expect(result).toEqual({ count: 1, nextExpiry: "2026-09-30T00:00:00Z" });
+  });
+
+  test("a voucher without an expiry counts and leaves the companion empty", () => {
+    expect(parseChatgptResetCredits({ credits: [{ id: "x", status: "available" }] }, NOW)).toEqual({
+      count: 1,
+      nextExpiry: "",
+    });
+  });
+
+  test("without a list the server count is trusted, malformed answers yield zero", () => {
+    expect(parseChatgptResetCredits({ available_count: 2 }, NOW)).toEqual({ count: 2, nextExpiry: "" });
+    expect(parseChatgptResetCredits({ available_count: -1 }, NOW)).toEqual({ count: 0, nextExpiry: "" });
+    expect(parseChatgptResetCredits(null, NOW)).toEqual({ count: 0, nextExpiry: "" });
+    expect(parseChatgptResetCredits("nope", NOW)).toEqual({ count: 0, nextExpiry: "" });
   });
 });

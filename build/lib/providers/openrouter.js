@@ -29,7 +29,7 @@ function parseOpenRouterKeyInfo(body) {
   var _a, _b, _c;
   const data = body == null ? void 0 : body.data;
   if (typeof data !== "object" || data === null) {
-    throw new import_provider.FetchError("network", "unexpected response shape (no data object)");
+    throw new import_provider.FetchError("service", "unexpected response shape (no data object)");
   }
   const info = data;
   const used = (0, import_pure_helpers.finiteNumber)((_a = info.usage) != null ? _a : info.credits_used);

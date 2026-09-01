@@ -106,11 +106,21 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
       add(
         state(`${accountId}.limits.${windowId}.percent`, `${limit.label} used`, "number", "value", limit.percent, "%"),
       );
-      if (limit.resetAt !== undefined) {
-        add(
-          state(`${accountId}.limits.${windowId}.resetAt`, `${limit.label} resets at`, "string", "date", limit.resetAt),
-        );
-      }
+      // resetAt is a FIXED part of every window, not an optional extra. Providers
+      // omit the timestamp whenever no window is currently running (Anthropic
+      // sends it as null right after a reset) — treating that as "capability
+      // gone" deleted the datapoint mid-throttle and re-created it after the
+      // next use (krobi, live 2026-09-01). The datapoint stays; an empty string
+      // says "no running window", because keeping the OLD date would be a lie.
+      add(
+        state(
+          `${accountId}.limits.${windowId}.resetAt`,
+          `${limit.label} resets at`,
+          "string",
+          "date",
+          limit.resetAt ?? "",
+        ),
+      );
     }
   }
 
@@ -135,6 +145,28 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
     }
     if (credits.toppedUp !== undefined) {
       add(state(`${accountId}.credits.toppedUp`, "Topped-up balance", "number", "value", credits.toppedUp, unit));
+    }
+    if (credits.resetCredits !== undefined) {
+      add(
+        state(
+          `${accountId}.credits.resetCredits`,
+          "Available limit-reset credits",
+          "number",
+          "value",
+          credits.resetCredits,
+        ),
+      );
+      // Companion timestamp — same fixed-part rule as limits.*.resetAt: always
+      // present next to the count, empty while no voucher is held.
+      add(
+        state(
+          `${accountId}.credits.resetCreditsNextExpiry`,
+          "Next reset credit expires at",
+          "string",
+          "date",
+          credits.resetCreditsNextExpiry ?? "",
+        ),
+      );
     }
   }
 
@@ -249,15 +281,26 @@ export function limitingWindow(snapshot: UsageSnapshot): { percent: number; labe
 }
 
 /**
- * What has to be deleted after a snapshot no longer carries datapoints it used to.
+ * What has to be deleted after a snapshot no longer carries STRUCTURE it used to.
  *
  * ioBroker never removes an object on its own: a limit window that a provider stops
  * reporting, or a model that got renamed, would sit in the tree frozen on its last
  * percentage and keep saying it forever. So every round compares what the account
- * delivers now against what it had, and what fell out goes.
+ * delivers now against what it had — but only STRUCTURE goes: a whole
+ * `limits.<window>` or `models.<model>` subtree whose window/model the answer no
+ * longer carries at all.
  *
- * Channels are included: a window's node is worthless once its values are gone, and
- * the deepest ones come first so a parent is never deleted before its children.
+ * A single VALUE inside a still-delivered window never counts as an orphan.
+ * Providers omit optional fields depending on the account's momentary state
+ * (Anthropic drops the reset timestamp while no window runs) — deleting on that
+ * removed the datapoint mid-throttle and re-created it after the next use (krobi,
+ * live 2026-09-01; the same class of bug as homeconnect's childLock). Datapoints
+ * never come and go with the provider's mood: once created they stay until their
+ * whole window/model/account goes, and time-stamp companions are actively written
+ * empty instead of being dropped.
+ *
+ * Channels come after their states, deepest first, so a parent is never deleted
+ * before its children.
  *
  * @param known every state id the account had before (relative to the instance)
  * @param current the state ids this snapshot delivers
@@ -270,15 +313,39 @@ export function orphanObjectIds(
   keep: readonly string[],
 ): string[] {
   const surviving = new Set([...current, ...keep]);
-  const goneStates = known.filter(id => !surviving.has(id));
+  // The subtrees whose members the answer still delivers — a state inside one of
+  // them survives even when its own id was not written this round.
+  const livingSubtrees = new Set<string>();
+  for (const id of current) {
+    const parts = id.split(".");
+    // <account>.limits.<window>.<state> / <account>.models.<model>.<state>
+    if (parts.length >= 4 && (parts[1] === "limits" || parts[1] === "models")) {
+      livingSubtrees.add(parts.slice(0, 3).join("."));
+    }
+  }
+  const goneStates = known.filter(id => {
+    if (surviving.has(id)) {
+      return false;
+    }
+    const parts = id.split(".");
+    if (parts.length >= 4 && (parts[1] === "limits" || parts[1] === "models")) {
+      // Structure: gone only when the whole window/model fell out of the answer.
+      return !livingSubtrees.has(parts.slice(0, 3).join("."));
+    }
+    // Everything outside those subtrees (credits/costs/tokens values, available)
+    // stays once created — a provider that stops a field mid-life leaves a frozen
+    // value, which is the smaller harm than a datapoint that comes and goes.
+    return false;
+  });
   const emptyChannels = new Set<string>();
+  const remaining = new Set([...surviving, ...known.filter(id => !goneStates.includes(id))]);
   for (const id of goneStates) {
     const parts = id.split(".");
     // Walk up from the state's own channel; the account node itself (one segment)
     // belongs to the skeleton and is never touched here.
     for (let depth = parts.length - 1; depth >= 2; depth--) {
       const parent = parts.slice(0, depth).join(".");
-      if (![...surviving].some(alive => alive.startsWith(`${parent}.`))) {
+      if (![...remaining].some(alive => alive.startsWith(`${parent}.`))) {
         emptyChannels.add(parent);
       }
     }

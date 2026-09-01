@@ -19,8 +19,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var chatgpt_sub_exports = {};
 __export(chatgpt_sub_exports, {
   CHATGPT_OAUTH: () => import_chatgpt_auth.CHATGPT_OAUTH,
+  CHATGPT_RESET_CREDITS_URL: () => CHATGPT_RESET_CREDITS_URL,
   CHATGPT_USAGE_URL: () => CHATGPT_USAGE_URL,
   chatgptSubProvider: () => chatgptSubProvider,
+  parseChatgptResetCredits: () => parseChatgptResetCredits,
   parseChatgptUsage: () => parseChatgptUsage
 });
 module.exports = __toCommonJS(chatgpt_sub_exports);
@@ -28,6 +30,7 @@ var import_http = require("../http");
 var import_provider = require("../provider");
 var import_chatgpt_auth = require("./chatgpt-auth");
 const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
+const CHATGPT_RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
 function readWindow(raw, name, label) {
   if (typeof raw !== "object" || raw === null) {
     return void 0;
@@ -48,7 +51,7 @@ function readWindow(raw, name, label) {
 function parseChatgptUsage(body) {
   var _a, _b;
   if (typeof body !== "object" || body === null) {
-    throw new import_provider.FetchError("network", "unexpected usage response");
+    throw new import_provider.FetchError("service", "unexpected usage response");
   }
   const raw = body;
   const limits = [];
@@ -88,10 +91,42 @@ function parseChatgptUsage(body) {
   }
   return snapshot;
 }
+function parseChatgptResetCredits(body, nowMs) {
+  const raw = typeof body === "object" && body !== null ? body : {};
+  const list = Array.isArray(raw.credits) ? raw.credits : null;
+  if (!list) {
+    const serverCount = Number(raw.available_count);
+    return { count: Number.isFinite(serverCount) && serverCount >= 0 ? serverCount : 0, nextExpiry: "" };
+  }
+  let count = 0;
+  let nextExpiry = "";
+  for (const entry of list) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const voucher = entry;
+    if (voucher.status !== "available") {
+      continue;
+    }
+    const expiresAt = typeof voucher.expires_at === "string" ? voucher.expires_at : "";
+    if (expiresAt) {
+      const expiryMs = Date.parse(expiresAt);
+      if (Number.isFinite(expiryMs) && expiryMs <= nowMs) {
+        continue;
+      }
+      if (!nextExpiry || expiresAt < nextExpiry) {
+        nextExpiry = expiresAt;
+      }
+    }
+    count++;
+  }
+  return { count, nextExpiry };
+}
 function chatgptSubProvider(store, postJson, fetchJson = import_http.getJson, now = Date.now) {
   return {
     kind: "chatgpt-sub",
     fetch: async () => {
+      var _a;
       let tokens = await store.load();
       if (!tokens) {
         throw new import_provider.FetchError("auth", "not signed in \u2014 start the ChatGPT sign-in in the instance settings");
@@ -107,15 +142,34 @@ function chatgptSubProvider(store, postJson, fetchJson = import_http.getJson, no
       if (tokens.accountRef) {
         headers["ChatGPT-Account-Id"] = tokens.accountRef;
       }
-      return parseChatgptUsage(await fetchJson(CHATGPT_USAGE_URL, headers));
+      const snapshot = parseChatgptUsage(await fetchJson(CHATGPT_USAGE_URL, headers));
+      try {
+        const vouchers = parseChatgptResetCredits(
+          await fetchJson(CHATGPT_RESET_CREDITS_URL, {
+            ...headers,
+            // What OpenAI's own desktop client sends on this route (CodexBar-verified).
+            "OpenAI-Beta": "codex-1",
+            originator: "Codex Desktop"
+          }),
+          now()
+        );
+        const credits = (_a = snapshot.credits) != null ? _a : { currency: "USD" };
+        credits.resetCredits = vouchers.count;
+        credits.resetCreditsNextExpiry = vouchers.nextExpiry;
+        snapshot.credits = credits;
+      } catch {
+      }
+      return snapshot;
     }
   };
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   CHATGPT_OAUTH,
+  CHATGPT_RESET_CREDITS_URL,
   CHATGPT_USAGE_URL,
   chatgptSubProvider,
+  parseChatgptResetCredits,
   parseChatgptUsage
 });
 //# sourceMappingURL=chatgpt-sub.js.map

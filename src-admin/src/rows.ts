@@ -1,38 +1,38 @@
 /** One row of the adapter's `native.accounts` (kept compatible with the backend parser). */
 export interface AccountRow {
-    name: string;
-    provider: string;
-    credentialId: string;
-    warnThreshold: number;
+  name: string;
+  provider: string;
+  credentialId: string;
+  warnThreshold: number;
 }
 
 /** One entry of the admin's central credential storage (category "AI"). */
 export interface CredentialEntry {
-    /** Full object id (system.credentials.<name>). */
-    id: string;
-    /** The id suffix. */
-    suffix: string;
-    /** Display name. */
-    name: string;
-    /** Icon data URL from the storage, if any. */
-    icon?: string;
+  /** Full object id (system.credentials.<name>). */
+  id: string;
+  /** The id suffix. */
+  suffix: string;
+  /** Display name. */
+  name: string;
+  /** Icon data URL from the storage, if any. */
+  icon?: string;
 }
 
 /** How a key-based provider is offered for a stored credential. */
 export interface KeyProviderOffer {
-    /** The provider kind to store in the row. */
-    provider: string;
-    /** Label shown in the row. */
-    label: string;
-    /** Why this row may need a different key than the one the assistant uses. */
-    needsAdminKey: boolean;
+  /** The provider kind to store in the row. */
+  provider: string;
+  /** Label shown in the row. */
+  label: string;
+  /** Why this row may need a different key than the one the assistant uses. */
+  needsAdminKey: boolean;
 }
 
 /** Fixed object id per subscription — must match `SUBSCRIPTION_IDS` in the adapter. */
 const SUBSCRIPTION_IDS: Record<string, string> = {
-    'claude-sub': 'claude',
-    'chatgpt-sub': 'chatgpt',
-    'gemini-sub': 'gemini',
+  "claude-sub": "claude",
+  "chatgpt-sub": "chatgpt",
+  "gemini-sub": "gemini",
 };
 
 /**
@@ -47,27 +47,27 @@ const SUBSCRIPTION_IDS: Record<string, string> = {
  * @returns the id, or an empty string when nothing fits
  */
 export function accountId(provider: string, credentialId: string): string {
-    const fixed = SUBSCRIPTION_IDS[provider];
-    if (fixed) {
-        return fixed;
-    }
-    const suffix = credentialId
-        .replace(/^system\.credentials\./, '')
-        .trim()
-        .replace(/[^a-zA-Z0-9_-]/g, '_')
-        .replace(/_{2,}/g, '_')
-        .replace(/^_+|_+$/g, '');
-    return suffix ? `${suffix}-api` : '';
+  const fixed = SUBSCRIPTION_IDS[provider];
+  if (fixed) {
+    return fixed;
+  }
+  const suffix = credentialId
+    .replace(/^system\.credentials\./, "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_{2,}/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return suffix ? `${suffix}-api` : "";
 }
 
 /** How a row's service status is shown: which colour, which label. */
 export interface ServiceBadge {
-    /** Translation key of the label. */
-    key: string;
-    /** MUI chip colour. */
-    color: 'success' | 'warning' | 'error';
-    /** The plain-text reason, shown on hover; empty while everything works. */
-    title: string;
+  /** Translation key of the label. */
+  key: string;
+  /** MUI chip colour. */
+  color: "success" | "warning" | "error";
+  /** The plain-text reason, shown on hover; empty while everything works. */
+  title: string;
 }
 
 /**
@@ -83,24 +83,24 @@ export interface ServiceBadge {
  * @returns the badge, or null while the account has never reported
  */
 export function serviceBadge(unreach: unknown, error: unknown): ServiceBadge | null {
-    if (unreach === undefined || unreach === null) {
-        return null;
-    }
-    const reason = typeof error === 'string' ? error : '';
-    if (unreach === true) {
-        return { key: 'aiu_stOffline', color: 'error', title: reason };
-    }
-    if (reason) {
-        return { key: 'aiu_stLimited', color: 'warning', title: reason };
-    }
-    return { key: 'aiu_stOnline', color: 'success', title: '' };
+  if (unreach === undefined || unreach === null) {
+    return null;
+  }
+  const reason = typeof error === "string" ? error : "";
+  if (unreach === true) {
+    return { key: "aiu_stOffline", color: "error", title: reason };
+  }
+  if (reason) {
+    return { key: "aiu_stLimited", color: "warning", title: reason };
+  }
+  return { key: "aiu_stOnline", color: "success", title: "" };
 }
 
 /** The three subscriptions, in the order the panel lists them. */
 export const SUBSCRIPTIONS: { provider: string; label: string; captionKey: string }[] = [
-    { provider: 'claude-sub', label: 'Claude', captionKey: 'aiu_capClaude' },
-    { provider: 'chatgpt-sub', label: 'ChatGPT', captionKey: 'aiu_capChatgpt' },
-    { provider: 'gemini-sub', label: 'Gemini', captionKey: 'aiu_capGemini' },
+  { provider: "claude-sub", label: "Claude", captionKey: "aiu_capClaude" },
+  { provider: "chatgpt-sub", label: "ChatGPT", captionKey: "aiu_capChatgpt" },
+  { provider: "gemini-sub", label: "Gemini", captionKey: "aiu_capGemini" },
 ];
 
 /**
@@ -115,31 +115,31 @@ export const SUBSCRIPTIONS: { provider: string; label: string; captionKey: strin
  * @returns the offer, or null when nothing fits
  */
 export function offerForCredential(suffix: string, name: string): KeyProviderOffer | null {
-    const hay = `${suffix} ${name}`.toLowerCase();
-    if (hay.includes('gemini')) {
-        return null; // no usage endpoint for a plain Gemini key — the subscription row covers Google
-    }
-    if (hay.includes('anthropic') || hay.includes('claude')) {
-        return { provider: 'anthropic-api', label: 'Anthropic', needsAdminKey: true };
-    }
-    if (hay.includes('chatgpt') || hay.includes('openai')) {
-        return { provider: 'openai', label: 'OpenAI', needsAdminKey: true };
-    }
-    if (hay.includes('deepseek')) {
-        return { provider: 'deepseek', label: 'DeepSeek', needsAdminKey: false };
-    }
-    if (hay.includes('openrouter') || hay.includes('router')) {
-        return { provider: 'openrouter', label: 'OpenRouter', needsAdminKey: false };
-    }
-    return null;
+  const hay = `${suffix} ${name}`.toLowerCase();
+  if (hay.includes("gemini")) {
+    return null; // no usage endpoint for a plain Gemini key — the subscription row covers Google
+  }
+  if (hay.includes("anthropic") || hay.includes("claude")) {
+    return { provider: "anthropic-api", label: "Anthropic", needsAdminKey: true };
+  }
+  if (hay.includes("chatgpt") || hay.includes("openai")) {
+    return { provider: "openai", label: "OpenAI", needsAdminKey: true };
+  }
+  if (hay.includes("deepseek")) {
+    return { provider: "deepseek", label: "DeepSeek", needsAdminKey: false };
+  }
+  if (hay.includes("openrouter") || hay.includes("router")) {
+    return { provider: "openrouter", label: "OpenRouter", needsAdminKey: false };
+  }
+  return null;
 }
 
 /** Every key-based provider, for the manual picker when the name gives nothing away. */
 export const KEY_PROVIDERS: KeyProviderOffer[] = [
-    { provider: 'openrouter', label: 'OpenRouter', needsAdminKey: false },
-    { provider: 'deepseek', label: 'DeepSeek', needsAdminKey: false },
-    { provider: 'openai', label: 'OpenAI', needsAdminKey: true },
-    { provider: 'anthropic-api', label: 'Anthropic', needsAdminKey: true },
+  { provider: "openrouter", label: "OpenRouter", needsAdminKey: false },
+  { provider: "deepseek", label: "DeepSeek", needsAdminKey: false },
+  { provider: "openai", label: "OpenAI", needsAdminKey: true },
+  { provider: "anthropic-api", label: "Anthropic", needsAdminKey: true },
 ];
 
 /**
@@ -150,7 +150,7 @@ export const KEY_PROVIDERS: KeyProviderOffer[] = [
  * @returns the row or undefined
  */
 export function subscriptionRow(rows: AccountRow[], provider: string): AccountRow | undefined {
-    return rows.find(row => row.provider === provider);
+  return rows.find(row => row.provider === provider);
 }
 
 /**
@@ -163,11 +163,11 @@ export function subscriptionRow(rows: AccountRow[], provider: string): AccountRo
  * @returns the new rows
  */
 export function toggleSubscription(rows: AccountRow[], provider: string, on: boolean, label: string): AccountRow[] {
-    const rest = rows.filter(row => row.provider !== provider);
-    if (!on) {
-        return rest;
-    }
-    return [...rest, { name: label, provider, credentialId: '', warnThreshold: 80 }];
+  const rest = rows.filter(row => row.provider !== provider);
+  if (!on) {
+    return rest;
+  }
+  return [...rest, { name: label, provider, credentialId: "", warnThreshold: 80 }];
 }
 
 /**
@@ -180,16 +180,16 @@ export function toggleSubscription(rows: AccountRow[], provider: string, on: boo
  * @returns the new rows
  */
 export function toggleCredential(
-    rows: AccountRow[],
-    credential: CredentialEntry,
-    provider: string,
-    on: boolean,
+  rows: AccountRow[],
+  credential: CredentialEntry,
+  provider: string,
+  on: boolean,
 ): AccountRow[] {
-    const rest = rows.filter(row => row.credentialId !== credential.id);
-    if (!on || !provider) {
-        return rest;
-    }
-    return [...rest, { name: credential.name, provider, credentialId: credential.id, warnThreshold: 80 }];
+  const rest = rows.filter(row => row.credentialId !== credential.id);
+  if (!on || !provider) {
+    return rest;
+  }
+  return [...rest, { name: credential.name, provider, credentialId: credential.id, warnThreshold: 80 }];
 }
 
 /**
@@ -197,17 +197,19 @@ export function toggleCredential(
  *
  * @param rows the configured rows
  * @param match how to find the row
+ * @param match.provider
+ * @param match.credentialId
  * @param raw the raw input value
  * @returns the new rows
  */
 export function setThreshold(
-    rows: AccountRow[],
-    match: { provider?: string; credentialId?: string },
-    raw: string,
+  rows: AccountRow[],
+  match: { provider?: string; credentialId?: string },
+  raw: string,
 ): AccountRow[] {
-    const value = Math.min(100, Math.max(10, Math.round(Number(raw)) || 80));
-    return rows.map(row => {
-        const hit = match.credentialId ? row.credentialId === match.credentialId : row.provider === match.provider;
-        return hit ? { ...row, warnThreshold: value } : row;
-    });
+  const value = Math.min(100, Math.max(10, Math.round(Number(raw)) || 80));
+  return rows.map(row => {
+    const hit = match.credentialId ? row.credentialId === match.credentialId : row.provider === match.provider;
+    return hit ? { ...row, warnThreshold: value } : row;
+  });
 }

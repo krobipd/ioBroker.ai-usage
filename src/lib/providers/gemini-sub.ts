@@ -104,7 +104,9 @@ export function parseCodeAssist(body: unknown): { project: string; tier: string 
  */
 export function parseGeminiQuota(body: unknown): UsageSnapshot {
   if (typeof body !== "object" || body === null) {
-    throw new FetchError("network", "unexpected quota response");
+    // "service": the endpoint answered with an unreadable body — its own fault,
+    // not a connection problem (which only a thrown fetch means).
+    throw new FetchError("service", "unexpected quota response");
   }
   const raw = body as Record<string, unknown>;
   const buckets = Array.isArray(raw.buckets) ? raw.buckets : [];

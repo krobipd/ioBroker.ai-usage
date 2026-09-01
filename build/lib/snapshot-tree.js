@@ -33,7 +33,7 @@ function state(id, name, type, role, value, unit) {
   return { def: { id, type: "state", common }, write: { id, value } };
 }
 function mapSnapshot(accountId, snapshot) {
-  var _a, _b;
+  var _a, _b, _c, _d;
   const objects = [];
   const writes = [];
   const add = (pair) => {
@@ -54,11 +54,15 @@ function mapSnapshot(accountId, snapshot) {
       add(
         state(`${accountId}.limits.${windowId}.percent`, `${limit.label} used`, "number", "value", limit.percent, "%")
       );
-      if (limit.resetAt !== void 0) {
-        add(
-          state(`${accountId}.limits.${windowId}.resetAt`, `${limit.label} resets at`, "string", "date", limit.resetAt)
-        );
-      }
+      add(
+        state(
+          `${accountId}.limits.${windowId}.resetAt`,
+          `${limit.label} resets at`,
+          "string",
+          "date",
+          (_a = limit.resetAt) != null ? _a : ""
+        )
+      );
     }
   }
   const credits = snapshot.credits;
@@ -82,6 +86,26 @@ function mapSnapshot(accountId, snapshot) {
     }
     if (credits.toppedUp !== void 0) {
       add(state(`${accountId}.credits.toppedUp`, "Topped-up balance", "number", "value", credits.toppedUp, unit));
+    }
+    if (credits.resetCredits !== void 0) {
+      add(
+        state(
+          `${accountId}.credits.resetCredits`,
+          "Available limit-reset credits",
+          "number",
+          "value",
+          credits.resetCredits
+        )
+      );
+      add(
+        state(
+          `${accountId}.credits.resetCreditsNextExpiry`,
+          "Next reset credit expires at",
+          "string",
+          "date",
+          (_b = credits.resetCreditsNextExpiry) != null ? _b : ""
+        )
+      );
     }
   }
   const costs = snapshot.costs;
@@ -145,7 +169,7 @@ function mapSnapshot(accountId, snapshot) {
               "number",
               "value",
               model.cost,
-              (_b = (_a = snapshot.costs) == null ? void 0 : _a.currency) != null ? _b : "USD"
+              (_d = (_c = snapshot.costs) == null ? void 0 : _c.currency) != null ? _d : "USD"
             )
           );
         }
@@ -175,13 +199,30 @@ function limitingWindow(snapshot) {
 }
 function orphanObjectIds(known, current, keep) {
   const surviving = /* @__PURE__ */ new Set([...current, ...keep]);
-  const goneStates = known.filter((id) => !surviving.has(id));
+  const livingSubtrees = /* @__PURE__ */ new Set();
+  for (const id of current) {
+    const parts = id.split(".");
+    if (parts.length >= 4 && (parts[1] === "limits" || parts[1] === "models")) {
+      livingSubtrees.add(parts.slice(0, 3).join("."));
+    }
+  }
+  const goneStates = known.filter((id) => {
+    if (surviving.has(id)) {
+      return false;
+    }
+    const parts = id.split(".");
+    if (parts.length >= 4 && (parts[1] === "limits" || parts[1] === "models")) {
+      return !livingSubtrees.has(parts.slice(0, 3).join("."));
+    }
+    return false;
+  });
   const emptyChannels = /* @__PURE__ */ new Set();
+  const remaining = /* @__PURE__ */ new Set([...surviving, ...known.filter((id) => !goneStates.includes(id))]);
   for (const id of goneStates) {
     const parts = id.split(".");
     for (let depth = parts.length - 1; depth >= 2; depth--) {
       const parent = parts.slice(0, depth).join(".");
-      if (![...surviving].some((alive) => alive.startsWith(`${parent}.`))) {
+      if (![...remaining].some((alive) => alive.startsWith(`${parent}.`))) {
         emptyChannels.add(parent);
       }
     }

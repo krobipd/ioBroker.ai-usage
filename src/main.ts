@@ -36,6 +36,13 @@ import { deepSeekProvider } from "./lib/providers/deepseek";
 import { openAiProvider } from "./lib/providers/openai";
 import { openRouterProvider } from "./lib/providers/openrouter";
 
+/**
+ * High sort-end marker for object-view key ranges (`startkey: prefix, endkey:
+ * prefix + SORT_KEY_END` covers every id below the prefix). One constant instead
+ * of the two spellings that had crept in.
+ */
+const SORT_KEY_END = "￿";
+
 /** A cancellable handle: interval or timeout — the engine treats them uniformly. */
 type TimerHandle =
   | { kind: "interval"; handle: ioBroker.Interval | undefined }
@@ -90,7 +97,7 @@ export class AiUsageAdapter extends utils.Adapter {
     try {
       const view = await this.getObjectViewAsync("system", "state", {
         startkey: `${this.namespace}.`,
-        endkey: `${this.namespace}.\uFFFF`,
+        endkey: `${this.namespace}.${SORT_KEY_END}`,
       });
       for (const row of view?.rows ?? []) {
         this.knownStateIds.add(row.id.substring(this.namespace.length + 1));
@@ -358,10 +365,18 @@ export class AiUsageAdapter extends utils.Adapter {
       }
       return { status: "awaiting-paste", url: attempt.url, flow: attempt.flow };
     }
+    // A valid sign-in WINS over a remembered failure: working tokens mean the
+    // account is signed in, whatever an earlier attempt left behind — showing
+    // the sign-in screen to a signed-in user was the bug (krobi 2026-09-01).
+    // The stale failure is dropped so it cannot resurface later.
+    if (await this.tokenStore(provider).load()) {
+      this.signInErrors.delete(provider);
+      return { status: "signed-in" };
+    }
     if (failure) {
       return { status: "failed", reason: failure };
     }
-    return (await this.tokenStore(provider).load()) ? { status: "signed-in" } : { status: "signed-out" };
+    return { status: "signed-out" };
   }
 
   /**
@@ -423,7 +438,9 @@ export class AiUsageAdapter extends utils.Adapter {
       },
       save: async (tokens: TokenSet): Promise<void> => {
         await mkdir(dir, { recursive: true });
-        await writeFile(file, this.encrypt(JSON.stringify(tokens)), "utf8");
+        // Owner-only file mode on top of the encryption — same hardening as the
+        // govee credentials file; the content is ciphertext either way.
+        await writeFile(file, this.encrypt(JSON.stringify(tokens)), { encoding: "utf8", mode: 0o600 });
         cached = tokens;
         read = true;
       },
@@ -609,7 +626,7 @@ export class AiUsageAdapter extends utils.Adapter {
           const start = `${this.namespace}.${prefix}.`;
           const view = await this.getObjectViewAsync("system", "state", {
             startkey: start,
-            endkey: `${start}￿`,
+            endkey: `${start}${SORT_KEY_END}`,
           });
           return (view?.rows ?? []).map(row => row.id.substring(this.namespace.length + 1));
         },

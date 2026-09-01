@@ -56,6 +56,16 @@ export interface CreditInfo {
   currency: string;
   /** True when the credits are pieces (requests), not money — excluded from cost totals. */
   pieces?: boolean;
+  /**
+   * Purchasable limit-reset vouchers currently available (ChatGPT/Codex "rate limit
+   * reset credits"). A count of pieces, never money.
+   */
+  resetCredits?: number;
+  /**
+   * When the next available reset voucher expires (ISO timestamp); empty string
+   * while none is held — the datapoint stays, only its value empties.
+   */
+  resetCreditsNextExpiry?: string;
 }
 
 /** Real money spent. */

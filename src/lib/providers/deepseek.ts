@@ -14,7 +14,8 @@ import { finiteNumber } from "../pure-helpers";
 export function parseDeepSeekBalance(body: unknown): UsageSnapshot {
   const obj = body as { is_available?: unknown; balance_infos?: unknown } | null;
   if (typeof obj !== "object" || obj === null || !Array.isArray(obj.balance_infos)) {
-    throw new FetchError("network", "unexpected response shape (no balance_infos)");
+    // "service": DeepSeek answered, we just cannot read it — not "no connection".
+    throw new FetchError("service", "unexpected response shape (no balance_infos)");
   }
   const first = obj.balance_infos.find(entry => typeof entry === "object" && entry !== null) as
     Record<string, unknown> | undefined;

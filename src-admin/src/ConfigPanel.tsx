@@ -87,8 +87,10 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
 
   async componentDidMount(): Promise<void> {
     void super.componentDidMount?.();
-    await this.loadCredentials();
-    await this.refresh();
+    // In parallel: the subscription rows must not wait for the credential-storage
+    // scan. Serialised, a slow object view kept the Claude row on its spinner for
+    // the whole scan although the adapter could have answered instantly.
+    await Promise.all([this.loadCredentials(), this.refresh()]);
     // A device-code sign-in finishes in the adapter, not here — poll while the card is open.
     this.timer = setInterval(() => void this.refresh(), 4000);
   }
@@ -148,22 +150,28 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   private async refreshServiceState(): Promise<void> {
     const ctx = this.props.oContext;
     const serviceState: Record<string, unknown> = {};
-    for (const row of this.accounts()) {
-      const id = accountId(row.provider, row.credentialId);
-      if (!id) {
-        continue;
-      }
-      try {
-        const unreach = await ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.unreach`);
-        const error = await ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.error`);
-        if (unreach && unreach.val !== null && unreach.val !== undefined) {
-          serviceState[`${id}.unreach`] = unreach.val;
-          serviceState[`${id}.error`] = error?.val ?? "";
+    // All rows in one burst — the previous one-after-another loop stretched a
+    // poll round to 2×rows round-trips every 4 s while the card is open.
+    await Promise.all(
+      this.accounts().map(async row => {
+        const id = accountId(row.provider, row.credentialId);
+        if (!id) {
+          return;
         }
-      } catch {
-        // an instance that never ran has no states yet — show nothing, guess nothing
-      }
-    }
+        try {
+          const [unreach, error] = await Promise.all([
+            ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.unreach`),
+            ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.error`),
+          ]);
+          if (unreach && unreach.val !== null && unreach.val !== undefined) {
+            serviceState[`${id}.unreach`] = unreach.val;
+            serviceState[`${id}.error`] = error?.val ?? "";
+          }
+        } catch {
+          // an instance that never ran has no states yet — show nothing, guess nothing
+        }
+      }),
+    );
     this.setState({ serviceState });
   }
 
@@ -180,30 +188,54 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       return null;
     }
     return (
-      <Chip size="small" color={badge.color} variant="outlined" label={I18n.t(badge.key)} title={badge.title} />
+      <Chip
+        size="small"
+        color={badge.color}
+        variant="outlined"
+        label={I18n.t(badge.key)}
+        title={badge.title}
+      />
     );
   }
 
-  /** Ask the adapter for the sign-in state of every switched-on subscription. */
+  /**
+   * Ask the adapter for the sign-in state of every switched-on subscription.
+   *
+   * A transport miss NEVER overwrites a known state: the status poll runs every
+   * 4 s, and a single unanswered message (socket reconnect, busy instance) used
+   * to replace a correctly shown "signed in" with the sign-in start screen —
+   * a transport failure is not a sign-in status (krobi, live 2026-09-01).
+   * States are merged per provider, not replaced wholesale, for the same reason.
+   */
   private async refreshSignIn(): Promise<void> {
     if (!this.props.alive) {
       return;
     }
-    const signIn: Record<string, SignInState> = {};
-    for (const entry of SUBSCRIPTIONS) {
-      if (!subscriptionRow(this.accounts(), entry.provider)) {
-        continue;
+    const answers = await Promise.all(
+      SUBSCRIPTIONS.filter(entry => subscriptionRow(this.accounts(), entry.provider)).map(async entry => ({
+        provider: entry.provider,
+        answer: await this.ask("signInStatus", entry.provider),
+      })),
+    );
+    this.setState(prev => {
+      const signIn = { ...prev.signIn };
+      for (const { provider, answer } of answers) {
+        if (answer) {
+          signIn[provider] = answer;
+        }
       }
-      const answer = await this.ask("signInStatus", entry.provider);
-      if (answer) {
-        signIn[entry.provider] = answer;
-      }
-    }
-    this.setState({ signIn });
+      return { signIn };
+    });
   }
 
   /**
    * Send one sign-in message to the adapter.
+   *
+   * Only a REAL adapter answer comes back. No answer at all — the message timed
+   * out, the socket hiccuped, the instance was busy — is `null`, and the caller
+   * decides: the status poll keeps what it knows, an explicit user action shows
+   * "no answer" (see {@link run}). Turning a transport miss into a "failed"
+   * status here was what flipped a signed-in row onto the sign-in screen.
    *
    * @param command the message command
    * @param provider the subscription kind
@@ -213,12 +245,15 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   private async ask(command: string, provider: string, value?: string): Promise<SignInState | null> {
     const ctx = this.props.oContext;
     try {
-      const answer = (await ctx.socket.sendTo(`${ctx.adapterName}.${ctx.instance}`, command, {
+      const answer = await ctx.socket.sendTo(`${ctx.adapterName}.${ctx.instance}`, command, {
         provider,
         value,
-      })) as SignInState & { error?: string };
-      if (!answer || answer.error) {
-        return { status: "failed", reason: answer?.error || I18n.t("aiu_noAnswer") };
+      });
+      if (!answer) {
+        return null;
+      }
+      if (answer.error) {
+        return { status: "failed", reason: answer.error };
       }
       return answer;
     } catch {
@@ -236,9 +271,12 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   private async run(command: string, provider: string, value?: string): Promise<void> {
     this.setState({ busy: provider });
     const answer = await this.ask(command, provider, value);
+    // Unlike the background status poll, an explicit click deserves an answer:
+    // no answer at all is shown as exactly that, never silently swallowed.
+    const shown: SignInState | null = answer ?? { status: "failed", reason: I18n.t("aiu_noAnswer") };
     this.setState(prev => ({
       busy: "",
-      signIn: answer ? { ...prev.signIn, [provider]: answer } : prev.signIn,
+      signIn: { ...prev.signIn, [provider]: shown },
       drafts: { ...prev.drafts, [provider]: "" },
     }));
   }
@@ -264,6 +302,8 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
    * @param key react key
    * @param row the row
    * @param match how to find the row again
+   * @param match.provider
+   * @param match.credentialId
    */
   private renderThreshold(
     key: string,
@@ -308,7 +348,12 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <CheckCircleIcon color="success" />
           <Typography sx={{ color: "success.main" }}>{I18n.t("aiu_signedIn")}</Typography>
-          <Button size="small" startIcon={<LogoutIcon />} disabled={busy} onClick={() => void this.run("signOut", provider)}>
+          <Button
+            size="small"
+            startIcon={<LogoutIcon />}
+            disabled={busy}
+            onClick={() => void this.run("signOut", provider)}
+          >
             {I18n.t("aiu_signOut")}
           </Button>
         </Box>
@@ -320,7 +365,10 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
           <Typography variant="body2">{I18n.t("aiu_deviceStep1")}</Typography>
           <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-            <Chip label={state.userCode} sx={{ fontSize: 20, fontFamily: "monospace", py: 2.5, px: 1 }} />
+            <Chip
+              label={state.userCode}
+              sx={{ fontSize: 20, fontFamily: "monospace", py: 2.5, px: 1 }}
+            />
             <Button
               size="small"
               startIcon={<ContentCopyIcon />}
@@ -373,9 +421,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
               size="small"
               label={I18n.t(isGoogle ? "aiu_addressLabel" : "aiu_codeLabel")}
               value={this.state.drafts[provider] ?? ""}
-              onChange={e =>
-                this.setState(prev => ({ drafts: { ...prev.drafts, [provider]: e.target.value } }))
-              }
+              onChange={e => this.setState(prev => ({ drafts: { ...prev.drafts, [provider]: e.target.value } }))}
               sx={{ minWidth: 340, flexGrow: 1 }}
             />
             <Button
@@ -394,7 +440,12 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         {state.status === "failed" ? <Alert severity="error">{state.reason}</Alert> : null}
         <Box>
-          <Button variant="contained" startIcon={<LoginIcon />} disabled={busy} onClick={() => void this.run("signInStart", provider)}>
+          <Button
+            variant="contained"
+            startIcon={<LoginIcon />}
+            disabled={busy}
+            onClick={() => void this.run("signInStart", provider)}
+          >
             {busy ? <CircularProgress size={20} /> : I18n.t("aiu_startSignIn")}
           </Button>
         </Box>
@@ -406,6 +457,9 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
    * One subscription row plus, while switched on, its sign-in area.
    *
    * @param entry the subscription descriptor
+   * @param entry.provider
+   * @param entry.label
+   * @param entry.captionKey
    */
   private renderSubscriptionRow(entry: { provider: string; label: string; captionKey: string }): React.JSX.Element {
     const row = subscriptionRow(this.accounts(), entry.provider);
@@ -413,11 +467,17 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       <Box key={entry.provider}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}>
           <Avatar sx={{ width: 28, height: 28, bgcolor: "transparent" }}>
-            <SmartToyIcon fontSize="small" color="primary" />
+            <SmartToyIcon
+              fontSize="small"
+              color="primary"
+            />
           </Avatar>
           <Box sx={{ minWidth: 180 }}>
             <Typography>{entry.label}</Typography>
-            <Typography variant="caption" sx={{ opacity: 0.7 }}>
+            <Typography
+              variant="caption"
+              sx={{ opacity: 0.7 }}
+            >
               {I18n.t(entry.captionKey)}
             </Typography>
           </Box>
@@ -425,12 +485,16 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
           {row ? this.renderThreshold(`${entry.provider}-t`, row, { provider: entry.provider }) : null}
           <Switch
             checked={!!row}
-            onChange={e => this.commit(toggleSubscription(this.accounts(), entry.provider, e.target.checked, entry.label))}
+            onChange={e =>
+              this.commit(toggleSubscription(this.accounts(), entry.provider, e.target.checked, entry.label))
+            }
             sx={{ ml: row ? 0 : "auto" }}
           />
         </Box>
         {row ? (
-          <Box sx={{ pl: 6, py: 1.5, borderBottom: 1, borderColor: "divider" }}>{this.renderSignIn(entry.provider)}</Box>
+          <Box sx={{ pl: 6, py: 1.5, borderBottom: 1, borderColor: "divider" }}>
+            {this.renderSignIn(entry.provider)}
+          </Box>
         ) : null}
       </Box>
     );
@@ -451,14 +515,23 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     const unusable = !offer && !this.state.providerChoice[credential.id] && !row;
 
     return (
-      <Box key={credential.id} sx={{ borderBottom: 1, borderColor: "divider" }}>
+      <Box
+        key={credential.id}
+        sx={{ borderBottom: 1, borderColor: "divider" }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1 }}>
-          <Avatar src={credential.icon} sx={{ width: 28, height: 28, bgcolor: "transparent" }}>
+          <Avatar
+            src={credential.icon}
+            sx={{ width: 28, height: 28, bgcolor: "transparent" }}
+          >
             <SmartToyIcon fontSize="small" />
           </Avatar>
           <Box sx={{ minWidth: 180 }}>
             <Typography>{credential.name}</Typography>
-            <Typography variant="caption" sx={{ opacity: 0.7 }}>
+            <Typography
+              variant="caption"
+              sx={{ opacity: 0.7 }}
+            >
               {I18n.t("aiu_storedKey")}
             </Typography>
           </Box>
@@ -476,7 +549,10 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
               sx={{ minWidth: 170 }}
             >
               {KEY_PROVIDERS.map(entry => (
-                <MenuItem key={entry.provider} value={entry.provider}>
+                <MenuItem
+                  key={entry.provider}
+                  value={entry.provider}
+                >
                   {entry.label}
                 </MenuItem>
               ))}
@@ -492,7 +568,10 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
           />
         </Box>
         {row && needsAdminKey ? (
-          <Alert severity="info" sx={{ mb: 1 }}>
+          <Alert
+            severity="info"
+            sx={{ mb: 1 }}
+          >
             {I18n.t("aiu_adminKeyHint")}
           </Alert>
         ) : null}
@@ -502,23 +581,38 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
 
   renderItem(): React.JSX.Element {
     return (
-      <Box data-testid="aiu-config" sx={{ maxWidth: 760 }}>
+      <Box
+        data-testid="aiu-config"
+        sx={{ maxWidth: 760 }}
+      >
         <Card variant="outlined">
           <CardContent>
-            <Typography variant="h6" sx={{ mb: 0.5 }}>
+            <Typography
+              variant="h6"
+              sx={{ mb: 0.5 }}
+            >
               {I18n.t("aiu_storedTitle")}
             </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
+            <Typography
+              variant="body2"
+              sx={{ opacity: 0.8, mb: 1 }}
+            >
               {I18n.t("aiu_storedHint")}
             </Typography>
             {SUBSCRIPTIONS.map(entry => this.renderSubscriptionRow(entry))}
             {!this.state.credentialsLoaded ? (
-              <CircularProgress size={24} sx={{ mt: 1 }} />
+              <CircularProgress
+                size={24}
+                sx={{ mt: 1 }}
+              />
             ) : (
               this.state.credentials.map(credential => this.renderCredentialRow(credential))
             )}
             {this.state.credentialsLoaded && this.state.credentials.length === 0 ? (
-              <Alert severity="info" sx={{ mt: 1 }}>
+              <Alert
+                severity="info"
+                sx={{ mt: 1 }}
+              >
                 {I18n.t("aiu_noCredentials")}
               </Alert>
             ) : null}

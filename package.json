@@ -1,6 +1,6 @@
 {
   "name": "iobroker.ai-usage",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "description": "ioBroker adapter monitoring usage, limits and costs of AI accounts (Claude, OpenAI, OpenRouter, DeepSeek)",
   "author": {
     "name": "krobi",
@@ -79,7 +79,7 @@
     "translate": "translate-adapter",
     "release": "release-script",
     "build:admin": "node tasks",
-    "prepublishOnly": "node tasks"
+    "publish:manual": "node tasks && npm publish"
   },
   "bugs": {
     "url": "https://github.com/krobipd/ioBroker.ai-usage/issues"

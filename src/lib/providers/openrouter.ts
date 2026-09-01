@@ -14,7 +14,8 @@ import { finiteNumber, round2 } from "../pure-helpers";
 export function parseOpenRouterKeyInfo(body: unknown): UsageSnapshot {
   const data = (body as { data?: unknown } | null)?.data;
   if (typeof data !== "object" || data === null) {
-    throw new FetchError("network", "unexpected response shape (no data object)");
+    // "service": OpenRouter answered, we just cannot read it — not "no connection".
+    throw new FetchError("service", "unexpected response shape (no data object)");
   }
   const info = data as Record<string, unknown>;
   const used = finiteNumber(info.usage ?? info.credits_used);
