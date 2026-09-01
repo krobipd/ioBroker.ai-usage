@@ -1,7 +1,7 @@
 {
     "settingsHeader": "Ustawienia",
     "label_pollInterval": "Interwał odpytywania (s)",
-    "help_pollInterval": "Jak często odpytywane jest każde konto. Poniżej 300 s grozi ograniczenie przez dostawcę — Claude blokuje całe konto na około jeden dzień.",
+    "help_pollInterval": "Jak często odpytywane jest każde konto. Poniżej 300 s grozi ograniczenie przez dostawcę — Claude odrzuca wtedy zapytania przez długi czas.",
     "label_notifications": "Powiadomienia",
     "help_notifications": "Jedno powiadomienie, gdy konto przekroczy próg ostrzegawczy lub dane dostępowe przestaną działać.",
     "supportHeader": "Wesprzyj rozwój",

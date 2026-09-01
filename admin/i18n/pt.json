@@ -1,7 +1,7 @@
 {
     "settingsHeader": "Configurações",
     "label_pollInterval": "Intervalo de consulta (s)",
-    "help_pollInterval": "Com que frequência cada conta é consultada. Abaixo de 300 s há risco de limitação pelo provedor — a Claude bloqueia a conta inteira por cerca de um dia.",
+    "help_pollInterval": "Com que frequência cada conta é consultada. Abaixo de 300 s há risco de limitação pelo provedor — a Claude passa então a rejeitar as consultas por muito tempo.",
     "label_notifications": "Notificações",
     "help_notifications": "Uma notificação quando uma conta ultrapassa o limite de aviso ou as credenciais deixam de funcionar.",
     "supportHeader": "Apoiar o desenvolvimento",

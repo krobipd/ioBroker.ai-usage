@@ -1,7 +1,7 @@
 {
     "settingsHeader": "Instellingen",
     "label_pollInterval": "Peilinterval (s)",
-    "help_pollInterval": "Hoe vaak elk account wordt bevraagd. Onder 300 s dreigt beperking door de aanbieder — Claude blokkeert het hele account ongeveer een dag.",
+    "help_pollInterval": "Hoe vaak elk account wordt bevraagd. Onder 300 s dreigt beperking door de aanbieder — Claude wijst de verzoeken dan lange tijd af.",
     "label_notifications": "Meldingen",
     "help_notifications": "Eén melding wanneer een account de waarschuwingsdrempel overschrijdt of de inloggegevens niet meer werken.",
     "supportHeader": "Ontwikkeling steunen",

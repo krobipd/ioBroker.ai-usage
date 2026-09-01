@@ -1,7 +1,7 @@
 {
     "settingsHeader": "Impostazioni",
     "label_pollInterval": "Intervallo di polling (s)",
-    "help_pollInterval": "Frequenza di interrogazione di ogni account. Sotto i 300 s si rischia la limitazione del provider — Claude blocca l'intero account per circa un giorno.",
+    "help_pollInterval": "Frequenza di interrogazione di ogni account. Sotto i 300 s si rischia la limitazione del provider — Claude rifiuta poi le richieste a lungo.",
     "label_notifications": "Notifiche",
     "help_notifications": "Una notifica quando un account supera la soglia di avviso o le credenziali smettono di funzionare.",
     "supportHeader": "Sostieni lo sviluppo",

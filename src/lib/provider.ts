@@ -94,7 +94,10 @@ export interface TokenInfo {
 
 /**
  * A transport-neutral usage snapshot — one fetch result. Only what the source
- * actually delivered is present; the tree builder creates nothing for absent parts.
+ * actually delivered is present. The tree builder creates nothing for absent
+ * PARTS (a missing credits/costs/tokens block), but inside a delivered part the
+ * time-stamp companions always exist, and existing datapoints outlive a
+ * momentary omission — see snapshot-tree.ts.
  */
 export interface UsageSnapshot {
   /** Limit windows (subscription accounts). */

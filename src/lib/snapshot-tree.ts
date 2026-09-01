@@ -72,8 +72,11 @@ export interface TreeResult {
 
 /**
  * Map one account snapshot onto the harmonised object tree: `limits.*`, `credits.*`,
- * `costs.*`, `tokens.*` (+ `models.*`) — only what the snapshot carries is created,
- * so the tree mirrors exactly what the provider's source delivers.
+ * `costs.*`, `tokens.*` (+ `models.*`) — only what the snapshot carries is created.
+ * Creation is capability-driven, but NOT a mirror: time-stamp companions
+ * (`resetAt`, `resetCreditsNextExpiry`) are a fixed part of their window/channel
+ * and are written empty while nothing runs, and once a datapoint exists it stays
+ * until its whole window/model goes (see {@link orphanObjectIds}).
  *
  * The account's own device object is NOT part of this — the poll engine's skeleton
  * owns it, together with the link that draws the connection icon. Building it here

@@ -91,7 +91,9 @@ ai-usage.0.
     └── tokens.*               — token counters
 ```
 
-Only what an account's source actually delivers is created.
+Only what an account's source actually delivers is created — and once created, a datapoint stays:
+the reset time simply empties while no window is running, and a window or model disappears from the
+tree only when the provider stops reporting it entirely.
 
 **The connection icon** sits next to each account, green while it delivers. A throttle keeps it
 green — the last values stay valid while the adapter waits. A rejected sign-in or a broken service

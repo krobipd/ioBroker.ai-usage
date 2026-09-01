@@ -1,7 +1,7 @@
 {
     "settingsHeader": "Settings",
     "label_pollInterval": "Poll interval (s)",
-    "help_pollInterval": "How often each account is queried. Below 300 s you risk provider throttling — Claude locks the whole account for about a day.",
+    "help_pollInterval": "How often each account is queried. Below 300 s you risk provider throttling — Claude then rejects the queries for a long time.",
     "label_notifications": "Notifications",
     "help_notifications": "One notification when an account crosses its warn threshold or its credentials stop working.",
     "supportHeader": "Support the development",

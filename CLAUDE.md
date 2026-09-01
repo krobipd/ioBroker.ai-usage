@@ -83,9 +83,12 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
    wandert ein ganzer Objektbaum, wenn der Nutzer umbenennt oder später einen Speicher-Eintrag
    anlegt. Anmelde-Status liegt IM Konto (`<konto>.info.signedIn`) — der frühere zweite Zweig
    `auth.<name>` zeigte jedes Abo doppelt (krobi-Fund 2026-08-26).
-5. **Harte Intervall-Untergrenze 60 s + Backoff** — die Claude-Drossel sperrt das NUTZERKONTO
-   ~24 h; für ChatGPT ist keine Kontosperre belegt, aber der Endpunkt ist IP-gedrosselt; für
-   Google gibt es keinen belegten sicheren Takt (einziger Anker: deren eigenes Programm cacht 30 s).
+5. **Harte Intervall-Untergrenze 60 s + Backoff** — die Claude-Drossel wirkt nach neuerer
+   Community-Messung (2026-09, Usage-Monitor #202) PRO ZUGANGS-TOKEN und hängt am Absender-Namen
+   (s. Entscheidung 20); die früher berichtete ~24-h-KONTO-Sperre ist damit relativiert, bleibt
+   aber der Vorsichtsgrund für die Untergrenze. Für ChatGPT ist keine Kontosperre belegt, der
+   Endpunkt ist IP-gedrosselt; für Google gibt es keinen belegten sicheren Takt (einziger Anker:
+   deren eigenes Programm cacht 30 s).
 6. **Nur Geliefertes anlegen — aber einmal Angelegtes bleibt** (capability-driven); gleiche Sache =
    gleicher Pfad über alle Anbieter. Ein Kontingent ohne brauchbaren Wert wird NICHT als 0 % erfunden.
    ⚠️ Seit 0.10.0 gilt die zweite Hälfte hart (krobi-Fund live 2026-09-01, Klassenfehler wie

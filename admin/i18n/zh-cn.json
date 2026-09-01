@@ -1,7 +1,7 @@
 {
     "settingsHeader": "设置",
     "label_pollInterval": "轮询间隔（秒）",
-    "help_pollInterval": "查询每个账户的频率。低于 300 秒可能被提供商限流——Claude 会将整个账户锁定约一天。",
+    "help_pollInterval": "查询每个账户的频率。低于 300 秒可能被提供商限流——Claude 随后会长时间拒绝查询。",
     "label_notifications": "通知",
     "help_notifications": "当账户超过警告阈值或凭据失效时发送一次通知。",
     "supportHeader": "支持开发",
