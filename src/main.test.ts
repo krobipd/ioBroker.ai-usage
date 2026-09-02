@@ -6,29 +6,30 @@ const files = new Map<string, string>();
 const unreadable = new Set<string>();
 
 vi.mock("node:fs/promises", () => ({
-  mkdir: vi.fn(async () => undefined),
-  readFile: vi.fn(async (path: string) => {
+  mkdir: vi.fn(() => Promise.resolve(undefined)),
+  readFile: vi.fn((path: string) => {
     if (unreadable.has(path)) {
       const error = new Error("EACCES: permission denied") as NodeJS.ErrnoException;
       error.code = "EACCES";
-      throw error;
+      return Promise.reject(error);
     }
     const content = files.get(path);
     if (content === undefined) {
       const error = new Error("ENOENT: no such file") as NodeJS.ErrnoException;
       error.code = "ENOENT";
-      throw error;
+      return Promise.reject(error);
     }
-    return content;
+    return Promise.resolve(content);
   }),
-  writeFile: vi.fn(async (path: string, content: string) => void files.set(path, content)),
-  unlink: vi.fn(async (path: string) => {
+  writeFile: vi.fn((path: string, content: string) => Promise.resolve(void files.set(path, content))),
+  unlink: vi.fn((path: string) => {
     if (!files.delete(path)) {
-      throw new Error("ENOENT");
+      return Promise.reject(new Error("ENOENT"));
     }
+    return Promise.resolve();
   }),
-  rename: vi.fn(async () => {
-    throw new Error("ENOENT");
+  rename: vi.fn(() => {
+    return Promise.reject(new Error("ENOENT"));
   }),
 }));
 
@@ -41,19 +42,19 @@ vi.mock("@iobroker/adapter-core", () => {
     public config: Record<string, unknown> = {};
     public on = vi.fn();
     public setState = vi.fn(async () => {});
-    public setStateChangedAsync = vi.fn(async () => ({ id: "", notChanged: false }));
-    public setInterval = vi.fn(() => ({}) as unknown);
+    public setStateChangedAsync = vi.fn(() => Promise.resolve({ id: "", notChanged: false }));
+    public setInterval = vi.fn(() => ({}));
     public clearInterval = vi.fn();
-    public setTimeout = vi.fn(() => ({}) as unknown);
+    public setTimeout = vi.fn(() => ({}));
     public clearTimeout = vi.fn();
     public sendTo = vi.fn();
     public extendObject = vi.fn(async () => {});
-    public getObjectAsync = vi.fn(async () => null);
+    public getObjectAsync = vi.fn(() => Promise.resolve(null));
     public delObjectAsync = vi.fn(async () => {});
-    public getAdapterObjectsAsync = vi.fn(async () => ({}));
-    public getObjectViewAsync = vi.fn(async () => ({ rows: [] as { id: string }[] }));
-    public getForeignObjectAsync = vi.fn(async () => null);
-    public extendForeignObjectAsync = vi.fn(async () => ({}));
+    public getAdapterObjectsAsync = vi.fn(() => Promise.resolve({}));
+    public getObjectViewAsync = vi.fn(() => Promise.resolve({ rows: [] as { id: string }[] }));
+    public getForeignObjectAsync = vi.fn(() => Promise.resolve(null));
+    public extendForeignObjectAsync = vi.fn(() => Promise.resolve({}));
     public encrypt = (value: string): string => `enc:${value}`;
     public decrypt = (value: string): string => {
       if (!value.startsWith("enc:")) {
@@ -65,7 +66,7 @@ vi.mock("@iobroker/adapter-core", () => {
   }
   return {
     Adapter,
-    Credentials: { getCredentials: vi.fn(async () => ({ values: { key: "k" } })) },
+    Credentials: { getCredentials: vi.fn(() => Promise.resolve({ values: { key: "k" } })) },
     getAbsoluteInstanceDataDir: () => "/data/ai-usage.0",
   };
 });
@@ -150,7 +151,7 @@ describe("token store", () => {
 
   test("a file without usable tokens counts as not signed in", async () => {
     const adapter = makeAdapter();
-    files.set(CLAUDE_FILE, "enc:" + JSON.stringify({ accessToken: "a" }));
+    files.set(CLAUDE_FILE, `enc:${JSON.stringify({ accessToken: "a" })}`);
     expect(await internals(adapter).tokenStore("claude-sub").load()).toBeNull();
   });
 });
@@ -187,10 +188,10 @@ describe("sign-in flow", () => {
     // settings row show the sign-in screen although working tokens existed.
     const adapter = makeAdapter();
     await internals(adapter).tokenStore("claude-sub").save(tokens);
-    (internals(adapter).signInErrors as Map<string, string>).set("claude-sub", "old failure");
+    internals(adapter).signInErrors.set("claude-sub", "old failure");
     expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-in");
     // The stale failure is dropped for good, not just outvoted.
-    expect((internals(adapter).signInErrors as Map<string, string>).has("claude-sub")).toBe(false);
+    expect(internals(adapter).signInErrors.has("claude-sub")).toBe(false);
   });
 
   test("every message is answered, including an unknown one", async () => {
@@ -198,7 +199,12 @@ describe("sign-in flow", () => {
     const answers: unknown[] = [];
     adapter.sendTo = vi.fn((_from: string, _cmd: string, response: unknown) => void answers.push(response));
     await internals(adapter).onMessage({ command: "nonsense", message: {}, from: "x", callback: 1 });
-    await internals(adapter).onMessage({ command: "signInStart", message: { provider: "nope" }, from: "x", callback: 1 });
+    await internals(adapter).onMessage({
+      command: "signInStart",
+      message: { provider: "nope" },
+      from: "x",
+      callback: 1,
+    });
     expect(answers).toHaveLength(2);
     expect(answers.every(a => !!(a as { error?: string }).error)).toBe(true);
   });
@@ -210,10 +216,12 @@ describe("the leftover stopInstance flag", () => {
     // it never removes. Without this the whole shutdown path stays dead on every
     // installation that once ran a version carrying it.
     const adapter = makeAdapter();
-    adapter.getForeignObjectAsync = vi.fn(async () => ({
-      common: { supportedMessages: { stopInstance: true } },
-    })) as unknown as typeof adapter.getForeignObjectAsync;
-    const extend = vi.fn(async () => ({}));
+    adapter.getForeignObjectAsync = vi.fn(() =>
+      Promise.resolve({
+        common: { supportedMessages: { stopInstance: true } },
+      }),
+    ) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(() => Promise.resolve({}));
     adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
 
     await internals(adapter).clearStopInstanceFlag();
@@ -228,8 +236,12 @@ describe("the leftover stopInstance flag", () => {
     // Otherwise every single start would rewrite the instance object, and every write
     // makes the host restart the instance — a loop.
     const adapter = makeAdapter();
-    adapter.getForeignObjectAsync = vi.fn(async () => ({ common: {} })) as unknown as typeof adapter.getForeignObjectAsync;
-    const extend = vi.fn(async () => ({}));
+    adapter.getForeignObjectAsync = vi.fn(() =>
+      Promise.resolve({
+        common: {},
+      }),
+    ) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(() => Promise.resolve({}));
     adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
 
     await internals(adapter).clearStopInstanceFlag();
@@ -245,11 +257,11 @@ describe("the leftover stopInstance flag", () => {
     const adapter = makeAdapter();
     adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
     const seen: string[] = [];
-    adapter.getForeignObjectAsync = vi.fn(async (id: string) => {
+    adapter.getForeignObjectAsync = vi.fn((id: string) => {
       seen.push(id);
-      return { common: { supportedMessages: { stopInstance: true } } };
+      return Promise.resolve({ common: { supportedMessages: { stopInstance: true } } });
     }) as unknown as typeof adapter.getForeignObjectAsync;
-    const extend = vi.fn(async () => ({}));
+    const extend = vi.fn(() => Promise.resolve({}));
     adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
 
     await (adapter as unknown as { onReady(): Promise<void> }).onReady();
@@ -264,7 +276,11 @@ describe("the leftover stopInstance flag", () => {
   test("without a correction the startup carries on as usual", async () => {
     const adapter = makeAdapter();
     adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
-    adapter.getForeignObjectAsync = vi.fn(async () => ({ common: {} })) as unknown as typeof adapter.getForeignObjectAsync;
+    adapter.getForeignObjectAsync = vi.fn(() =>
+      Promise.resolve({
+        common: {},
+      }),
+    ) as unknown as typeof adapter.getForeignObjectAsync;
 
     await (adapter as unknown as { onReady(): Promise<void> }).onReady();
 
@@ -273,9 +289,9 @@ describe("the leftover stopInstance flag", () => {
 
   test("an unreadable instance object does not stop the startup", async () => {
     const adapter = makeAdapter();
-    adapter.getForeignObjectAsync = vi.fn(async () => {
-      throw new Error("objects db down");
-    }) as unknown as typeof adapter.getForeignObjectAsync;
+    adapter.getForeignObjectAsync = vi.fn(() => {
+      return Promise.reject(new Error("objects db down"));
+    });
     // Kein Abbruch des Starts, wenn die Objekt-Datenbank nicht antwortet.
     await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(false);
   });
@@ -297,7 +313,7 @@ describe("object housekeeping", () => {
   test("an empty account table deletes nothing — the guard against wiping the tree", async () => {
     const adapter = makeAdapter();
     adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
-    adapter.getAdapterObjectsAsync = vi.fn(async () => ({ "ai-usage.0.claude": {} }) as never);
+    adapter.getAdapterObjectsAsync = vi.fn(() => Promise.resolve({ "ai-usage.0.claude": {} } as never));
     await internals(adapter).cleanupStaleObjects();
     expect(adapter.delObjectAsync).not.toHaveBeenCalled();
   });
@@ -307,15 +323,14 @@ describe("object housekeeping", () => {
     adapter.config = {
       accounts: [{ name: "Claude", provider: "claude-sub", credentialId: "", warnThreshold: 80 }],
     } as unknown as ioBroker.AdapterConfig;
-    adapter.getAdapterObjectsAsync = vi.fn(
-      async () =>
-        ({
-          "ai-usage.0.claude": {},
-          "ai-usage.0.claude.info.unreach": {},
-          "ai-usage.0.old-api": {},
-          "ai-usage.0.info": {},
-          "ai-usage.0.total": {},
-        }) as never,
+    adapter.getAdapterObjectsAsync = vi.fn(() =>
+      Promise.resolve({
+        "ai-usage.0.claude": {},
+        "ai-usage.0.claude.info.unreach": {},
+        "ai-usage.0.old-api": {},
+        "ai-usage.0.info": {},
+        "ai-usage.0.total": {},
+      } as never),
     );
     await internals(adapter).cleanupStaleObjects();
     expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
@@ -324,9 +339,11 @@ describe("object housekeeping", () => {
 
   test("the startup snapshot records the existing ids without the instance prefix", async () => {
     const adapter = makeAdapter();
-    adapter.getObjectViewAsync = vi.fn(async () => ({
-      rows: [{ id: "ai-usage.0.claude.warning" }, { id: "ai-usage.0.total.accounts" }],
-    })) as unknown as typeof adapter.getObjectViewAsync;
+    adapter.getObjectViewAsync = vi.fn(() =>
+      Promise.resolve({
+        rows: [{ id: "ai-usage.0.claude.warning" }, { id: "ai-usage.0.total.accounts" }],
+      }),
+    ) as unknown as typeof adapter.getObjectViewAsync;
     await internals(adapter).snapshotExistingStates();
     expect([...internals(adapter).knownStateIds]).toEqual(["claude.warning", "total.accounts"]);
   });
@@ -366,7 +383,7 @@ describe("shutdown", () => {
             resolve("");
           }),
         ),
-    ) as unknown as typeof adapter.setState;
+    );
     const done = vi.fn(() => void order.push("callback"));
     internals(adapter).onUnload(done);
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -379,7 +396,7 @@ describe("shutdown", () => {
     // The states database going down mid-shutdown must not leave the controller
     // waiting for a callback that never comes.
     const adapter = makeAdapter();
-    adapter.setState = vi.fn(() => Promise.reject(new Error("connection closed"))) as unknown as typeof adapter.setState;
+    adapter.setState = vi.fn(() => Promise.reject(new Error("connection closed")));
     const done = vi.fn();
     internals(adapter).onUnload(done);
     await new Promise(resolve => setTimeout(resolve, 10));

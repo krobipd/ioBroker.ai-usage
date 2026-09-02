@@ -108,7 +108,12 @@ describe("device-code sign-in", () => {
 
 describe("chatgptSubProvider", () => {
   test("without stored tokens the fetch asks for the sign-in", async () => {
-    const provider = chatgptSubProvider(memoryStore(null), () => Promise.resolve({}), () => Promise.resolve({}), () => 0);
+    const provider = chatgptSubProvider(
+      memoryStore(null),
+      () => Promise.resolve({}),
+      () => Promise.resolve({}),
+      () => 0,
+    );
     await expect(provider.fetch()).rejects.toThrow(FetchError);
   });
 

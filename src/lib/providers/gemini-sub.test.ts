@@ -51,7 +51,12 @@ describe("parseGeminiQuota", () => {
   test("remaining fraction becomes utilisation in percent", () => {
     const snapshot = parseGeminiQuota({
       buckets: [
-        { modelId: "gemini-2.5-pro", tokenType: "REQUESTS", remainingFraction: 0.75, resetTime: "2026-08-27T16:01:15Z" },
+        {
+          modelId: "gemini-2.5-pro",
+          tokenType: "REQUESTS",
+          remainingFraction: 0.75,
+          resetTime: "2026-08-27T16:01:15Z",
+        },
         { modelId: "gemini-2.5-flash", remainingFraction: 0.2 },
       ],
     });

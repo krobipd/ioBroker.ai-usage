@@ -6,7 +6,9 @@ describe("parseDeepSeekBalance", () => {
     // Real /user/balance response shape from the API docs.
     const snapshot = parseDeepSeekBalance({
       is_available: true,
-      balance_infos: [{ currency: "CNY", total_balance: "110.00", granted_balance: "10.00", topped_up_balance: "100.00" }],
+      balance_infos: [
+        { currency: "CNY", total_balance: "110.00", granted_balance: "10.00", topped_up_balance: "100.00" },
+      ],
     });
     expect(snapshot.available).toBe(true);
     expect(snapshot.credits).toEqual({ remaining: 110, granted: 10, toppedUp: 100, currency: "CNY" });

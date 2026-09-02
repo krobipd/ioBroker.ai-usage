@@ -1,10 +1,4 @@
-import {
-  accountId,
-  clampPollInterval,
-  datapointBalanceLine,
-  parseAccounts,
-  sanitizeId,
-} from "./pure-helpers";
+import { accountId, clampPollInterval, datapointBalanceLine, parseAccounts, sanitizeId } from "./pure-helpers";
 
 describe("sanitizeId", () => {
   test("keeps safe characters and collapses the rest to single underscores", () => {

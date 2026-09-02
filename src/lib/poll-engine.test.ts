@@ -3,7 +3,11 @@ import type { ObjectDef } from "./snapshot-tree";
 import type { AccountConfig } from "./pure-helpers";
 import { FetchError, type UsageProvider, type UsageSnapshot } from "./provider";
 
-/** A scripted provider: shift one result per fetch (value = snapshot, function = thrower). */
+/**
+ * A scripted provider: shift one result per fetch (value = snapshot, function = thrower).
+ *
+ * @param script Results handed out one per fetch: a snapshot, or a function that throws
+ */
 function scriptedProvider(script: (UsageSnapshot | (() => never))[]): UsageProvider & { fetches: number } {
   const provider = {
     kind: "openrouter" as const,
@@ -129,7 +133,9 @@ describe("PollEngine", () => {
     const provider = scriptedProvider([{ credits: { used: 41.2, limit: 100, percent: 41.2, currency: "USD" } }]);
     const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
     await engine.start();
-    expect(h.objects).toEqual(expect.arrayContaining(["router", "router.info.unreach", "router.info.error", "total.costs.today"]));
+    expect(h.objects).toEqual(
+      expect.arrayContaining(["router", "router.info.unreach", "router.info.error", "total.costs.today"]),
+    );
     await h.tick();
     expect(provider.fetches).toBe(1);
     expect(h.states.get("router.credits.used")).toBe(41.2);
@@ -203,12 +209,7 @@ describe("PollEngine", () => {
     const netFail = (): never => {
       throw new FetchError("network", "timeout");
     };
-    const provider = scriptedProvider([
-      { credits: { used: 1, currency: "USD" } },
-      netFail,
-      netFail,
-      netFail,
-    ]);
+    const provider = scriptedProvider([{ credits: { used: 1, currency: "USD" } }, netFail, netFail, netFail]);
     const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
     await engine.start();
     await h.tick(); // ok
@@ -398,12 +399,7 @@ describe("PollEngine", () => {
     const boom = (): never => {
       throw new FetchError("network", "ETIMEDOUT");
     };
-    const provider = scriptedProvider([
-      { limits: [{ name: "week", label: "Week", percent: 10 }] },
-      boom,
-      boom,
-      boom,
-    ]);
+    const provider = scriptedProvider([{ limits: [{ name: "week", label: "Week", percent: 10 }] }, boom, boom, boom]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
