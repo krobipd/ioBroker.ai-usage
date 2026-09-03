@@ -14,6 +14,7 @@ on:
     # Pflicht-Prüfauftrag der Branch-Sperre (Dependabot-Zusammenführung).
     paths-ignore:
       - "**.md"
+      - "docs/**"
   pull_request:
     branches:
       - main
