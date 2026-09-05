@@ -136,8 +136,11 @@ jobs:
           cache-dependency-path: src-admin/package-lock.json
       - name: Install admin component dependencies
         run: npm ci --prefix src-admin
+      # Der Compiler der KOMPONENTE, nicht der aus dem Root: hier ist nur src-admin
+      # installiert, und `npx tsc` sucht im Root — beim ersten Lauf dieses Jobs wollte
+      # npx daraufhin ein fremdes `tsc@2.0.4` nachladen (2026-09-05).
       - name: Type-check the admin component
-        run: npx --no-install tsc --noEmit -p src-admin/tsconfig.json
+        run: ./src-admin/node_modules/.bin/tsc --noEmit -p src-admin/tsconfig.json
       - name: Lint the admin component
         run: npm --prefix src-admin run lint
       # Die Vitest-Konfig liegt ausserhalb des tsconfig-include und wurde von keinem
