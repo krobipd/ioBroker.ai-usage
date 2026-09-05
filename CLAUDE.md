@@ -237,7 +237,9 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     und die Engine sind reine Module, die die Tests ohne all das fahren. `src/lib/i18n.ts` liest die
     elf Dateien deshalb selbst; sein einziger Mehrwert wäre die Sprachwahl gewesen — genau der
     Schritt, der hier nicht passieren darf. Fehlt ein Schlüssel, steht er als Name im Baum: sichtbar
-    und greppbar, statt leer.
+    und greppbar, statt leer. Umfang: 49 Schlüssel × 11 Sprachen, gegengeprüft von
+    `i18n.test.ts` (jede Sprache dieselben Schlüssel, `%s` überall gleich oft, und jeder im
+    Quelltext benutzte Schlüssel existiert).
 24. **Die drei Manifest-Objekte werden im `onReady` per `extendObject` erneuert** (0.11.0):
     js-controller wendet `instanceObjects` selbst an, aber mit `preserve` auf `common.name` — eine
     UMBENENNUNG erreicht sonst nur neue Anlagen, während Manifest und Namens-Gate grün aussehen.
@@ -256,7 +258,18 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     vollständig zurück — bei kleiner Server-Seitengröße wären `costs.month`/`projectedMonth` still
     zu niedrig gewesen. Schranke jetzt 32 (ein Monat plus eins), und wer sie erreicht, meldet es ins
     Protokoll. Beide Report-Anbieter schicken ein explizites `limit=31`; bei Anthropic fehlte es.
-27. **Datei-Existenz ist keine Lebendigkeit** (0.11.0): `signInState` meldete `signed-in`, sobald die
+27. **Der Name eines Limit-Fensters ist ein SCHLÜSSEL, nicht der Anbieter-Text** (0.11.0):
+    `LimitWindow.label` bleibt die ENGLISCHE Fassung für Logzeilen und Warnmeldungen
+    (flottenweit englisch), der Objektname kommt aus `labelKey` (+ `labelArg` für den Teil, den
+    der Anbieter benannt hat). Claude `session`/`weekly_all` haben feste Schlüssel, ein
+    Modell-Fenster wird `nameWindowModelWeek` mit dem Modell als `%s` → im Baum steht
+    „Woche (Fable)"; ChatGPT-Zusatzfenster und Googles Modell-Kontingente analog. Deshalb nimmt
+    `tName(key, arg)` als Argument auch ein ÜBERSETZUNGSOBJEKT: sonst stünde in der deutschen
+    „%s used"-Zeile der englische Fenstername.
+    ⚠️ **Gefunden hat das erst das live-tree-Gate NACH dem Deploy** — das statische Rollen-Gate
+    sieht diese Namen nicht, weil sie über einen Laufzeitwert (`limit.label`) liefen. Ein
+    Adapter, dessen Namen aus Parser-Werten kommen, ist für den statischen Namens-Check blind.
+28. **Datei-Existenz ist keine Lebendigkeit** (0.11.0): `signInState` meldete `signed-in`, sobald die
     Token-Datei etwas hergab — ein vom Anbieter abgelehntes Auffrisch-Token ließ also einen grünen
     Haken neben einem gelben „Sign-in rejected" stehen, die exakte Umkehrung von krobis Fund vom
     2026-09-01. Die Engine meldet den `auth`-Zustand jetzt bei jedem Wechsel über `authState` an den
@@ -278,7 +291,10 @@ test/standards/                → iobroker-adapter-checks (Repo-Standards)
 Entscheidungen 11 und 21: sie war bei 6,25 % Zeilen-Deckung und ALLE sechs Mutationen überlebten
 (Audit 2026-09-04). `http.ts` ist das einzige Modul ohne injizierte Naht — deshalb `vi.stubGlobal`.
 `src-admin/src/rows.test.ts` (seit 0.11.0) prüft die zweite, bis dahin ungetestete Kopie der
-Zeilen-Logik im Konfig-Panel; `src/lib/i18n.test.ts` beweist Vollständigkeit und
+Zeilen-Logik im Konfig-Panel — die Datei liegt bei ihrem Code, wird vom ROOT-Testlauf gefahren
+(`vitest.config.mts` nimmt `src-admin/src/**` mit auf) und steht seit 2026-09-05 auch in
+`coverage.include`: vitest 5 wertet das Muster STRIKT aus, ohne die zweite Zeile fiel die Datei
+still aus der Messung ([[reference_vitest5_deckung_und_pool]]); `src/lib/i18n.test.ts` beweist Vollständigkeit und
 Platzhalter-Konsistenz der elf Sprachdateien und dass jeder im Quelltext benutzte Schlüssel existiert.
 
 `src/main.test.ts` (seit 0.8.0) deckt die Adapter-Schicht ab — Zugangsdaten-Ablage, Anmelde-Wege,
@@ -289,6 +305,16 @@ die ZWEITE Kopie der Kennungs-Regel im Konfig-Panel an die des Adapters.
 ```
 
 ```
+
+**Gates, die es vor 0.11.0 nicht gab** (alle drei fanden beim ersten Lauf etwas):
+`npm run lint:admin` + `npm run check:admin` (die Komponente hat eine eigene Lint-Konfiguration und
+einen eigenen Compiler; der Typecheck lief in KEINEM Gate und deckte drei in TS 7 entfallende
+`tsconfig`-Optionen auf) · `npm run check:config` (ein `tsc`-Lauf allein auf `vitest.config.mts` —
+die Datei liegt außerhalb jedes tsconfig-include, dort überlebte ein toter `forks`-Schlüssel den
+Sprung auf vitest 5) · CI-Job `admin-check-and-lint`, der beides fährt.
+⚠️ Der Job installiert **beide** Abhängigkeitsbäume: der Lint der Komponente lädt die
+Prettier-Regel, und Prettier löst seine Konfiguration aufwärts zur Root-Datei auf, die
+`@iobroker/eslint-config` importiert ([[feedback_ci_job_im_leeren_klon_pruefen]]).
 
 **Test-Oberfläche krobi:** NUR das Claude-Abo (Max). ChatGPT-Abo, Gemini-Abo, OpenRouter, DeepSeek,
 OpenAI-Organisation und Anthropic-Organisation sind vorbild-/messungs-belegt, aber nie an einem

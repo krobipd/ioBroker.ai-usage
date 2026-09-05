@@ -16,7 +16,11 @@ export default defineConfig({
       // — without this the v8 provider silently omits them and the headline
       // number overstates real coverage (fleet lesson from the govee-smart
       // v2.16.1 audit; before the v0.7.2 test wave this hid main.ts at 0 %).
-      include: ["src/**/*.ts"],
+      // vitest 5 wertet `include` STRIKT aus: was hier nicht steht, wird nicht
+      // gemessen — auch nicht, wenn ein Test es importiert. Unter vitest 4 rutschte
+      // `src-admin/src` still mit hinein; ohne die zweite Zeile faellt es heraus und
+      // die Prozentzahl STEIGT, weil weniger gemessen wird.
+      include: ["src/**/*.ts", "src-admin/src/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/**/*.d.ts"],
     },
   },
