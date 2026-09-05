@@ -145,7 +145,7 @@ so instead of pretending to be connected; signing in again is all it takes.
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 0.11.0 (2026-09-05)
 
 - Fixed: Signing in from the instance settings works again — a leftover setting from an earlier version had silently closed the adapter's message channel, so none of the three flows reached it
 - Fixed: A subscription whose stored sign-in was rejected no longer claims to be signed in — the row now offers the sign-in again instead of showing a green check next to an error
@@ -177,11 +177,6 @@ so instead of pretending to be connected; signing in again is all it takes.
 ### 0.9.1 (2026-08-27)
 
 - Changed: While an account has nothing to report — the adapter switched off, or started and not asked yet — the reason now reads "Unknown" instead of a sentence about the adapter
-
-### 0.9.0 (2026-08-27)
-
-- Fixed: Switching the instance off now shows every account as offline in the object tree and the settings, instead of leaving them green for as long as the adapter is not running
-- Fixed: After a crash or a hard kill an account no longer keeps claiming to deliver data; every account starts as "not delivering" until its first answer arrives
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

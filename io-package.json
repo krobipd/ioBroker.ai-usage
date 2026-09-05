@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.10.0",
+    "version": "0.11.0",
     "news": {
-      "NEXT": {
+      "0.11.0": {
         "en": "Signing in from the instance settings works again — a leftover setting had closed the adapter's message channel. Object names now come in eleven languages.",
         "de": "Die Anmeldung aus den Instanz-Einstellungen funktioniert wieder — eine Alt-Einstellung hatte den Nachrichtenkanal geschlossen. Objektnamen gibt es jetzt in elf Sprachen.",
         "ru": "Вход из настроек экземпляра снова работает — старая настройка закрывала канал сообщений адаптера. Имена объектов теперь доступны на одиннадцати языках.",
