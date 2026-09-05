@@ -37,6 +37,14 @@ import {
   type CredentialEntry,
 } from "./rows";
 
+/**
+ * High sort-end marker for object-view key ranges — everything below the prefix.
+ *
+ * The same constant the adapter uses. It used to be a hand-typed `香` here, which
+ * quietly hid every credential sorting above U+9999 from this list.
+ */
+const SORT_KEY_END = "\uFFFF";
+
 /** What the adapter reports about one subscription's sign-in. */
 type SignInState =
   | { status: "signed-in" }
@@ -109,7 +117,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       const objects = await this.props.oContext.socket.getObjectViewSystem(
         "config",
         "system.credentials.",
-        "system.credentials.香",
+        `system.credentials.${SORT_KEY_END}`,
       );
       const credentials: CredentialEntry[] = (Object.values(objects || {}) as ioBroker.Object[])
         .filter(obj => !!obj && (obj.native as { type?: string })?.type === "ai")
@@ -146,10 +154,16 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
    * This is what makes the online indicator visible where the user actually looks —
    * the datapoints alone answer the question only for someone who browses the object
    * tree (krobi 2026-08-26).
+   *
+   * A row whose read FAILED keeps the value it had: rebuilding the whole map every
+   * four seconds made a single socket hiccup blank the badge — the same mistake the
+   * sign-in poll made until 2026-09-01.
    */
   private async refreshServiceState(): Promise<void> {
     const ctx = this.props.oContext;
     const serviceState: Record<string, unknown> = {};
+    /** Rows whose state could not be read this round — their known value survives. */
+    const missed = new Set<string>();
     // All rows in one burst — the previous one-after-another loop stretched a
     // poll round to 2×rows round-trips every 4 s while the card is open.
     await Promise.all(
@@ -168,11 +182,24 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
             serviceState[`${id}.error`] = error?.val ?? "";
           }
         } catch {
-          // an instance that never ran has no states yet — show nothing, guess nothing
+          // A read that FAILED is not "no status": the instance may simply have been
+          // busy. Keep what the row already showed — the same rule the sign-in poll
+          // learned on 2026-09-01, applied to the badge.
+          missed.add(id);
         }
       }),
     );
-    this.setState({ serviceState });
+    this.setState(prev => {
+      const merged = { ...serviceState };
+      for (const id of missed) {
+        for (const key of [`${id}.unreach`, `${id}.error`]) {
+          if (prev.serviceState[key] !== undefined) {
+            merged[key] = prev.serviceState[key];
+          }
+        }
+      }
+      return { serviceState: merged };
+    });
   }
 
   /**

@@ -24,6 +24,7 @@ __export(snapshot_tree_exports, {
   orphanObjectIds: () => orphanObjectIds
 });
 module.exports = __toCommonJS(snapshot_tree_exports);
+var import_i18n = require("./i18n");
 var import_pure_helpers = require("./pure-helpers");
 function state(id, name, type, role, value, unit) {
   const common = { name, type, role, read: true, write: false };
@@ -44,20 +45,28 @@ function mapSnapshot(accountId, snapshot) {
     objects.push({ id, type: "channel", common: { name } });
   };
   if (snapshot.limits && snapshot.limits.length > 0) {
-    channel(`${accountId}.limits`, "Limit windows");
+    channel(`${accountId}.limits`, (0, import_i18n.tName)("nameLimits"));
     for (const limit of snapshot.limits) {
       const windowId = (0, import_pure_helpers.sanitizeId)(limit.name);
       if (!windowId) {
         continue;
       }
-      channel(`${accountId}.limits.${windowId}`, limit.label);
+      const windowName = (0, import_i18n.tName)(limit.labelKey, limit.labelArg);
+      channel(`${accountId}.limits.${windowId}`, windowName);
       add(
-        state(`${accountId}.limits.${windowId}.percent`, `${limit.label} used`, "number", "value", limit.percent, "%")
+        state(
+          `${accountId}.limits.${windowId}.percent`,
+          (0, import_i18n.tName)("nameWindowPercent", windowName),
+          "number",
+          "value",
+          limit.percent,
+          "%"
+        )
       );
       add(
         state(
           `${accountId}.limits.${windowId}.resetAt`,
-          `${limit.label} resets at`,
+          (0, import_i18n.tName)("nameWindowResetAt", windowName),
           "string",
           "date",
           (_a = limit.resetAt) != null ? _a : ""
@@ -67,40 +76,45 @@ function mapSnapshot(accountId, snapshot) {
   }
   const credits = snapshot.credits;
   if (credits) {
-    channel(`${accountId}.credits`, "Credits");
+    channel(`${accountId}.credits`, (0, import_i18n.tName)("nameCredits"));
     const unit = credits.pieces ? "" : credits.currency;
     if (credits.used !== void 0) {
-      add(state(`${accountId}.credits.used`, "Credits used", "number", "value", credits.used, unit));
+      add(state(`${accountId}.credits.used`, (0, import_i18n.tName)("nameCreditsUsed"), "number", "value", credits.used, unit));
     }
     if (credits.limit !== void 0) {
-      add(state(`${accountId}.credits.limit`, "Credits limit", "number", "value", credits.limit, unit));
+      add(state(`${accountId}.credits.limit`, (0, import_i18n.tName)("nameCreditsLimit"), "number", "value", credits.limit, unit));
     }
     if (credits.remaining !== void 0) {
-      add(state(`${accountId}.credits.remaining`, "Credits remaining", "number", "value", credits.remaining, unit));
+      add(
+        state(
+          `${accountId}.credits.remaining`,
+          (0, import_i18n.tName)("nameCreditsRemaining"),
+          "number",
+          "value",
+          credits.remaining,
+          unit
+        )
+      );
     }
     if (credits.percent !== void 0) {
-      add(state(`${accountId}.credits.percent`, "Credits used (percent)", "number", "value", credits.percent, "%"));
+      add(state(`${accountId}.credits.percent`, (0, import_i18n.tName)("nameCreditsPercent"), "number", "value", credits.percent, "%"));
     }
     if (credits.granted !== void 0) {
-      add(state(`${accountId}.credits.granted`, "Granted balance", "number", "value", credits.granted, unit));
+      add(state(`${accountId}.credits.granted`, (0, import_i18n.tName)("nameCreditsGranted"), "number", "value", credits.granted, unit));
     }
     if (credits.toppedUp !== void 0) {
-      add(state(`${accountId}.credits.toppedUp`, "Topped-up balance", "number", "value", credits.toppedUp, unit));
+      add(
+        state(`${accountId}.credits.toppedUp`, (0, import_i18n.tName)("nameCreditsToppedUp"), "number", "value", credits.toppedUp, unit)
+      );
     }
     if (credits.resetCredits !== void 0) {
       add(
-        state(
-          `${accountId}.credits.resetCredits`,
-          "Available limit-reset credits",
-          "number",
-          "value",
-          credits.resetCredits
-        )
+        state(`${accountId}.credits.resetCredits`, (0, import_i18n.tName)("nameResetCredits"), "number", "value", credits.resetCredits)
       );
       add(
         state(
           `${accountId}.credits.resetCreditsNextExpiry`,
-          "Next reset credit expires at",
+          (0, import_i18n.tName)("nameResetCreditsExpiry"),
           "string",
           "date",
           (_b = credits.resetCreditsNextExpiry) != null ? _b : ""
@@ -110,21 +124,21 @@ function mapSnapshot(accountId, snapshot) {
   }
   const costs = snapshot.costs;
   if (costs) {
-    channel(`${accountId}.costs`, "Costs");
+    channel(`${accountId}.costs`, (0, import_i18n.tName)("nameCosts"));
     if (costs.today !== void 0) {
-      add(state(`${accountId}.costs.today`, "Costs today", "number", "value", costs.today, costs.currency));
+      add(state(`${accountId}.costs.today`, (0, import_i18n.tName)("nameCostsToday"), "number", "value", costs.today, costs.currency));
     }
     if (costs.month !== void 0) {
-      add(state(`${accountId}.costs.month`, "Costs this month", "number", "value", costs.month, costs.currency));
+      add(state(`${accountId}.costs.month`, (0, import_i18n.tName)("nameCostsMonth"), "number", "value", costs.month, costs.currency));
     }
     if (costs.total !== void 0) {
-      add(state(`${accountId}.costs.total`, "Costs total (lifetime)", "number", "value", costs.total, costs.currency));
+      add(state(`${accountId}.costs.total`, (0, import_i18n.tName)("nameCostsTotal"), "number", "value", costs.total, costs.currency));
     }
     if (costs.projectedMonth !== void 0) {
       add(
         state(
           `${accountId}.costs.projectedMonth`,
-          "Costs projected month-end (computed)",
+          (0, import_i18n.tName)("nameCostsProjected"),
           "number",
           "value",
           costs.projectedMonth,
@@ -135,15 +149,15 @@ function mapSnapshot(accountId, snapshot) {
   }
   const tokens = snapshot.tokens;
   if (tokens) {
-    channel(`${accountId}.tokens`, "Tokens");
+    channel(`${accountId}.tokens`, (0, import_i18n.tName)("nameTokens"));
     if (tokens.inputToday !== void 0) {
-      add(state(`${accountId}.tokens.inputToday`, "Input tokens today", "number", "value", tokens.inputToday));
+      add(state(`${accountId}.tokens.inputToday`, (0, import_i18n.tName)("nameTokensInput"), "number", "value", tokens.inputToday));
     }
     if (tokens.outputToday !== void 0) {
-      add(state(`${accountId}.tokens.outputToday`, "Output tokens today", "number", "value", tokens.outputToday));
+      add(state(`${accountId}.tokens.outputToday`, (0, import_i18n.tName)("nameTokensOutput"), "number", "value", tokens.outputToday));
     }
     if (tokens.perModel && tokens.perModel.length > 0) {
-      channel(`${accountId}.models`, "Per-model usage");
+      channel(`${accountId}.models`, (0, import_i18n.tName)("nameModels"));
       for (const model of tokens.perModel) {
         const modelId = (0, import_pure_helpers.sanitizeId)(model.model);
         if (!modelId) {
@@ -154,7 +168,7 @@ function mapSnapshot(accountId, snapshot) {
           add(
             state(
               `${accountId}.models.${modelId}.tokensToday`,
-              `${model.model} tokens today`,
+              (0, import_i18n.tName)("nameModelTokens", model.model),
               "number",
               "value",
               model.tokens
@@ -165,7 +179,7 @@ function mapSnapshot(accountId, snapshot) {
           add(
             state(
               `${accountId}.models.${modelId}.costToday`,
-              `${model.model} costs today`,
+              (0, import_i18n.tName)("nameModelCosts", model.model),
               "number",
               "value",
               model.cost,
@@ -177,7 +191,7 @@ function mapSnapshot(accountId, snapshot) {
     }
   }
   if (snapshot.available !== void 0) {
-    add(state(`${accountId}.available`, "Balance sufficient for calls", "boolean", "indicator", snapshot.available));
+    add(state(`${accountId}.available`, (0, import_i18n.tName)("nameAvailable"), "boolean", "indicator", snapshot.available));
   }
   return { objects, writes };
 }

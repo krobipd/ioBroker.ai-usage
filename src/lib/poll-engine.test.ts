@@ -40,6 +40,8 @@ interface Harness {
   /** The full definition per upserted id — for assertions on `common`. */
   upserted: Map<string, ObjectDef>;
   notifications: string[];
+  /** Every `authState` callback the engine fired, in order. */
+  authStates: { accountId: string; rejected: boolean }[];
   /** How many repeating timers are armed right now. */
   intervalCount(): number;
   /** Fire every scheduled one-shot immediately queued and each interval once. */
@@ -55,6 +57,7 @@ function makeHarness(): Harness {
   const existing: string[] = [];
   const upserted = new Map<string, ObjectDef>();
   const notifications: string[] = [];
+  const authStates: { accountId: string; rejected: boolean }[] = [];
   const pending: (() => void)[] = [];
   const intervals: (() => void)[] = [];
   const clock = { now: 1_000_000 };
@@ -87,6 +90,7 @@ function makeHarness(): Harness {
     now: () => clock.now,
     log: { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined },
     notify: (_account, message) => void notifications.push(message),
+    authState: (accountId, rejected) => void authStates.push({ accountId, rejected }),
   };
   return {
     deps,
@@ -97,6 +101,7 @@ function makeHarness(): Harness {
     objects,
     upserted,
     notifications,
+    authStates,
     clock,
     intervalCount: () => intervals.length,
     tick: async () => {
@@ -148,9 +153,9 @@ describe("PollEngine", () => {
   test("warn threshold: ONE notification on the upward transition only", async () => {
     const h = makeHarness();
     const provider = scriptedProvider([
-      { limits: [{ name: "week", label: "Week", percent: 50 }] },
-      { limits: [{ name: "week", label: "Week", percent: 85 }] },
-      { limits: [{ name: "week", label: "Week", percent: 90 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 50 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 85 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 90 }] },
     ]);
     const engine = new PollEngine([account({ id: "c", name: "C" })], new Map([["c", provider]]), 300, h.deps);
     await engine.start();
@@ -183,6 +188,65 @@ describe("PollEngine", () => {
     expect(h.states.get("a.info.error")).toBe("");
     await h.tick(); // breaks again → a NEW notification
     expect(h.notifications).toHaveLength(2);
+  });
+
+  test("a rejected sign-in is reported to the settings card — once per transition", async () => {
+    // The card must be able to tell a live sign-in from a token file that merely
+    // still exists; without this it reported "signed in" off file existence alone.
+    const h = makeHarness();
+    const authFail = (): never => {
+      throw new FetchError("auth", "401");
+    };
+    const provider = scriptedProvider([authFail, authFail, { credits: { remaining: 5, currency: "USD" } }, authFail]);
+    const engine = new PollEngine(
+      [account({ id: "claude", name: "Claude" })],
+      new Map([["claude", provider]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    expect(h.authStates).toEqual([{ accountId: "claude", rejected: true }]);
+    await h.tick(); // still rejected — no repeat
+    expect(h.authStates).toHaveLength(1);
+    await h.tick(); // recovers
+    expect(h.authStates[1]).toEqual({ accountId: "claude", rejected: false });
+    await h.tick(); // rejected again
+    expect(h.authStates[2]).toEqual({ accountId: "claude", rejected: true });
+  });
+
+  test("a throttle or a service fault is NOT a rejected sign-in", async () => {
+    // Only `auth` means the stored credentials stopped working. A 429 or a 500 must
+    // never push the user onto the sign-in screen.
+    const h = makeHarness();
+    const thrower = (kind: "rate-limit" | "service" | "network"): (() => never) => {
+      return () => {
+        throw new FetchError(kind, "boom");
+      };
+    };
+    // One account per class: a rate-limit arms a backoff that would swallow the
+    // following rounds, so a single account could never exercise all three.
+    const limited = scriptedProvider([thrower("rate-limit")]);
+    const broken = scriptedProvider([thrower("service")]);
+    const offline = scriptedProvider([thrower("network")]);
+    const engine = new PollEngine(
+      [
+        account({ id: "limited", name: "Limited" }),
+        account({ id: "broken", name: "Broken" }),
+        account({ id: "offline", name: "Offline" }),
+      ],
+      new Map([
+        ["limited", limited],
+        ["broken", broken],
+        ["offline", offline],
+      ]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    expect(limited.fetches + broken.fetches + offline.fetches).toBe(3);
+    expect(h.authStates).toEqual([]);
   });
 
   test("rate-limit: backoff skips polls and keeps the last values", async () => {
@@ -226,7 +290,9 @@ describe("PollEngine", () => {
     // Without common.statusStates the object tree shows no icon at all — that link
     // is the ONLY thing the object browser reads for it (krobi 2026-08-26).
     const h = makeHarness();
-    const provider = scriptedProvider([{ limits: [{ name: "week", label: "Week", percent: 10 }] }]);
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 10 }] },
+    ]);
     const engine = new PollEngine([account({ id: "c", name: "Claude" })], new Map([["c", provider]]), 300, h.deps);
     await engine.start();
     expect(h.upserted.get("c")?.common.statusStates).toEqual({ offlineId: "info.unreach" });
@@ -236,8 +302,14 @@ describe("PollEngine", () => {
     const h = makeHarness();
     const rounds: number[] = [];
     h.deps.afterFirstRound = () => rounds.push(1);
-    const a = scriptedProvider([{ limits: [{ name: "w", label: "W", percent: 1 }] }, { limits: [] }]);
-    const b = scriptedProvider([{ limits: [{ name: "w", label: "W", percent: 2 }] }, { limits: [] }]);
+    const a = scriptedProvider([
+      { limits: [{ name: "w", labelKey: "nameWindowSession", label: "W", percent: 1 }] },
+      { limits: [] },
+    ]);
+    const b = scriptedProvider([
+      { limits: [{ name: "w", labelKey: "nameWindowSession", label: "W", percent: 2 }] },
+      { limits: [] },
+    ]);
     const engine = new PollEngine(
       [account({ id: "a", name: "A" }), account({ id: "b", name: "B" })],
       new Map([
@@ -295,7 +367,9 @@ describe("PollEngine", () => {
 
   test("a full window raises limitReached on account and totals", async () => {
     const h = makeHarness();
-    const provider = scriptedProvider([{ limits: [{ name: "week", label: "Week", percent: 100 }] }]);
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 100 }] },
+    ]);
     const engine = new PollEngine([account({ id: "f", name: "F" })], new Map([["f", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
@@ -308,9 +382,15 @@ describe("PollEngine", () => {
     const provider = scriptedProvider([
       {
         limits: [
-          { name: "session", label: "Session (5 h)", percent: 72 },
-          { name: "week", label: "Week (all models)", percent: 72 },
-          { name: "weekly_scoped-Fable", label: "weekly scoped Fable", percent: 100, scoped: true },
+          { name: "session", labelKey: "nameWindowSession", label: "Session (5 h)", percent: 72 },
+          { name: "week", labelKey: "nameWindowSession", label: "Week (all models)", percent: 72 },
+          {
+            name: "weekly_scoped-Fable",
+            labelKey: "nameWindowSession",
+            label: "weekly scoped Fable",
+            percent: 100,
+            scoped: true,
+          },
         ],
       },
     ]);
@@ -330,8 +410,8 @@ describe("PollEngine", () => {
     const provider = scriptedProvider([
       {
         limits: [
-          { name: "session", label: "Session (5 h)", percent: 40 },
-          { name: "week", label: "Week (all models)", percent: 91 },
+          { name: "session", labelKey: "nameWindowSession", label: "Session (5 h)", percent: 40 },
+          { name: "week", labelKey: "nameWindowSession", label: "Week (all models)", percent: 91 },
         ],
       },
     ]);
@@ -344,7 +424,7 @@ describe("PollEngine", () => {
   test("a rejected sign-in marks the account offline but names the sign-in as the cause", async () => {
     const h = makeHarness();
     const provider = scriptedProvider([
-      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 10 }] },
       () => {
         throw new FetchError("auth", "HTTP 401");
       },
@@ -361,7 +441,7 @@ describe("PollEngine", () => {
   test("a fault reported BY the service marks it offline at once, without three strikes", async () => {
     const h = makeHarness();
     const provider = scriptedProvider([
-      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 10 }] },
       () => {
         throw new FetchError("service", "HTTP 503");
       },
@@ -378,11 +458,11 @@ describe("PollEngine", () => {
   test("a single transport hiccup does not make the indicator flap", async () => {
     const h = makeHarness();
     const provider = scriptedProvider([
-      { limits: [{ name: "week", label: "Week", percent: 10 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 10 }] },
       () => {
         throw new FetchError("network", "ECONNRESET");
       },
-      { limits: [{ name: "week", label: "Week", percent: 11 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 11 }] },
     ]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
@@ -399,7 +479,12 @@ describe("PollEngine", () => {
     const boom = (): never => {
       throw new FetchError("network", "ETIMEDOUT");
     };
-    const provider = scriptedProvider([{ limits: [{ name: "week", label: "Week", percent: 10 }] }, boom, boom, boom]);
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 10 }] },
+      boom,
+      boom,
+      boom,
+    ]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
@@ -420,7 +505,9 @@ describe("PollEngine", () => {
       plain.push(id);
       original(id, value);
     };
-    const provider = scriptedProvider([{ limits: [{ name: "w", label: "W", percent: 10 }] }]);
+    const provider = scriptedProvider([
+      { limits: [{ name: "w", labelKey: "nameWindowSession", label: "W", percent: 10 }] },
+    ]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();
@@ -478,11 +565,11 @@ describe("PollEngine", () => {
     const provider = scriptedProvider([
       {
         limits: [
-          { name: "week", label: "Week", percent: 10 },
-          { name: "gone", label: "Gone", percent: 20 },
+          { name: "week", labelKey: "nameWindowSession", label: "Week", percent: 10 },
+          { name: "gone", labelKey: "nameWindowSession", label: "Gone", percent: 20 },
         ],
       },
-      { limits: [{ name: "week", label: "Week", percent: 12 }] },
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 12 }] },
     ]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
@@ -501,7 +588,9 @@ describe("PollEngine", () => {
     const h = makeHarness();
     // Left behind while the adapter was stopped — the in-memory list knows nothing of it.
     h.existing.push("a.limits.old.percent", "a.limits.week.percent");
-    const provider = scriptedProvider([{ limits: [{ name: "week", label: "Week", percent: 10 }] }]);
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", labelKey: "nameWindowSession", label: "Week", percent: 10 }] },
+    ]);
     const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
     await engine.start();
     await h.tick();

@@ -33,14 +33,25 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
   const raw = body as Record<string, unknown>;
   const limits: LimitWindow[] = [];
   const seen = new Set<string>();
-  const push = (name: string, label: string, percent: unknown, resetsAt: unknown, scoped = false): void => {
+  const push = (
+    name: string,
+    label: string,
+    percent: unknown,
+    resetsAt: unknown,
+    scoped = false,
+    labelKey = "nameWindowOther",
+    labelArg?: string,
+  ): void => {
     const id = sanitizeId(name);
     const value = Number(percent);
     if (!id || seen.has(id) || !Number.isFinite(value)) {
       return;
     }
     seen.add(id);
-    const window: LimitWindow = { name: id, label, percent: value };
+    const window: LimitWindow = { name: id, label, percent: value, labelKey };
+    if (labelArg !== undefined) {
+      window.labelArg = labelArg;
+    }
     if (typeof resetsAt === "string" && resetsAt) {
       window.resetAt = resetsAt;
     }
@@ -80,22 +91,45 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
       // (weekly_scoped and friends) covers ONE model and must not drive the
       // account's warning — see LimitWindow.scoped.
       const scoped = kind !== "session" && kind !== "weekly_all";
-      push(nameParts.join("-"), labelParts.join(" "), limit.percent, limit.resets_at, scoped);
+      // The name in the tree is translated; the English `label` above stays for the
+      // log lines. A model or surface the provider named is the only foreign part
+      // and rides along as the `%s`.
+      const foreign = [typeof model === "string" ? model : "", typeof surface === "string" ? surface : ""]
+        .filter(Boolean)
+        .join(" ");
+      const labelKey =
+        kind === "session" ? "nameWindowSession" : kind === "weekly_all" ? "nameWindowWeek" : "nameWindowModelWeek";
+      push(
+        nameParts.join("-"),
+        labelParts.join(" "),
+        limit.percent,
+        limit.resets_at,
+        scoped,
+        labelKey,
+        labelKey === "nameWindowModelWeek" ? foreign || kind.replace(/_/g, " ") : undefined,
+      );
     }
   }
 
   // Fallback for older payloads without the limits[] array.
   if (limits.length === 0) {
-    const flat = (key: string, name: string, label: string, scoped = false): void => {
+    const flat = (
+      key: string,
+      name: string,
+      label: string,
+      labelKey: string,
+      scoped = false,
+      labelArg?: string,
+    ): void => {
       const block = raw[key];
       if (typeof block === "object" && block !== null) {
         const data = block as Record<string, unknown>;
-        push(name, label, data.utilization, data.resets_at, scoped);
+        push(name, label, data.utilization, data.resets_at, scoped, labelKey, labelArg);
       }
     };
-    flat("five_hour", "session", "Session (5 h)");
-    flat("seven_day", "week", "Week (all models)");
-    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet", true);
+    flat("five_hour", "session", "Session (5 h)", "nameWindowSession");
+    flat("seven_day", "week", "Week (all models)", "nameWindowWeek");
+    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet", "nameWindowModelWeek", true, "Sonnet");
   }
 
   const snapshot: UsageSnapshot = {};

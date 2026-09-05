@@ -86,24 +86,39 @@ export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unkn
  * @param adminKey the organization ADMIN key
  * @param fetchJson the JSON-GET seam
  * @param now clock (ms) — injected for tests
+ * @param warn where a partial report is reported to
  * @returns the provider
  */
 export function anthropicApiProvider(
   adminKey: string,
   fetchJson: JsonFetch = getJson,
   now: () => number = Date.now,
+  warn: (message: string) => void = () => undefined,
 ): UsageProvider {
   return {
     kind: "anthropic-api",
     fetch: async (): Promise<UsageSnapshot> => {
       const headers = { "x-api-key": adminKey, "anthropic-version": "2023-06-01" };
       const start = encodeURIComponent(monthStartIso(now()));
+      const truncated = (report: string): ((pages: number) => void) => {
+        return pages =>
+          warn(`the ${report} report was still offering more after ${pages} pages — this month's figures are partial`);
+      };
+      // `limit=31` like the OpenAI calls: without it the server picks the page size,
+      // and a small default turns a month into a walk through many pages — the exact
+      // situation the page ceiling exists for.
       const usage = await fetchAllPages(
-        `${BASE}/usage_report/messages?starting_at=${start}&bucket_width=1d`,
+        `${BASE}/usage_report/messages?starting_at=${start}&bucket_width=1d&limit=31`,
         headers,
         fetchJson,
+        truncated("usage"),
       );
-      const costs = await fetchAllPages(`${BASE}/cost_report?starting_at=${start}&bucket_width=1d`, headers, fetchJson);
+      const costs = await fetchAllPages(
+        `${BASE}/cost_report?starting_at=${start}&bucket_width=1d&limit=31`,
+        headers,
+        fetchJson,
+        truncated("cost"),
+      );
       return parseAnthropicReports(usage, costs, now());
     },
   };

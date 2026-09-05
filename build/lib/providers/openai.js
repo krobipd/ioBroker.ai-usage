@@ -97,18 +97,27 @@ function parseOpenAiReports(usageBuckets, costBuckets, nowMs) {
   }
   return snapshot;
 }
-function openAiProvider(adminKey, fetchJson = import_http.getJson, now = Date.now) {
+function openAiProvider(adminKey, fetchJson = import_http.getJson, now = Date.now, warn = () => void 0) {
   return {
     kind: "openai",
     fetch: async () => {
       const headers = { Authorization: `Bearer ${adminKey}` };
       const start = (0, import_report_utils.monthStartUnix)(now());
+      const truncated = (report) => {
+        return (pages) => warn(`the ${report} report was still offering more after ${pages} pages \u2014 this month's figures are partial`);
+      };
       const usage = await (0, import_report_utils.fetchAllPages)(
         `${BASE}/usage/completions?start_time=${start}&bucket_width=1d&limit=31&group_by=model`,
         headers,
-        fetchJson
+        fetchJson,
+        truncated("usage")
       );
-      const costs = await (0, import_report_utils.fetchAllPages)(`${BASE}/costs?start_time=${start}&limit=31`, headers, fetchJson);
+      const costs = await (0, import_report_utils.fetchAllPages)(
+        `${BASE}/costs?start_time=${start}&limit=31`,
+        headers,
+        fetchJson,
+        truncated("cost")
+      );
       return parseOpenAiReports(usage, costs, now());
     }
   };

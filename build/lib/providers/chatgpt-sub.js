@@ -18,6 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var chatgpt_sub_exports = {};
 __export(chatgpt_sub_exports, {
+  CHATGPT_IDENTITY: () => import_chatgpt_auth.CHATGPT_IDENTITY,
   CHATGPT_OAUTH: () => import_chatgpt_auth.CHATGPT_OAUTH,
   CHATGPT_RESET_CREDITS_URL: () => CHATGPT_RESET_CREDITS_URL,
   CHATGPT_USAGE_URL: () => CHATGPT_USAGE_URL,
@@ -31,7 +32,7 @@ var import_provider = require("../provider");
 var import_chatgpt_auth = require("./chatgpt-auth");
 const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const CHATGPT_RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
-function readWindow(raw, name, label) {
+function readWindow(raw, name, label, labelKey, labelArg) {
   if (typeof raw !== "object" || raw === null) {
     return void 0;
   }
@@ -40,7 +41,10 @@ function readWindow(raw, name, label) {
   if (!Number.isFinite(percent)) {
     return void 0;
   }
-  const window = { name, label, percent };
+  const window = { name, label, percent, labelKey };
+  if (labelArg !== void 0) {
+    window.labelArg = labelArg;
+  }
   const resetAt = Number(entry.reset_at);
   if (Number.isFinite(resetAt) && resetAt > 0) {
     const ms = resetAt > 1e12 ? resetAt : resetAt * 1e3;
@@ -56,8 +60,8 @@ function parseChatgptUsage(body) {
   const raw = body;
   const limits = [];
   const rateLimit = (_a = raw.rate_limit) != null ? _a : {};
-  const session = readWindow(rateLimit.primary_window, "session", "Session (5 h)");
-  const week = readWindow(rateLimit.secondary_window, "week", "Week");
+  const session = readWindow(rateLimit.primary_window, "session", "Session (5 h)", "nameWindowSession");
+  const week = readWindow(rateLimit.secondary_window, "week", "Week", "nameWindowWeekShort");
   if (session) {
     limits.push(session);
   }
@@ -74,7 +78,7 @@ function parseChatgptUsage(body) {
     if (!name || limits.some((window2) => window2.name === name)) {
       continue;
     }
-    const window = readWindow(entry.rate_limit, name, label);
+    const window = readWindow(entry.rate_limit, name, label, "nameWindowOther", label);
     if (window) {
       window.scoped = true;
       limits.push(window);
@@ -137,7 +141,11 @@ function chatgptSubProvider(store, postJson, fetchJson = import_http.getJson, no
       }
       const headers = {
         Authorization: `Bearer ${tokens.accessToken}`,
-        "User-Agent": "ioBroker.ai-usage"
+        // The Codex identity, NOT our own name — see CHATGPT_IDENTITY: the backend
+        // gates these routes on the originator, and the second call below already
+        // announced itself as a Codex client while this one did not.
+        "User-Agent": import_chatgpt_auth.CHATGPT_IDENTITY.userAgent,
+        originator: import_chatgpt_auth.CHATGPT_IDENTITY.originator
       };
       if (tokens.accountRef) {
         headers["ChatGPT-Account-Id"] = tokens.accountRef;
@@ -147,9 +155,8 @@ function chatgptSubProvider(store, postJson, fetchJson = import_http.getJson, no
         const vouchers = parseChatgptResetCredits(
           await fetchJson(CHATGPT_RESET_CREDITS_URL, {
             ...headers,
-            // What OpenAI's own desktop client sends on this route (CodexBar-verified).
-            "OpenAI-Beta": "codex-1",
-            originator: "Codex Desktop"
+            // Route-specific extra on top of the shared identity (CodexBar-verified).
+            "OpenAI-Beta": "codex-1"
           }),
           now()
         );
@@ -165,6 +172,7 @@ function chatgptSubProvider(store, postJson, fetchJson = import_http.getJson, no
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  CHATGPT_IDENTITY,
   CHATGPT_OAUTH,
   CHATGPT_RESET_CREDITS_URL,
   CHATGPT_USAGE_URL,

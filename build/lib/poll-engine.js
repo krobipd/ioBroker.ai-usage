@@ -21,6 +21,7 @@ __export(poll_engine_exports, {
   PollEngine: () => PollEngine
 });
 module.exports = __toCommonJS(poll_engine_exports);
+var import_i18n = require("./i18n");
 var import_provider = require("./provider");
 var import_snapshot_tree = require("./snapshot-tree");
 var import_totals = require("./totals");
@@ -54,6 +55,7 @@ class PollEngine {
         skipUntil: 0,
         backoffMs: BACKOFF_START_MS,
         authNotified: false,
+        authRejected: false,
         serviceOnline: false,
         state: "no-connection",
         // Nothing known until the service says something; the skeleton writes
@@ -151,6 +153,7 @@ class PollEngine {
     const runtime = this.runtimes.find((entry) => entry.config.id === accountId);
     if (runtime) {
       runtime.authNotified = false;
+      runtime.authRejected = false;
       runtime.skipUntil = 0;
       await this.pollAccount(runtime);
     }
@@ -190,6 +193,7 @@ class PollEngine {
    * @param runtime the account's runtime
    */
   async pollOnce(runtime) {
+    var _a, _b;
     const { config } = runtime;
     if (this.deps.now() < runtime.skipUntil) {
       this.deps.log.debug(`${config.name}: in rate-limit backoff \u2014 poll skipped`);
@@ -207,6 +211,10 @@ class PollEngine {
       runtime.serviceOnline = true;
       runtime.state = "ok";
       runtime.error = "";
+      if (runtime.authRejected) {
+        runtime.authRejected = false;
+        (_b = (_a = this.deps).authState) == null ? void 0 : _b.call(_a, config.id, false);
+      }
       await this.applySnapshot(runtime, snapshot);
     } catch (e) {
       this.handleFailure(runtime, e);
@@ -296,7 +304,7 @@ class PollEngine {
    * @param error the thrown error
    */
   handleFailure(runtime, error) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const { config } = runtime;
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof import_provider.FetchError && error.kind === "auth") {
@@ -304,11 +312,15 @@ class PollEngine {
       runtime.serviceOnline = true;
       runtime.state = "unauthorized";
       runtime.error = `Sign-in rejected \u2014 ${message}`;
+      if (!runtime.authRejected) {
+        runtime.authRejected = true;
+        (_b = (_a = this.deps).authState) == null ? void 0 : _b.call(_a, config.id, true);
+      }
       if (!runtime.authNotified) {
         runtime.authNotified = true;
         const text = `${config.name}: credentials rejected \u2014 ${message}`;
         this.deps.log.warn(text);
-        (_b = (_a = this.deps).notify) == null ? void 0 : _b.call(_a, config.name, text);
+        (_d = (_c = this.deps).notify) == null ? void 0 : _d.call(_c, config.name, text);
       }
       return;
     }
@@ -412,7 +424,7 @@ class PollEngine {
           statusStates: { offlineId: "info.unreach" }
         }
       },
-      { id: `${config.id}.info`, type: "channel", common: { name: "Info" } },
+      { id: `${config.id}.info`, type: "channel", common: { name: (0, import_i18n.tName)("nameAccountInfo") } },
       {
         // The two slots ioBroker itself provides for this — measured against
         // @iobroker/type-detector 6.0.0: `unreach` is the offline marker every
@@ -421,7 +433,7 @@ class PollEngine {
         id: `${config.id}.info.unreach`,
         type: "state",
         common: {
-          name: "AI service not reachable",
+          name: (0, import_i18n.tName)("nameUnreach"),
           type: "boolean",
           role: "indicator.maintenance.unreach",
           read: true,
@@ -434,23 +446,23 @@ class PollEngine {
         // boolean only (E1009). Validity wins, so the message rides on `text`.
         id: `${config.id}.info.error`,
         type: "state",
-        common: { name: "Last error", type: "string", role: "text", read: true, write: false }
+        common: { name: (0, import_i18n.tName)("nameLastError"), type: "string", role: "text", read: true, write: false }
       },
       {
         id: `${config.id}.info.lastUpdate`,
         type: "state",
-        common: { name: "Last successful update", type: "string", role: "date", read: true, write: false }
+        common: { name: (0, import_i18n.tName)("nameLastUpdate"), type: "string", role: "date", read: true, write: false }
       },
       {
         id: `${config.id}.warning`,
         type: "state",
-        common: { name: "Above warn threshold", type: "boolean", role: "indicator", read: true, write: false }
+        common: { name: (0, import_i18n.tName)("nameWarning"), type: "boolean", role: "indicator", read: true, write: false }
       },
       {
         id: `${config.id}.limitReached`,
         type: "state",
         common: {
-          name: "A plan-wide limit window is full",
+          name: (0, import_i18n.tName)("nameLimitReached"),
           type: "boolean",
           role: "indicator",
           read: true,
@@ -469,12 +481,12 @@ class PollEngine {
   /** The totals skeleton (channel + states). */
   async createTotalsSkeleton() {
     const defs = [
-      { id: "total.costs", type: "channel", common: { name: "Costs (USD accounts)" } },
+      { id: "total.costs", type: "channel", common: { name: (0, import_i18n.tName)("nameTotalCosts") } },
       {
         id: "total.costs.today",
         type: "state",
         common: {
-          name: "Costs today (all accounts)",
+          name: (0, import_i18n.tName)("nameTotalCostsToday"),
           type: "number",
           role: "value",
           read: true,
@@ -486,7 +498,7 @@ class PollEngine {
         id: "total.costs.month",
         type: "state",
         common: {
-          name: "Costs this month (all accounts)",
+          name: (0, import_i18n.tName)("nameTotalCostsMonth"),
           type: "number",
           role: "value",
           read: true,
@@ -498,7 +510,7 @@ class PollEngine {
         id: "total.costs.projectedMonth",
         type: "state",
         common: {
-          name: "Costs projected month-end (computed)",
+          name: (0, import_i18n.tName)("nameTotalCostsProjected"),
           type: "number",
           role: "value",
           read: true,
@@ -510,7 +522,11 @@ class PollEngine {
         id: "total.maxLimitPercent",
         type: "state",
         common: {
-          name: "Highest plan-wide utilisation of any account",
+          // NOT "plan-wide utilisation": the value is whatever speaks for an
+          // account (fullest plan-wide window OR its granted budget, see
+          // limitingWindow) — the old name promised something narrower than the
+          // number ever was.
+          name: (0, import_i18n.tName)("nameTotalMaxPercent"),
           type: "number",
           role: "value",
           read: true,
@@ -522,7 +538,7 @@ class PollEngine {
         id: "total.warningsActive",
         type: "state",
         common: {
-          name: "Accounts above their warn threshold",
+          name: (0, import_i18n.tName)("nameTotalWarnings"),
           type: "number",
           role: "value",
           read: true,
@@ -533,7 +549,7 @@ class PollEngine {
         id: "total.limitReached",
         type: "state",
         common: {
-          name: "Any plan-wide limit window full",
+          name: (0, import_i18n.tName)("nameTotalLimitReached"),
           type: "boolean",
           role: "indicator",
           read: true,
@@ -543,12 +559,12 @@ class PollEngine {
       {
         id: "total.accountsReachable",
         type: "state",
-        common: { name: "Reachable accounts", type: "number", role: "value", read: true, write: false }
+        common: { name: (0, import_i18n.tName)("nameTotalReachable"), type: "number", role: "value", read: true, write: false }
       },
       {
         id: "total.accounts",
         type: "state",
-        common: { name: "Configured accounts", type: "number", role: "value", read: true, write: false }
+        common: { name: (0, import_i18n.tName)("nameTotalAccounts"), type: "number", role: "value", read: true, write: false }
       }
     ];
     for (const def of defs) {

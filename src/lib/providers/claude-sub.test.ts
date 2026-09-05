@@ -58,9 +58,28 @@ describe("parseClaudeUsage", () => {
       five_hour: null,
     });
     expect(snapshot.limits).toEqual([
-      { name: "session", label: "Session (5 h)", percent: 34, resetAt: "2026-08-25T14:00:00Z" },
-      { name: "week", label: "Week (all models)", percent: 62, resetAt: "2026-09-01T09:00:00Z" },
-      { name: "weekly_scoped-Fable_5", label: "weekly scoped Fable 5", percent: 71, scoped: true },
+      {
+        name: "session",
+        label: "Session (5 h)",
+        labelKey: "nameWindowSession",
+        percent: 34,
+        resetAt: "2026-08-25T14:00:00Z",
+      },
+      {
+        name: "week",
+        label: "Week (all models)",
+        labelKey: "nameWindowWeek",
+        percent: 62,
+        resetAt: "2026-09-01T09:00:00Z",
+      },
+      {
+        name: "weekly_scoped-Fable_5",
+        label: "weekly scoped Fable 5",
+        labelKey: "nameWindowModelWeek",
+        labelArg: "Fable 5",
+        percent: 71,
+        scoped: true,
+      },
     ]);
   });
 
@@ -70,8 +89,14 @@ describe("parseClaudeUsage", () => {
       seven_day: { utilization: 40 },
     });
     expect(snapshot.limits).toEqual([
-      { name: "session", label: "Session (5 h)", percent: 12, resetAt: "2026-08-25T15:00:00Z" },
-      { name: "week", label: "Week (all models)", percent: 40 },
+      {
+        name: "session",
+        label: "Session (5 h)",
+        labelKey: "nameWindowSession",
+        percent: 12,
+        resetAt: "2026-08-25T15:00:00Z",
+      },
+      { name: "week", label: "Week (all models)", labelKey: "nameWindowWeek", percent: 40 },
     ]);
   });
 
@@ -143,6 +168,11 @@ describe("claudeSubProvider", () => {
     expect(calls[0].url).toBe("https://api.anthropic.com/api/oauth/usage");
     expect(calls[0].headers.Authorization).toBe("Bearer at");
     expect(calls[0].headers["anthropic-beta"]).toBe("oauth-2025-04-20");
+    // Design decision 20: the throttle bucket keys on the sender identity. Our own
+    // name landed in the aggressive bucket with permanent 429s — a regression here
+    // would be invisible in every other test.
+    expect(calls[0].headers["User-Agent"]).toMatch(/^claude-code\//);
+    expect(calls[0].headers["User-Agent"]).not.toContain("ioBroker");
     expect(snapshot.limits?.[0].percent).toBe(5);
   });
 

@@ -90,6 +90,10 @@ function parseGeminiQuota(body) {
     const window = {
       name,
       label: model || kind || "Quota",
+      // Google names every bucket after a model — the model is the foreign part,
+      // the frame around it is translated.
+      labelKey: "nameWindowQuota",
+      labelArg: model || kind || "",
       percent: Math.round((1 - Math.min(Math.max(fraction, 0), 1)) * 1e3) / 10,
       scoped: true
     };

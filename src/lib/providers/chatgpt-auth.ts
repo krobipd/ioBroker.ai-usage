@@ -16,6 +16,33 @@ export const CHATGPT_OAUTH = {
   fallbackLifetimeMs: 60 * 60_000,
 } as const;
 
+/**
+ * The identity every call to the ChatGPT backend carries — the same rule that made
+ * the Claude query identify as claude-code (design decision 20), applied here.
+ *
+ * Source-verified in openai/codex, `codex-rs/login/src/auth/default_client.rs`:
+ * `DEFAULT_ORIGINATOR = "codex_cli_rs"`, and `default_headers()` sets BOTH the
+ * `originator` header and a User-Agent built as
+ * `"{originator}/{version} ({os} {release}; {arch}) {terminal}"` on EVERY outgoing
+ * request. The backend gates these routes on the originator (whitelist:
+ * `codex_cli_rs`, `codex_vscode`, `codex_sdk_ts`, or anything starting with
+ * `Codex`) — a wrong or missing one is answered with 403.
+ *
+ * Before 0.11.0 the usage call sent `User-Agent: ioBroker.ai-usage` and no
+ * originator at all, while the reset-credit call on the SAME route announced itself
+ * as `Codex Desktop`: one request claiming two identities, and the main call
+ * carrying none of them. Both calls now carry this one identity.
+ *
+ * Version = the npm release of `@openai/codex` current when this was written; like
+ * the Claude bucket, the gate keys on the product name, not the exact number. The
+ * OS/terminal part of the real format is deliberately left out — we are not a
+ * terminal, and inventing one would be a lie in a header, not a compatibility gain.
+ */
+export const CHATGPT_IDENTITY = {
+  originator: "codex_cli_rs",
+  userAgent: "codex_cli_rs/0.153.2",
+} as const;
+
 /** A JSON POST seam (injected so the modules stay testable). */
 export type JsonPost = (
   url: string,

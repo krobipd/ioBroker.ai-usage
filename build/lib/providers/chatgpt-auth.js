@@ -18,6 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var chatgpt_auth_exports = {};
 __export(chatgpt_auth_exports, {
+  CHATGPT_IDENTITY: () => CHATGPT_IDENTITY,
   CHATGPT_OAUTH: () => CHATGPT_OAUTH,
   exchangeDeviceCode: () => exchangeDeviceCode,
   pollDeviceCode: () => pollDeviceCode,
@@ -39,6 +40,10 @@ const CHATGPT_OAUTH = {
   windowMs: 15 * 6e4,
   /** Fallback lifetime when the access token carries no expiry. */
   fallbackLifetimeMs: 60 * 6e4
+};
+const CHATGPT_IDENTITY = {
+  originator: "codex_cli_rs",
+  userAgent: "codex_cli_rs/0.153.2"
 };
 function str(body, key) {
   if (typeof body !== "object" || body === null) {
@@ -116,6 +121,7 @@ function toTokenSet(body, now, previousRefresh, previousAccount) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  CHATGPT_IDENTITY,
   CHATGPT_OAUTH,
   exchangeDeviceCode,
   pollDeviceCode,

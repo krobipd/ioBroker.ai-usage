@@ -20,6 +20,7 @@ subscriptions plus OpenRouter, DeepSeek, OpenAI and Anthropic API accounts. Need
 - **Central credentials** — API keys come from the admin's credential storage, shared with the admin AI assistant
 - **Online status** — the connection icon you know from every device, plus the reason in plain text
 - **Read-only** — the adapter only reads; it never calls or configures an AI service
+- **Object names in eleven languages** — the tree reads in your ioBroker language, not just English
 - **Throttle-safe** — a minimum interval and automatic backoff keep the provider from locking your account
 
 ---
@@ -36,7 +37,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 - Node.js >= 22
 - ioBroker js-controller >= 7.2.2
-- **ioBroker Admin >= 8.0.1** — the adapter uses the admin's central credential storage
+- **ioBroker Admin >= 8.0.11** — the adapter uses the admin's central credential storage
 
 ---
 
@@ -44,23 +45,23 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 The instance settings show one list of AI accounts. Switch on what you want to monitor.
 
-| Account | How it is connected |
-|---------|---------------------|
-| **[Claude](https://claude.ai) subscription** | Open the sign-in page, log in, copy the code shown there and paste it back |
-| **[ChatGPT](https://chatgpt.com) subscription** | The adapter shows a short code; type it on the OpenAI page it links to. The settings page notices by itself. Your Codex CLI session is not touched |
-| **[Google Gemini](https://gemini.google.com) subscription** | Open the sign-in page and log in. Google sends the result to `localhost`, so **your browser shows an error page — that is expected**. Copy the **whole address** from the address bar and paste it back |
-| **[OpenRouter](https://openrouter.ai), [DeepSeek](https://www.deepseek.com)** | Pick the stored key from the admin's credential storage |
-| **[OpenAI](https://openai.com), [Anthropic](https://www.anthropic.com)** | Needs an **admin key** of your organisation, not the key the admin assistant uses. A personal account without an organisation cannot deliver these reports at all — use the Claude subscription instead |
+| Account                                                                       | How it is connected                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[Claude](https://claude.ai) subscription**                                  | Open the sign-in page, log in, copy the code shown there and paste it back                                                                                                                              |
+| **[ChatGPT](https://chatgpt.com) subscription**                               | The adapter shows a short code; type it on the OpenAI page it links to. The settings page notices by itself. Your Codex CLI session is not touched                                                      |
+| **[Google Gemini](https://gemini.google.com) subscription**                   | Open the sign-in page and log in. Google sends the result to `localhost`, so **your browser shows an error page — that is expected**. Copy the **whole address** from the address bar and paste it back |
+| **[OpenRouter](https://openrouter.ai), [DeepSeek](https://www.deepseek.com)** | Pick the stored key from the admin's credential storage                                                                                                                                                 |
+| **[OpenAI](https://openai.com), [Anthropic](https://www.anthropic.com)**      | Needs an **admin key** of your organisation, not the key the admin assistant uses. A personal account without an organisation cannot deliver these reports at all — use the Claude subscription instead |
 
 The three subscription endpoints are **not officially documented**; they are the ones those
 providers' own tools use and can change without notice. Claude was tested against a live
 subscription, ChatGPT and Google could not be — please open an issue if something looks wrong.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| **Warn at %** | Per account: one notification when a plan-wide limit window crosses this utilisation | 80 |
-| **Poll interval** | How often each account is queried, 60–3600 seconds. The floor keeps the provider from throttling you | 300 |
-| **Notifications** | One notification on threshold crossing or broken credentials | on |
+| Option            | Description                                                                                          | Default |
+| ----------------- | ---------------------------------------------------------------------------------------------------- | ------- |
+| **Warn at %**     | Per account: one notification when a plan-wide limit window crosses this utilisation                 | 80      |
+| **Poll interval** | How often each account is queried, 60–3600 seconds. The floor keeps the provider from throttling you | 300     |
+| **Notifications** | One notification on threshold crossing or broken credentials                                         | on      |
 
 ---
 
@@ -71,14 +72,14 @@ ai-usage.0.
 ├── info.connection            — at least one account is delivering data (bool)
 ├── total.                     — totals across all accounts
 │   ├── costs.today/month/…    — summed real money (same currency only)
-│   ├── maxLimitPercent        — highest plan-wide utilisation of any account
+│   ├── maxLimitPercent        — highest utilisation of any account (limit window or budget)
 │   ├── warningsActive         — accounts above their threshold
-│   ├── limitReached           — a plan-wide window is full (automation trigger)
+│   ├── limitReached           — an account is at 100 % (automation trigger)
 │   ├── accountsReachable      — accounts currently delivering data
 │   └── accounts               — configured accounts
 ├── claude / chatgpt / gemini  — one node per subscription
 │   ├── warning                — this account is above its warn threshold (bool)
-│   ├── limitReached           — a plan-wide window of this account is full (bool)
+│   ├── limitReached           — this account is at 100 % (bool)
 │   ├── info.unreach           — account is not delivering (bool) — drives the connection icon
 │   ├── info.error             — why there is no data; empty while all is well, "Unknown" while the adapter itself has nothing to report
 │   ├── info.lastUpdate        — time of the last successful read
@@ -88,7 +89,8 @@ ai-usage.0.
     ├── warning / limitReached — same triggers as above
     ├── info.*                 — same three status states as above
     ├── credits.* / costs.*    — granted budget and real money
-    └── tokens.*               — token counters
+    ├── tokens.*               — token counters
+    └── models.<model>.*        — tokens and costs per model, where the report carries them
 ```
 
 Only what an account's source actually delivers is created — and once created, a datapoint stays:
@@ -107,11 +109,16 @@ than none. Google reports no plan-wide window at all, so there the fullest model
 the account and the warning names that model. To watch one model anyway, build the automation on
 its own `limits.<window>.percent`.
 
+**A nearly spent budget counts the same way.** Where a provider reports a granted budget, it
+competes with the time windows and the higher of the two speaks for the account — money that is
+gone blocks it just as hard as a full window. The warning says which of the two it is.
+
 ---
 
 ## Troubleshooting
 
 ### An account delivers no data
+
 Read `info.error` — it names the cause. A rejected sign-in means signing in again in the settings,
 or that the key is not an organisation admin key. A service fault or a missing connection is
 outside your instance and clears up by itself. The log states the same reason once.
@@ -120,8 +127,14 @@ outside your instance and clears up by itself. The log states the same reason on
 started and has not asked yet.
 
 ### A subscription says "not signed in" although you just signed in
+
 Save the settings first, then sign in — the row needs a saved account to attach the sign-in to.
 After a successful sign-in the account is queried immediately, so values appear within seconds.
+
+### A subscription asks you to sign in again although it worked yesterday
+
+The provider rejected the stored sign-in — a refresh token that was revoked or expired. The row says
+so instead of pretending to be connected; signing in again is all it takes.
 
 ---
 
@@ -131,6 +144,19 @@ After a successful sign-in the account is queried immediately, so values appear 
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+
+### **WORK IN PROGRESS**
+
+- Fixed: Signing in from the instance settings works again — a leftover setting from an earlier version had silently closed the adapter's message channel, so none of the three flows reached it
+- Fixed: A subscription whose stored sign-in was rejected no longer claims to be signed in — the row now offers the sign-in again instead of showing a green check next to an error
+- Fixed: The status badge of an account no longer blanks out for a moment when a single status read is missed — a hiccup in the settings page is not an account without a status
+- Fixed: A stored credential whose name sorts high in the alphabet is no longer missing from the account list in the instance settings
+- Fixed: The settings page falls back to English for a browser language the adapter does not ship, instead of passing that language on unchecked
+- Improved: All object names are now available in eleven languages instead of English only, and a renamed object reaches installations that already exist
+- Improved: ChatGPT usage is read with the identity that endpoint expects, the way the Claude query already did — fewer rejected requests on that account
+- Improved: Monthly cost reports can no longer be cut short in silence — a report that does not fit is reported in the log instead of producing a figure that is too low
+- Changed: "Highest account utilisation" says what it always measured — the fullest limit window **or** the account's remaining budget
+
 ### 0.10.0 (2026-09-01)
 
 - Fixed: The reset-time datapoint of a limit window no longer disappears and reappears — it stays and simply empties while no window is running
@@ -199,4 +225,4 @@ SOFTWARE.
 
 ---
 
-*Developed with assistance from Claude.ai*
+_Developed with assistance from Claude.ai_

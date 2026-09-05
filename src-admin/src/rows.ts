@@ -1,3 +1,23 @@
+/** The eleven languages this adapter ships — the i18n files under `src/i18n/`. */
+const SUPPORTED_LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"] as const;
+
+/**
+ * Pick the shipped language closest to what the browser reports.
+ *
+ * The browser can report anything (`sv-SE`, `cs`, an empty string); handing that
+ * straight to `setLanguage` used to compile only because a type suppression turned
+ * the whole expression into `any` — it was never checked against what we actually
+ * ship. Anything we do not have falls back to English.
+ *
+ * @param reported what `navigator.language` says
+ * @returns one of the shipped languages
+ */
+export function supportedLanguage(reported: string | undefined): ioBroker.Languages {
+  const lower = (reported || "en").toLowerCase();
+  const candidate = lower.startsWith("zh") ? "zh-cn" : lower.substring(0, 2);
+  return (SUPPORTED_LANGUAGES as readonly string[]).includes(candidate) ? (candidate as ioBroker.Languages) : "en";
+}
+
 /** One row of the adapter's `native.accounts` (kept compatible with the backend parser). */
 export interface AccountRow {
   name: string;

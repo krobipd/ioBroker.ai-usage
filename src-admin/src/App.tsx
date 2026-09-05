@@ -6,6 +6,7 @@ import { Box } from "@mui/material";
 import { GenericApp, I18n, Loader, type GenericAppProps, type GenericAppState } from "@iobroker/gui-components";
 
 import ConfigPanel from "./ConfigPanel";
+import { supportedLanguage } from "./rows";
 
 import enLocal from "./i18n/en.json";
 import deLocal from "./i18n/de.json";
@@ -49,9 +50,7 @@ class App extends GenericApp<GenericAppProps, AppState> {
     for (const [lang, dict] of Object.entries(translations)) {
       I18n.extendTranslations(dict, lang as ioBroker.Languages);
     }
-    // @ts-expect-error userLanguage could exist
-    const browserLang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
-    I18n.setLanguage(browserLang.startsWith("zh") ? "zh-cn" : browserLang.substring(0, 2));
+    I18n.setLanguage(supportedLanguage(navigator.language));
   }
 
   render(): React.JSX.Element {

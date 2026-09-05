@@ -83,15 +83,21 @@ interface Internals {
   signOut(provider: string): Promise<unknown>;
   startSignIn(provider: string): Promise<unknown>;
   submitSignIn(provider: string, message: unknown): Promise<{ status: string; reason?: string }>;
-  signInState(provider: string): Promise<{ status: string }>;
+  signInState(provider: string): Promise<{ status: string; reason?: string }>;
+  finishSignIn(provider: string, tokens: TokenSet): Promise<void>;
   onMessage(obj: unknown): Promise<void>;
   removeRetiredStates(accounts: { id: string }[]): Promise<number>;
   clearStopInstanceFlag(): Promise<boolean>;
+  loadTranslations(): void;
+  refreshManifestObjects(): Promise<void>;
   cleanupStaleObjects(): Promise<void>;
   snapshotExistingStates(): Promise<void>;
+  countUpsert(id: string): void;
+  logDatapointBalance(): void;
   knownStateIds: Set<string>;
   attempts: Map<string, unknown>;
   signInErrors: Map<string, string>;
+  rejectedTokens: Set<string>;
   onUnload(cb: () => void): void;
 }
 
@@ -194,6 +200,47 @@ describe("sign-in flow", () => {
     expect(internals(adapter).signInErrors.has("claude-sub")).toBe(false);
   });
 
+  test("a rejected sign-in is NOT reported as signed in, even with tokens on disk", async () => {
+    // The inverse of the 2026-09-01 bug: a revoked refresh token leaves the file in
+    // place, so "the store has something" used to read as "signed in" — a green check
+    // next to an amber "Sign-in rejected" badge.
+    const adapter = makeAdapter();
+    await internals(adapter).tokenStore("claude-sub").save(tokens);
+    expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-in");
+
+    internals(adapter).rejectedTokens.add("claude-sub");
+    internals(adapter).signInErrors.set("claude-sub", "HTTP 401");
+    const state = await internals(adapter).signInState("claude-sub");
+    expect(state.status).toBe("failed");
+    expect(state.reason).toBe("HTTP 401");
+    // The file stays: a provider hiccup must not sign the user out behind their back.
+    expect(await internals(adapter).tokenStore("claude-sub").load()).not.toBeNull();
+  });
+
+  test("a rejected sign-in without a remembered reason still says what to do", async () => {
+    const adapter = makeAdapter();
+    await internals(adapter).tokenStore("claude-sub").save(tokens);
+    internals(adapter).rejectedTokens.add("claude-sub");
+    const state = await internals(adapter).signInState("claude-sub");
+    expect(state.status).toBe("failed");
+    expect(state.reason).toContain("sign in again");
+  });
+
+  test("starting, finishing or signing out clears the rejection", async () => {
+    const adapter = makeAdapter();
+    internals(adapter).rejectedTokens.add("claude-sub");
+    await internals(adapter).startSignIn("claude-sub");
+    expect(internals(adapter).rejectedTokens.has("claude-sub")).toBe(false);
+
+    internals(adapter).rejectedTokens.add("claude-sub");
+    await internals(adapter).finishSignIn("claude-sub", tokens);
+    expect(internals(adapter).rejectedTokens.has("claude-sub")).toBe(false);
+
+    internals(adapter).rejectedTokens.add("claude-sub");
+    await internals(adapter).signOut("claude-sub");
+    expect(internals(adapter).rejectedTokens.has("claude-sub")).toBe(false);
+  });
+
   test("every message is answered, including an unknown one", async () => {
     const adapter = makeAdapter();
     const answers: unknown[] = [];
@@ -210,8 +257,8 @@ describe("sign-in flow", () => {
   });
 });
 
-describe("the leftover stopInstance flag", () => {
-  test("a flag still set in the instance object is cleared once", async () => {
+describe("the leftover supportedMessages key", () => {
+  test("a flag still set in the instance object is removed, not overwritten", async () => {
     // The entry lives in the manifest AND as a copy in the database; an update merges,
     // it never removes. Without this the whole shutdown path stays dead on every
     // installation that once ran a version carrying it.
@@ -226,13 +273,71 @@ describe("the leftover stopInstance flag", () => {
 
     await internals(adapter).clearStopInstanceFlag();
 
+    // `null` DELETES the key. Writing `{ stopInstance: false }` would leave an object
+    // behind, and the key is a positive list: an object without a value other than
+    // false shuts the message box, so no `sendTo` ever reaches the adapter again.
     expect(extend).toHaveBeenCalledWith("system.adapter.ai-usage.0", {
-      common: { supportedMessages: { stopInstance: false } },
+      common: { supportedMessages: null },
     });
     expect(adapter.log.info).toHaveBeenCalledWith(expect.stringContaining("restarts once"));
   });
 
-  test("nothing is written when the flag is already gone", async () => {
+  test("the half-correction of 0.9.2 is repaired too", async () => {
+    // The live state on krobi's server (2026-09-04): the old code wrote this itself and
+    // its guard read `stopInstance`, so it never looked at its own result again. The
+    // message box stayed shut for good. The trigger is the KEY, not the value.
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(() =>
+      Promise.resolve({
+        common: { supportedMessages: { stopInstance: false } },
+      }),
+    ) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(() => Promise.resolve({}));
+    adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
+
+    await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(true);
+
+    expect(extend).toHaveBeenCalledWith("system.adapter.ai-usage.0", {
+      common: { supportedMessages: null },
+    });
+  });
+
+  test("an empty supportedMessages object is removed as well", async () => {
+    // Same class: an object with no entry at all is still an object, and still shuts
+    // the message box.
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(() =>
+      Promise.resolve({ common: { supportedMessages: {} } }),
+    ) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(() => Promise.resolve({}));
+    adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
+
+    await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(true);
+
+    expect(extend).toHaveBeenCalledWith("system.adapter.ai-usage.0", {
+      common: { supportedMessages: null },
+    });
+  });
+
+  test("a list whose only entry is stopInstance loses the whole key", async () => {
+    // Removing just the entry would leave an EMPTY positive list — which shuts the
+    // message box exactly the same way. This adapter never declares the key at all,
+    // so the whole thing goes.
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(() =>
+      Promise.resolve({ common: { supportedMessages: { stopInstance: true } } }),
+    ) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(() => Promise.resolve({}));
+    adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
+
+    await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(true);
+
+    expect(extend).toHaveBeenCalledWith("system.adapter.ai-usage.0", {
+      common: { supportedMessages: null },
+    });
+  });
+
+  test("nothing is written when the key is already gone", async () => {
     // Otherwise every single start would rewrite the instance object, and every write
     // makes the host restart the instance — a loop.
     const adapter = makeAdapter();
@@ -273,6 +378,21 @@ describe("the leftover stopInstance flag", () => {
     expect(adapter.setState).not.toHaveBeenCalled();
   });
 
+  test("a null in the instance object counts as gone", async () => {
+    // js-controller stores the deletion as `null`, and that must not read as "the key
+    // exists" — otherwise every start would rewrite the object and restart the instance.
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(() =>
+      Promise.resolve({ common: { supportedMessages: null } }),
+    ) as unknown as typeof adapter.getForeignObjectAsync;
+    const extend = vi.fn(() => Promise.resolve({}));
+    adapter.extendForeignObjectAsync = extend as unknown as typeof adapter.extendForeignObjectAsync;
+
+    await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(false);
+
+    expect(extend).not.toHaveBeenCalled();
+  });
+
   test("without a correction the startup carries on as usual", async () => {
     const adapter = makeAdapter();
     adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
@@ -294,6 +414,39 @@ describe("the leftover stopInstance flag", () => {
     });
     // Kein Abbruch des Starts, wenn die Objekt-Datenbank nicht antwortet.
     await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(false);
+  });
+});
+
+describe("manifest objects reach an existing installation", () => {
+  test("info, info.connection and total are refreshed with their translated texts", async () => {
+    // js-controller applies instanceObjects with `preserve` on common.name: without
+    // this refresh a renamed object reaches NEW installations only, while every
+    // existing tree keeps the old text and the manifest looks correct.
+    const adapter = makeAdapter();
+    const extended: { id: string; obj: { common?: { name?: unknown; desc?: unknown } } }[] = [];
+    adapter.extendObject = vi.fn((id: string, obj: unknown) => {
+      extended.push({ id, obj: obj as { common?: { name?: unknown } } });
+      return Promise.resolve({});
+    }) as unknown as typeof adapter.extendObject;
+
+    internals(adapter).loadTranslations();
+    await internals(adapter).refreshManifestObjects();
+
+    expect(extended.map(entry => entry.id)).toEqual(["info", "info.connection", "total"]);
+    // Full translation objects, not a resolved language.
+    const connection = extended[1].obj.common?.name as Record<string, string>;
+    expect(connection.en).toBe("At least one account reachable");
+    expect(Object.keys(connection).length).toBe(11);
+    // Only the connection has something to explain — the two containers stay empty.
+    expect(extended[1].obj.common?.desc).toBeDefined();
+    expect(extended[0].obj.common?.desc).toBeUndefined();
+    expect(extended[2].obj.common?.desc).toBeUndefined();
+  });
+
+  test("a failing refresh never stops the startup", async () => {
+    const adapter = makeAdapter();
+    adapter.extendObject = vi.fn(() => Promise.reject(new Error("objects db down")));
+    await expect(internals(adapter).refreshManifestObjects()).resolves.toBeUndefined();
   });
 });
 
@@ -335,6 +488,51 @@ describe("object housekeeping", () => {
     await internals(adapter).cleanupStaleObjects();
     expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
     expect(adapter.delObjectAsync).toHaveBeenCalledWith("old-api", { recursive: true });
+  });
+
+  test("a plain restart reports NOTHING — the whole point of the startup snapshot", async () => {
+    // The create path runs extendObject over EVERY state once per process, also over
+    // states that were already there. Counting "the create path touched it" would
+    // report the entire tree as new after every restart and turn the line into noise.
+    const adapter = makeAdapter();
+    adapter.getObjectViewAsync = vi.fn(() =>
+      Promise.resolve({
+        rows: [{ id: "ai-usage.0.claude.warning" }, { id: "ai-usage.0.claude.limits.week.percent" }],
+      }),
+    ) as unknown as typeof adapter.getObjectViewAsync;
+    await internals(adapter).snapshotExistingStates();
+
+    // The engine upserts both existing states again, as it does on every start.
+    for (const id of ["claude.warning", "claude.limits.week.percent"]) {
+      internals(adapter).countUpsert(id);
+    }
+    internals(adapter).logDatapointBalance();
+    expect(adapter.log.info).not.toHaveBeenCalled();
+  });
+
+  test("only what the snapshot did not hold counts as new", async () => {
+    const adapter = makeAdapter();
+    adapter.getObjectViewAsync = vi.fn(() =>
+      Promise.resolve({ rows: [{ id: "ai-usage.0.claude.warning" }] }),
+    ) as unknown as typeof adapter.getObjectViewAsync;
+    await internals(adapter).snapshotExistingStates();
+
+    internals(adapter).countUpsert("claude.warning"); // already there
+    internals(adapter).countUpsert("claude.limits.session.percent"); // new
+    internals(adapter).countUpsert("claude.limits.session.resetAt"); // new
+    internals(adapter).logDatapointBalance();
+
+    expect(adapter.log.info).toHaveBeenCalledWith("Object tree updated: created 2 datapoint(s)");
+  });
+
+  test("the balance is written once, not once per account", async () => {
+    const adapter = makeAdapter();
+    adapter.getObjectViewAsync = vi.fn(() => Promise.resolve({ rows: [] }));
+    await internals(adapter).snapshotExistingStates();
+    internals(adapter).countUpsert("claude.warning");
+    internals(adapter).logDatapointBalance();
+    internals(adapter).logDatapointBalance();
+    expect(adapter.log.info).toHaveBeenCalledTimes(1);
   });
 
   test("the startup snapshot records the existing ids without the instance prefix", async () => {

@@ -22,11 +22,15 @@ export interface Totals {
   costsProjectedMonth: number;
   /** The currency the sums are in. */
   currency: string;
-  /** The highest PLAN-WIDE limit utilisation of any account (percent); model-scoped windows stay out. */
+  /**
+   * The highest utilisation of any account (percent) — per account the fullest
+   * plan-wide window or its granted budget, whichever is higher. Model-scoped
+   * windows stay out unless an account has nothing else (Google).
+   */
   maxLimitPercent: number;
   /** Number of accounts above their warn threshold. */
   warningsActive: number;
-  /** True when any plan-wide limit window is full (>= 100 %). */
+  /** True when any account reached 100 % — on its limit window or on its budget. */
   limitReached: boolean;
   /** Reachable accounts. */
   accountsReachable: number;

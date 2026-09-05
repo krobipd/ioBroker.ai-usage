@@ -7,7 +7,7 @@ import {
   type UsageProvider,
   type UsageSnapshot,
 } from "../provider";
-import { CHATGPT_OAUTH, refreshChatgptTokens, type JsonPost } from "./chatgpt-auth";
+import { CHATGPT_IDENTITY, CHATGPT_OAUTH, refreshChatgptTokens, type JsonPost } from "./chatgpt-auth";
 
 /** Where the subscription usage lives (the endpoint OpenAI's own Codex client uses). */
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
@@ -30,10 +30,18 @@ export const CHATGPT_RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/r
  *
  * @param raw the window object
  * @param name the object id segment
- * @param label the human-readable label
+ * @param label the English label for log lines
+ * @param labelKey i18n key for the translated object name
+ * @param labelArg the provider-named part substituted into that key, where there is one
  * @returns the window, or undefined when unusable
  */
-function readWindow(raw: unknown, name: string, label: string): LimitWindow | undefined {
+function readWindow(
+  raw: unknown,
+  name: string,
+  label: string,
+  labelKey: string,
+  labelArg?: string,
+): LimitWindow | undefined {
   if (typeof raw !== "object" || raw === null) {
     return undefined;
   }
@@ -42,7 +50,10 @@ function readWindow(raw: unknown, name: string, label: string): LimitWindow | un
   if (!Number.isFinite(percent)) {
     return undefined;
   }
-  const window: LimitWindow = { name, label, percent };
+  const window: LimitWindow = { name, label, percent, labelKey };
+  if (labelArg !== undefined) {
+    window.labelArg = labelArg;
+  }
   const resetAt = Number(entry.reset_at);
   if (Number.isFinite(resetAt) && resetAt > 0) {
     const ms = resetAt > 1e12 ? resetAt : resetAt * 1000;
@@ -70,8 +81,8 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
   const raw = body as Record<string, unknown>;
   const limits: LimitWindow[] = [];
   const rateLimit = (raw.rate_limit ?? {}) as Record<string, unknown>;
-  const session = readWindow(rateLimit.primary_window, "session", "Session (5 h)");
-  const week = readWindow(rateLimit.secondary_window, "week", "Week");
+  const session = readWindow(rateLimit.primary_window, "session", "Session (5 h)", "nameWindowSession");
+  const week = readWindow(rateLimit.secondary_window, "week", "Week", "nameWindowWeekShort");
   if (session) {
     limits.push(session);
   }
@@ -94,7 +105,8 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
     if (!name || limits.some(window => window.name === name)) {
       continue;
     }
-    const window = readWindow(entry.rate_limit, name, label);
+    // The provider named this one — it rides in as the `%s` of a translated frame.
+    const window = readWindow(entry.rate_limit, name, label, "nameWindowOther", label);
     if (window) {
       // These sit next to the plan-wide session/week windows and cover one model
       // each — reported, but never the reason for a warning (LimitWindow.scoped).
@@ -192,7 +204,11 @@ export function chatgptSubProvider(
       }
       const headers: Record<string, string> = {
         Authorization: `Bearer ${tokens.accessToken}`,
-        "User-Agent": "ioBroker.ai-usage",
+        // The Codex identity, NOT our own name — see CHATGPT_IDENTITY: the backend
+        // gates these routes on the originator, and the second call below already
+        // announced itself as a Codex client while this one did not.
+        "User-Agent": CHATGPT_IDENTITY.userAgent,
+        originator: CHATGPT_IDENTITY.originator,
       };
       // Only send the account id when we have one — an empty header is rejected.
       if (tokens.accountRef) {
@@ -207,9 +223,8 @@ export function chatgptSubProvider(
         const vouchers = parseChatgptResetCredits(
           await fetchJson(CHATGPT_RESET_CREDITS_URL, {
             ...headers,
-            // What OpenAI's own desktop client sends on this route (CodexBar-verified).
+            // Route-specific extra on top of the shared identity (CodexBar-verified).
             "OpenAI-Beta": "codex-1",
-            originator: "Codex Desktop",
           }),
           now(),
         );
@@ -225,4 +240,4 @@ export function chatgptSubProvider(
   };
 }
 
-export { CHATGPT_OAUTH };
+export { CHATGPT_IDENTITY, CHATGPT_OAUTH };

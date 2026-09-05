@@ -8,7 +8,7 @@ describe("computeTotals", () => {
           reachable: true,
           warning: true,
           snapshot: {
-            limits: [{ name: "week", label: "Week", percent: 82 }],
+            limits: [{ name: "week", label: "Week", labelKey: "nameWindowSession", percent: 82 }],
             costs: { month: 3.2, currency: "USD" },
           },
         },
@@ -34,7 +34,13 @@ describe("computeTotals", () => {
 
   test("a full window flips limitReached", () => {
     const totals = computeTotals(
-      [{ reachable: true, warning: true, snapshot: { limits: [{ name: "s", label: "S", percent: 100 }] } }],
+      [
+        {
+          reachable: true,
+          warning: true,
+          snapshot: { limits: [{ name: "s", label: "S", labelKey: "nameWindowSession", percent: 100 }] },
+        },
+      ],
       1,
     );
     expect(totals.limitReached).toBe(true);

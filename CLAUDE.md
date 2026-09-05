@@ -50,6 +50,8 @@ src/lib/snapshot-tree.ts       → Snapshot → Objekt-Definitionen + Werte (cap
 src/lib/totals.ts              → total.* aus den Snapshots im Speicher
 src/lib/pure-helpers.ts        → Konten-Tabelle parsen (API-Boundary), sanitizeId, Konto-Kennung,
                                  round2/finiteNumber (von allen Anbieter-Modulen benutzt)
+src/lib/i18n.ts                → Objektnamen als Übersetzungsobjekt aus `admin/i18n/<lang>.json`
+                                 (`tName`), bewusst OHNE adapter-core — s. Entscheidung 23
 src/types/adapter-config.d.ts  → native-Typen
 src-admin/                     → React-Konfig-Panel (Module-Federation, Admin-8-only, guiApi 2):
                                  EINE Liste — 3 Abo-Zeilen + je eine Zeile pro gespeichertem
@@ -67,7 +69,7 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
 
 1. **Admin-8-only** (krobi 2026-08-25): Schlüssel-Konten über den zentralen Zugangsdaten-Speicher
    (`system.credentials.*`, Lese-Helfer in adapter-core) — keine eigenen Schlüsselfelder.
-   `globalDependencies admin >= 8.0.1`.
+   `globalDependencies admin >= 8.0.11` (folgt dem ioBroker-Stable-Stand).
 2. **DREI Zugangs-Wege, weil die Anbieter drei verschiedene erzwingen** (Recherche 2026-08-26,
    Belege in `Ressourcen/ai-usage/`): Claude = Code einfügen · ChatGPT = Geräte-Code eintippen,
    Adapter pollt selbst · Gemini = Adresszeile der Fehlerseite einfügen (GEMESSEN: Googles
@@ -174,28 +176,28 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
 19. **Offline-Kennzeichnung an DREI Stellen** (0.9.0, live gemessen — allgemeine Regel jetzt in
     `Entwicklung/CLAUDE_CODING.md`):
     a) **Kein `supportedMessages.stopInstance` im Manifest.** Mit dem Eintrag beendet der Host den
-       Prozess bedingungslos hart, `onUnload` läuft NIE — jeder Abschalt-Schreibvorgang war toter
-       Code, auch das `info.connection` seit 0.1.0. Ein Test nagelt fest, dass der Eintrag draußen
-       bleibt; es ist eine Manifest-Eigenschaft, die kein Code verteidigen kann.
+    Prozess bedingungslos hart, `onUnload` läuft NIE — jeder Abschalt-Schreibvorgang war toter
+    Code, auch das `info.connection` seit 0.1.0. Ein Test nagelt fest, dass der Eintrag draußen
+    bleibt; es ist eine Manifest-Eigenschaft, die kein Code verteidigen kann.
     a2) **`clearStopInstanceFlag()` ganz am Anfang von `onReady`** (0.9.2/0.9.3): der Eintrag lebt
-       als Kopie im Instanzobjekt weiter und überlebt jedes Update — ohne diese Einmal-Korrektur
-       war (a) auf bestehenden Installationen wirkungslos. Nur bei gesetztem Feld schreiben (sonst
-       Neustart-Schleife, jede Objekt-Änderung startet die Instanz neu) und den Start danach SOFORT
-       verlassen (sonst Zeitgeber-Warnung im Protokoll). Vorbild: public-holidays.
+    als Kopie im Instanzobjekt weiter und überlebt jedes Update — ohne diese Einmal-Korrektur
+    war (a) auf bestehenden Installationen wirkungslos. Nur bei gesetztem Feld schreiben (sonst
+    Neustart-Schleife, jede Objekt-Änderung startet die Instanz neu) und den Start danach SOFORT
+    verlassen (sonst Zeitgeber-Warnung im Protokoll). Vorbild: public-holidays.
     b) **`onUnload` meldet erst nach den Schreibvorgängen fertig** (`.finally(callback)`) —
-       fire-and-forget kommt nicht an. `markAllOffline()` schreibt `info.unreach`, `info.error`,
-       `total.accountsReachable` und `info.connection`; dauert ~100 ms, Frist des Hosts ist 1 s.
-       Keine eigene Notbremse: die Adapter-Zeitschaltung verweigert beim Beenden, eine nackte
-       meldet der Prüfbot (E5005).
+    fire-and-forget kommt nicht an. `markAllOffline()` schreibt `info.unreach`, `info.error`,
+    `total.accountsReachable` und `info.connection`; dauert ~100 ms, Frist des Hosts ist 1 s.
+    Keine eigene Notbremse: die Adapter-Zeitschaltung verweigert beim Beenden, eine nackte
+    meldet der Prüfbot (E5005).
     c) **Start-Stempel im Skelett-Aufbau** — jedes Konto steht auf „liefert nicht", bis die erste
-       Antwort da ist. Der tragende Teil: Absturz, Stromausfall und harter Abschuss lassen keinen
-       Abschalt-Code laufen. nut2 macht dasselbe mit `markAllUnreachable()`.
+    Antwort da ist. Der tragende Teil: Absturz, Stromausfall und harter Abschuss lassen keinen
+    Abschalt-Code laufen. nut2 macht dasselbe mit `markAllUnreachable()`.
     d) **Der Grund-Text ist `REASON_UNKNOWN` = `Unknown`** (0.9.1, krobi-Vorgabe: „da muss eine rote
-       linie her in allen adaptern") — an EINER Stelle definiert, benutzt beim Start und beim
-       Beenden. Leer im Normalbetrieb, sonst der Text des Anbieters. Vorher stand dort ein Satz,
-       den ich mir ausgedacht hatte („The adapter is stopped — nothing is being read"); der
-       angehängte Halbsatz war die Rechtfertigung, an der krobi sich gestoßen hat. Ein Gate im
-       Konsistenz-Audit fängt jeden adapter-eigenen Wortlaut.
+    linie her in allen adaptern") — an EINER Stelle definiert, benutzt beim Start und beim
+    Beenden. Leer im Normalbetrieb, sonst der Text des Anbieters. Vorher stand dort ein Satz,
+    den ich mir ausgedacht hatte („The adapter is stopped — nothing is being read"); der
+    angehängte Halbsatz war die Rechtfertigung, an der krobi sich gestoßen hat. Ein Gate im
+    Konsistenz-Audit fängt jeden adapter-eigenen Wortlaut.
 20. **Die Claude-Abfrage meldet sich als claude-code** (0.10.0): der Drossel-Eimer des
     Abfrage-Endpunkts hängt an der Absender-Kennung — dreifach community-gemessen
     (Claude-Code-Usage-Monitor #202, claude-code #31021/#31637): claude-code-Kennung = großzügiger
@@ -208,6 +210,59 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     die ankam, aber nicht unserem Schema entspricht, heißt „der Dienst hat geantwortet und ist
     defekt" — vorher lief sie als „keine Verbindung" mit drei tolerierten Versuchen und versteckte
     einen echten Dienst-Defekt hinter der falschen Anzeige (alle fünf Parser betroffen).
+22. **`supportedMessages` wird GELÖSCHT, ausgelöst vom bloßen Vorhandensein des Schlüssels**
+    (0.11.0, Audit 2026-09-04 — am Live-Objekt gemessen). Die Korrektur aus 0.9.2 schrieb
+    `{ stopInstance: false }` und ihr Wächter prüfte `?.stopInstance`: sie sah ihren eigenen
+    Zustand nie wieder, und der Schlüssel ist eine **Positivliste** — steht dort ein Objekt ohne
+    einen Wert ungleich `false`, sieht der Host `common.messagebox` nicht mehr an, `subscribeMessage`
+    unterbleibt, und KEIN `sendTo` erreicht den Adapter, ohne eine Logzeile. Damit waren alle drei
+    Anmelde-Flüsse der Konfigseite tot (`ConfigPanel.ask()`). Richtig ist
+    `extendForeignObject(id, { common: { supportedMessages: null } })`, ausgelöst von
+    `supported === undefined || supported === null`. Polling und `onUnload` waren nie betroffen —
+    ohne stopInstance-Unterstützung nimmt der Host den normalen Entlade-Weg. Zwei Mutationen
+    verteidigen beide Hälften.
+    ⚠️ **Offener Flotten-Punkt, NICHT hier entschieden:** `.claude/rules/coding.md` kennt einen
+    zweiten Fall — ein Adapter, der den Schlüssel legitim braucht (`deviceManager: true`), müsste
+    nur den einen Eintrag entfernen, weil das Löschen des ganzen Schlüssels gegen das Manifest
+    arbeitet, das ihn beim nächsten Start wieder setzt (Neustart-Schleife). Das Konsistenz-Gate
+    verlangt die einfache Form (Auslöser = Schlüssel existiert, geschrieben wird `null`), und die
+    ist für DIESEN Adapter richtig: er darf den Schlüssel nie deklarieren (Entscheidung 19a, per
+    Test festgenagelt). Eine gehärtete Fassung wurde am 2026-09-04 gebaut und wieder
+    zurückgenommen — Gate und Regel gehören der Flotte, nicht diesem Adapter. An krobi gemeldet.
+23. **Objektnamen kommen aus `admin/i18n`, gelesen OHNE adapter-core** (0.11.0): der Flotten-Standard
+    verlangt das volle Übersetzungsobjekt in `common.name`/`desc` für JEDEN Objekttyp (Kernteam,
+    nut2 #15) — der Adapter darf nicht selbst in die Systemsprache auflösen, weil das Objekt die
+    Sprache überlebt, die beim Anlegen galt. `I18n` aus adapter-core kommt dafür NICHT in Frage:
+    schon der Import ruft `process.exit`, wenn kein js-controller danebensteht, und der Baumbauer
+    und die Engine sind reine Module, die die Tests ohne all das fahren. `src/lib/i18n.ts` liest die
+    elf Dateien deshalb selbst; sein einziger Mehrwert wäre die Sprachwahl gewesen — genau der
+    Schritt, der hier nicht passieren darf. Fehlt ein Schlüssel, steht er als Name im Baum: sichtbar
+    und greppbar, statt leer.
+24. **Die drei Manifest-Objekte werden im `onReady` per `extendObject` erneuert** (0.11.0):
+    js-controller wendet `instanceObjects` selbst an, aber mit `preserve` auf `common.name` — eine
+    UMBENENNUNG erreicht sonst nur neue Anlagen, während Manifest und Namens-Gate grün aussehen.
+    Ausgeschrieben mit festen Ids, nicht als Schleife über eine Tabelle: ein Leser und das
+    Konsistenz-Gate sollen sehen, welche Objekte abgedeckt sind.
+25. **Die ChatGPT-Abfrage meldet sich als Codex** (0.11.0, dieselbe Regel wie Entscheidung 20):
+    quellverifiziert in openai/codex, `codex-rs/login/src/auth/default_client.rs` —
+    `DEFAULT_ORIGINATOR = "codex_cli_rs"`, und `default_headers()` setzt `originator` UND einen
+    User-Agent auf JEDER Anfrage; der Backend-Zugang hängt an dieser Kennung (Whitelist
+    `codex_cli_rs`/`codex_vscode`/`codex_sdk_ts`/alles mit `Codex`, sonst 403). Vorher schickte der
+    Verbrauchs-Aufruf `ioBroker.ai-usage` und gar keinen originator, während der Gutschein-Aufruf auf
+    DERSELBEN Route `Codex Desktop` behauptete. Nie an einem echten Konto geprüft — steht so im
+    Changelog.
+26. **Eine gekappte Seitenwanderung sagt es** (0.11.0): `fetchAllPages` brach nach 12 Seiten ab,
+    während der Kommentar mit 31 Tages-Eimern argumentierte, und gab das Teilergebnis wortlos als
+    vollständig zurück — bei kleiner Server-Seitengröße wären `costs.month`/`projectedMonth` still
+    zu niedrig gewesen. Schranke jetzt 32 (ein Monat plus eins), und wer sie erreicht, meldet es ins
+    Protokoll. Beide Report-Anbieter schicken ein explizites `limit=31`; bei Anthropic fehlte es.
+27. **Datei-Existenz ist keine Lebendigkeit** (0.11.0): `signInState` meldete `signed-in`, sobald die
+    Token-Datei etwas hergab — ein vom Anbieter abgelehntes Auffrisch-Token ließ also einen grünen
+    Haken neben einem gelben „Sign-in rejected" stehen, die exakte Umkehrung von krobis Fund vom
+    2026-09-01. Die Engine meldet den `auth`-Zustand jetzt bei jedem Wechsel über `authState` an den
+    Adapter (`rejectedTokens`), und die Karte zeigt wieder den Anmelde-Weg. Die Datei bleibt liegen:
+    ein Anbieter-Aussetzer darf den Nutzer nicht hinter seinem Rücken abmelden. Nur `auth` zählt —
+    Drossel, Dienst-Defekt und Netzfehler nicht.
 
 ## Tests
 
@@ -219,12 +274,20 @@ test/integration.js            → standard: @iobroker/testing integration (CI)
 test/standards/                → iobroker-adapter-checks (Repo-Standards)
 ```
 
+`src/lib/http.test.ts` (seit 0.11.0) nagelt die Status→Fehlerklasse-Abbildung fest, das Rückgrat der
+Entscheidungen 11 und 21: sie war bei 6,25 % Zeilen-Deckung und ALLE sechs Mutationen überlebten
+(Audit 2026-09-04). `http.ts` ist das einzige Modul ohne injizierte Naht — deshalb `vi.stubGlobal`.
+`src-admin/src/rows.test.ts` (seit 0.11.0) prüft die zweite, bis dahin ungetestete Kopie der
+Zeilen-Logik im Konfig-Panel; `src/lib/i18n.test.ts` beweist Vollständigkeit und
+Platzhalter-Konsistenz der elf Sprachdateien und dass jeder im Quelltext benutzte Schlüssel existiert.
+
 `src/main.test.ts` (seit 0.8.0) deckt die Adapter-Schicht ab — Zugangsdaten-Ablage, Anmelde-Wege,
 Aufräumen, Start-Schnappschuss, Abschalten; ai-usage war der einzige Adapter der Flotte ohne, und
 genau dort saßen vier der acht Fehler des 0.8.0-Audits. Ein Test in `pure-helpers.test.ts` nagelt
 die ZWEITE Kopie der Kennungs-Regel im Konfig-Panel an die des Adapters.
 
 ```
+
 ```
 
 **Test-Oberfläche krobi:** NUR das Claude-Abo (Max). ChatGPT-Abo, Gemini-Abo, OpenRouter, DeepSeek,

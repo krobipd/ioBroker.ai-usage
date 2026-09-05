@@ -25,19 +25,21 @@ __export(report_utils_exports, {
   projectMonth: () => projectMonth
 });
 module.exports = __toCommonJS(report_utils_exports);
-async function fetchAllPages(url, headers, fetchJson) {
+const MAX_REPORT_PAGES = 32;
+async function fetchAllPages(url, headers, fetchJson, onTruncated) {
   const buckets = [];
   let page;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < MAX_REPORT_PAGES; i++) {
     const body = await fetchJson(page ? `${url}&page=${encodeURIComponent(page)}` : url, headers);
     if (Array.isArray(body == null ? void 0 : body.data)) {
       buckets.push(...body.data);
     }
     if ((body == null ? void 0 : body.has_more) !== true || typeof (body == null ? void 0 : body.next_page) !== "string" || !body.next_page) {
-      break;
+      return buckets;
     }
     page = body.next_page;
   }
+  onTruncated == null ? void 0 : onTruncated(MAX_REPORT_PAGES);
   return buckets;
 }
 function monthStartUnix(nowMs) {

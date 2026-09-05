@@ -15,6 +15,10 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".editorconfig"
+      - "LICENSE"
   pull_request:
     branches:
       - main
@@ -115,6 +119,33 @@ jobs:
           fi
           echo "✓ all ioBroker-deps at or ahead of stable repository"
 
+  # Die Admin-Komponente ist ein eigenes Bundle mit eigenem package.json — der
+  # Root-Lint ignoriert `src-admin/` und die ioBroker-Check-Action installiert dort
+  # nichts. Ohne diesen Job standen 839 Zeilen Produktionscode ausserhalb JEDES
+  # Gates (Audit 2026-09-04): die 116 Lint-Funde, die 0.10.0 aufgeraeumt hat,
+  # haetten jederzeit unbemerkt zurueckkommen koennen.
+  admin-check-and-lint:
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: src-admin/package-lock.json
+      - name: Install admin component dependencies
+        run: npm ci --prefix src-admin
+      - name: Type-check the admin component
+        run: npx --no-install tsc --noEmit -p src-admin/tsconfig.json
+      - name: Lint the admin component
+        run: npm --prefix src-admin run lint
+      # Die Vitest-Konfig liegt ausserhalb des tsconfig-include und wurde von keinem
+      # Gate gelesen — so ueberlebte ein toter `forks`-Schluessel den Umstieg auf
+      # vitest 5, ohne je zu wirken (Audit 2026-09-04).
+      - name: Type-check the vitest config
+        run: npm run check:config
+
   workflow-lint:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
     runs-on: ubuntu-latest
@@ -142,7 +173,7 @@ jobs:
           build: true
 
   deploy:
-    needs: [check-and-lint, adapter-tests, repochecker-version-gate, workflow-lint]
+    needs: [check-and-lint, admin-check-and-lint, adapter-tests, repochecker-version-gate, workflow-lint]
     if: |
       contains(github.event.head_commit.message, '[skip ci]') == false &&
       github.event_name == 'push' &&

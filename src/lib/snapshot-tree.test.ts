@@ -5,9 +5,15 @@ describe("mapSnapshot", () => {
   test("a subscription snapshot yields device, limit channels and percent/reset states", () => {
     const snapshot: UsageSnapshot = {
       limits: [
-        { name: "session", label: "5-hour session", percent: 34, resetAt: "2026-08-25T14:00:00Z" },
-        { name: "week", label: "Week", percent: 62 },
-        { name: "fable-4x", label: "Fable weekly", percent: 71 },
+        {
+          name: "session",
+          labelKey: "nameWindowSession",
+          label: "5-hour session",
+          percent: 34,
+          resetAt: "2026-08-25T14:00:00Z",
+        },
+        { name: "week", label: "Week", labelKey: "nameWindowSession", percent: 62 },
+        { name: "fable-4x", label: "Fable weekly", labelKey: "nameWindowSession", percent: 71 },
       ],
     };
     const { objects, writes } = mapSnapshot("claude", snapshot);
@@ -159,8 +165,8 @@ describe("maxLimitPercent", () => {
     expect(
       maxLimitPercent({
         limits: [
-          { name: "a", label: "A", percent: 30 },
-          { name: "b", label: "B", percent: 80 },
+          { name: "a", label: "A", labelKey: "nameWindowSession", percent: 30 },
+          { name: "b", label: "B", labelKey: "nameWindowSession", percent: 80 },
         ],
       }),
     ).toBe(80);
@@ -171,9 +177,15 @@ describe("maxLimitPercent", () => {
   test("a model-scoped window never speaks for the account, however full it is", () => {
     const snapshot = {
       limits: [
-        { name: "session", label: "Session (5 h)", percent: 72 },
-        { name: "week", label: "Week (all models)", percent: 72 },
-        { name: "weekly_scoped-Fable", label: "weekly scoped Fable", percent: 100, scoped: true },
+        { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 72 },
+        { name: "week", label: "Week (all models)", labelKey: "nameWindowSession", percent: 72 },
+        {
+          name: "weekly_scoped-Fable",
+          label: "weekly scoped Fable",
+          labelKey: "nameWindowSession",
+          percent: 100,
+          scoped: true,
+        },
       ],
     };
     expect(maxLimitPercent(snapshot)).toBe(72);
@@ -184,8 +196,8 @@ describe("maxLimitPercent", () => {
     expect(
       maxLimitPercent({
         limits: [
-          { name: "week", label: "Week", percent: 40 },
-          { name: "fable", label: "Fable weekly", percent: 100, scoped: true },
+          { name: "week", label: "Week", labelKey: "nameWindowSession", percent: 40 },
+          { name: "fable", label: "Fable weekly", labelKey: "nameWindowSession", percent: 100, scoped: true },
         ],
       }),
     ).toBe(40);
@@ -197,8 +209,8 @@ describe("maxLimitPercent", () => {
     expect(
       limitingWindow({
         limits: [
-          { name: "pro", label: "gemini-2.5-pro", percent: 25, scoped: true },
-          { name: "flash", label: "gemini-2.5-flash", percent: 80, scoped: true },
+          { name: "pro", label: "gemini-2.5-pro", labelKey: "nameWindowSession", percent: 25, scoped: true },
+          { name: "flash", label: "gemini-2.5-flash", labelKey: "nameWindowSession", percent: 80, scoped: true },
         ],
       }),
     ).toEqual({ percent: 80, label: "gemini-2.5-flash" });
@@ -208,8 +220,8 @@ describe("maxLimitPercent", () => {
     expect(
       limitingWindow({
         limits: [
-          { name: "session", label: "Session (5 h)", percent: 40 },
-          { name: "week", label: "Week (all models)", percent: 91 },
+          { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 40 },
+          { name: "week", label: "Week (all models)", labelKey: "nameWindowSession", percent: 91 },
         ],
       }),
     ).toEqual({ percent: 91, label: "Week (all models)" });

@@ -74,6 +74,11 @@ export function accountId(provider: string, credentialId: string): string {
  * A row exists exactly as long as its switch is on: switching an account off removes
  * the row, which is also what lets the stale-object cleanup work off this one list.
  *
+ * Unknown keys are ignored, not rejected — rows written by an older version still
+ * carry an `enabled` flag from the table days. It is inert (presence of the row IS
+ * the switch), and stripping it would mean rewriting the user's config, which
+ * restarts the instance for no gain.
+ *
  * @param raw the native.accounts value
  * @returns the validated accounts
  */

@@ -34,14 +34,17 @@ function parseClaudeUsage(body) {
   const raw = body;
   const limits = [];
   const seen = /* @__PURE__ */ new Set();
-  const push = (name, label, percent, resetsAt, scoped = false) => {
+  const push = (name, label, percent, resetsAt, scoped = false, labelKey = "nameWindowOther", labelArg) => {
     const id = (0, import_pure_helpers.sanitizeId)(name);
     const value = Number(percent);
     if (!id || seen.has(id) || !Number.isFinite(value)) {
       return;
     }
     seen.add(id);
-    const window = { name: id, label, percent: value };
+    const window = { name: id, label, percent: value, labelKey };
+    if (labelArg !== void 0) {
+      window.labelArg = labelArg;
+    }
     if (typeof resetsAt === "string" && resetsAt) {
       window.resetAt = resetsAt;
     }
@@ -76,20 +79,30 @@ function parseClaudeUsage(body) {
         labelParts.push(`(${surface})`);
       }
       const scoped = kind !== "session" && kind !== "weekly_all";
-      push(nameParts.join("-"), labelParts.join(" "), limit.percent, limit.resets_at, scoped);
+      const foreign = [typeof model === "string" ? model : "", typeof surface === "string" ? surface : ""].filter(Boolean).join(" ");
+      const labelKey = kind === "session" ? "nameWindowSession" : kind === "weekly_all" ? "nameWindowWeek" : "nameWindowModelWeek";
+      push(
+        nameParts.join("-"),
+        labelParts.join(" "),
+        limit.percent,
+        limit.resets_at,
+        scoped,
+        labelKey,
+        labelKey === "nameWindowModelWeek" ? foreign || kind.replace(/_/g, " ") : void 0
+      );
     }
   }
   if (limits.length === 0) {
-    const flat = (key, name, label, scoped = false) => {
+    const flat = (key, name, label, labelKey, scoped = false, labelArg) => {
       const block = raw[key];
       if (typeof block === "object" && block !== null) {
         const data = block;
-        push(name, label, data.utilization, data.resets_at, scoped);
+        push(name, label, data.utilization, data.resets_at, scoped, labelKey, labelArg);
       }
     };
-    flat("five_hour", "session", "Session (5 h)");
-    flat("seven_day", "week", "Week (all models)");
-    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet", true);
+    flat("five_hour", "session", "Session (5 h)", "nameWindowSession");
+    flat("seven_day", "week", "Week (all models)", "nameWindowWeek");
+    flat("seven_day_sonnet", "week-sonnet", "Week Sonnet", "nameWindowModelWeek", true, "Sonnet");
   }
   const snapshot = {};
   if (limits.length > 0) {

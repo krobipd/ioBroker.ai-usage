@@ -81,18 +81,27 @@ function parseAnthropicReports(usageBuckets, costBuckets, nowMs) {
   }
   return snapshot;
 }
-function anthropicApiProvider(adminKey, fetchJson = import_http.getJson, now = Date.now) {
+function anthropicApiProvider(adminKey, fetchJson = import_http.getJson, now = Date.now, warn = () => void 0) {
   return {
     kind: "anthropic-api",
     fetch: async () => {
       const headers = { "x-api-key": adminKey, "anthropic-version": "2023-06-01" };
       const start = encodeURIComponent((0, import_report_utils.monthStartIso)(now()));
+      const truncated = (report) => {
+        return (pages) => warn(`the ${report} report was still offering more after ${pages} pages \u2014 this month's figures are partial`);
+      };
       const usage = await (0, import_report_utils.fetchAllPages)(
-        `${BASE}/usage_report/messages?starting_at=${start}&bucket_width=1d`,
+        `${BASE}/usage_report/messages?starting_at=${start}&bucket_width=1d&limit=31`,
         headers,
-        fetchJson
+        fetchJson,
+        truncated("usage")
       );
-      const costs = await (0, import_report_utils.fetchAllPages)(`${BASE}/cost_report?starting_at=${start}&bucket_width=1d`, headers, fetchJson);
+      const costs = await (0, import_report_utils.fetchAllPages)(
+        `${BASE}/cost_report?starting_at=${start}&bucket_width=1d&limit=31`,
+        headers,
+        fetchJson,
+        truncated("cost")
+      );
       return parseAnthropicReports(usage, costs, now());
     }
   };

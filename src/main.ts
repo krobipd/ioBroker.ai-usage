@@ -2,7 +2,8 @@ import * as utils from "@iobroker/adapter-core";
 import { Credentials } from "@iobroker/adapter-core";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { postForm, postJson } from "./lib/http";
+import { getJson, postForm, postJson } from "./lib/http";
+import { loadCatalogue, tName } from "./lib/i18n";
 import { PollEngine } from "./lib/poll-engine";
 import {
   clampPollInterval,
@@ -12,6 +13,11 @@ import {
   type AccountConfig,
 } from "./lib/pure-helpers";
 import type { TokenSet, TokenStore, UsageProvider } from "./lib/provider";
+
+/** Reverse of {@link SUBSCRIPTION_IDS}: which subscription owns an account id. */
+const PROVIDER_BY_ACCOUNT_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(SUBSCRIPTION_IDS).map(([provider, id]) => [id, provider]),
+);
 import { SIGN_IN_FLOWS, SIGN_IN_LABELS, attemptExpired, type SignInState } from "./lib/sign-in";
 import { buildAuthorizeUrl, exchangeCode, generatePkce, type PkcePair } from "./lib/providers/claude-auth";
 import { claudeSubProvider } from "./lib/providers/claude-sub";
@@ -67,6 +73,18 @@ export class AiUsageAdapter extends utils.Adapter {
   private readonly attempts = new Map<string, Attempt>();
   /** Last failure reason per provider, shown in the admin row. */
   private readonly signInErrors = new Map<string, string>();
+  /**
+   * Providers whose last query was rejected with `auth` — the stored tokens exist but
+   * no longer work.
+   *
+   * Without this the settings page reads "signed in" off the mere EXISTENCE of the
+   * token file: a dead refresh token left a green check next to an amber badge saying
+   * "Sign-in rejected". That is the exact inverse of the bug krobi found on
+   * 2026-09-01, and just as much a lie. The file is deliberately NOT deleted — a
+   * provider hiccup must not silently sign the user out — the card is simply told the
+   * truth so the sign-in button is there when it is needed.
+   */
+  private readonly rejectedTokens = new Set<string>();
   /** Device-code pollers, so they can be stopped on unload. */
   private readonly devicePollers = new Map<string, TimerHandle>();
   /** One token store per subscription — see {@link tokenStore} for why it is shared. */
@@ -104,6 +122,23 @@ export class AiUsageAdapter extends utils.Adapter {
       }
     } catch (e) {
       this.log.debug(`Could not snapshot existing states: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /**
+   * Count one state the create path just touched — but only if it is genuinely new.
+   *
+   * The create path runs `extendObject` for EVERY state once per process, including
+   * the ones that were already in the database. "The create path touched it" would
+   * therefore report the whole tree as new after every restart, and the balance line
+   * would be noise within a day. Only what the startup snapshot did not hold counts.
+   *
+   * @param id the state id, relative to the instance
+   */
+  private countUpsert(id: string): void {
+    if (!this.knownStateIds.has(id)) {
+      this.knownStateIds.add(id);
+      this.createdStates++;
     }
   }
 
@@ -199,6 +234,7 @@ export class AiUsageAdapter extends utils.Adapter {
    */
   private async startSignIn(provider: string): Promise<SignInState | { error: string }> {
     this.signInErrors.delete(provider);
+    this.rejectedTokens.delete(provider);
     this.stopDevicePoller(provider);
     const flow = SIGN_IN_FLOWS[provider];
     const now = Date.now();
@@ -280,6 +316,7 @@ export class AiUsageAdapter extends utils.Adapter {
     await this.tokenStore(provider).save(tokens);
     this.attempts.delete(provider);
     this.signInErrors.delete(provider);
+    this.rejectedTokens.delete(provider);
     this.stopDevicePoller(provider);
     const id = SUBSCRIPTION_IDS[provider];
     if (id) {
@@ -369,9 +406,17 @@ export class AiUsageAdapter extends utils.Adapter {
     // account is signed in, whatever an earlier attempt left behind — showing
     // the sign-in screen to a signed-in user was the bug (krobi 2026-09-01).
     // The stale failure is dropped so it cannot resurface later.
-    if (await this.tokenStore(provider).load()) {
+    //
+    // "Valid" means the tokens are there AND the last query was not rejected: a
+    // refresh token the provider has revoked still sits on disk, and reporting that
+    // as "signed in" put a green check next to an amber "Sign-in rejected" badge.
+    // File existence is not liveness.
+    if ((await this.tokenStore(provider).load()) && !this.rejectedTokens.has(provider)) {
       this.signInErrors.delete(provider);
       return { status: "signed-in" };
+    }
+    if (this.rejectedTokens.has(provider)) {
+      return { status: "failed", reason: failure ?? "the stored sign-in was rejected — sign in again" };
     }
     if (failure) {
       return { status: "failed", reason: failure };
@@ -389,6 +434,7 @@ export class AiUsageAdapter extends utils.Adapter {
     await this.tokenStore(provider).clear();
     this.attempts.delete(provider);
     this.signInErrors.delete(provider);
+    this.rejectedTokens.delete(provider);
     this.stopDevicePoller(provider);
     return { status: "signed-out" };
   }
@@ -524,9 +570,8 @@ export class AiUsageAdapter extends utils.Adapter {
 
   // ------------------------------------------------------------- life cycle
 
-  /** Validate the configuration, clean up stale objects and start the engine. */
   /**
-   * Clear a leftover `supportedMessages.stopInstance` from THIS instance's object.
+   * Remove a leftover `supportedMessages` key from THIS instance's object.
    *
    * The entry lives in two places: in the adapter's manifest, and as a copy in the
    * instance object in the database. An update merges the manifest into that copy —
@@ -535,6 +580,15 @@ export class AiUsageAdapter extends utils.Adapter {
    * runs: the update alone changes nothing (found by a second pair of eyes on the
    * live server 2026-08-27, after my own test had been contaminated by a value I had
    * set by hand).
+   *
+   * 0.9.2 wrote `{ stopInstance: false }` here, which made it WORSE: the key is a
+   * positive list, so an object without a value other than false shuts the message
+   * box — the host no longer looks at `common.messagebox`, never subscribes, and no
+   * `sendTo` reaches the adapter, without a single line in the log. Every sign-in
+   * from the settings page went nowhere (measured on the live server 2026-09-04:
+   * `supportedMessages: {"stopInstance": false}`). The key has to be DELETED, and
+   * the trigger has to be its mere existence — the old guard read `stopInstance`
+   * and therefore never saw the state it had written itself.
    *
    * Writing the instance object makes the host restart this instance once. That is
    * the price, it happens on the first start after the update and never again —
@@ -550,12 +604,26 @@ export class AiUsageAdapter extends utils.Adapter {
     const id = `system.adapter.${this.namespace}`;
     try {
       const obj = await this.getForeignObjectAsync(id);
-      const supported = obj?.common?.supportedMessages as { stopInstance?: unknown } | undefined;
-      if (!supported?.stopInstance) {
+      const supported = obj?.common?.supportedMessages as Record<string, unknown> | undefined | null;
+      // The trigger is the KEY EXISTING AT ALL, not the value behind `stopInstance`.
+      // A guard reading `stopInstance` never sees the state it wrote itself, so a
+      // half-corrected installation stayed half-corrected forever.
+      if (supported === undefined || supported === null) {
         return false;
       }
       this.log.info("Correcting a leftover setting from an earlier version — this instance restarts once");
-      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      // DELETE the key — `null` is what extendObject copies over an existing value.
+      // Writing `{ stopInstance: false }` leaves an OBJECT behind, and
+      // `supportedMessages` is a positive list: an object without a value other than
+      // false makes the host stop looking at `common.messagebox` and never subscribe —
+      // no `sendTo` reaches the adapter and nothing is logged. That is what killed
+      // every sign-in message from the settings page.
+      //
+      // This adapter must never declare the key (decision 19a, pinned by a test), so
+      // deleting all of it is right here. An adapter that legitimately needs it
+      // (`deviceManager`) would have to strip only the one entry — that case is the
+      // fleet's to decide, not this adapter's.
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (e) {
       this.log.debug(`Could not check the instance object: ${e instanceof Error ? e.message : String(e)}`);
@@ -563,6 +631,70 @@ export class AiUsageAdapter extends utils.Adapter {
     }
   }
 
+  /**
+   * The directory holding `i18n/<lang>.json` — `admin/`, one level above `build/`.
+   */
+  private i18nRoot(): string {
+    return join(__dirname, "..", "admin");
+  }
+
+  /**
+   * Load the object-name catalogue before anything creates an object.
+   *
+   * A failure here must not stop the adapter — the objects would carry their keys as
+   * names, which is ugly but traceable, and every value would still be correct. It
+   * is loud in the log for exactly that reason.
+   */
+  private loadTranslations(): void {
+    try {
+      const count = loadCatalogue(this.i18nRoot());
+      this.log.debug(`Object name catalogue loaded (${count} entries)`);
+    } catch (e) {
+      this.log.warn(
+        `Object names fall back to their keys — the translations could not be read (${
+          e instanceof Error ? e.message : String(e)
+        })`,
+      );
+    }
+  }
+
+  /**
+   * Objects declared in the manifest, refreshed on every start.
+   *
+   * js-controller applies `instanceObjects` itself, but with `preserve` on
+   * `common.name`: a RENAMED object reaches new installations only, while every
+   * existing tree keeps the old text and the manifest looks correct all the while.
+   * The explicit refresh is what carries a changed name or description into an
+   * installation that already exists (fleet rule).
+   */
+  private async refreshManifestObjects(): Promise<void> {
+    try {
+      // Spelled out one by one, with literal ids: a loop over a table would hide
+      // which objects are covered, from a reader and from the consistency gate alike.
+      await this.extendObject("info", {
+        type: "channel",
+        common: { name: tName("nameInfoChannel") },
+        native: {},
+      });
+      await this.extendObject("info.connection", {
+        type: "state",
+        // The only one of the three with something to explain — the two containers
+        // stay without a description rather than getting an invented sentence.
+        common: { name: tName("nameConnection"), desc: tName("descConnection") },
+        native: {},
+      });
+      await this.extendObject("total", {
+        type: "folder",
+        common: { name: tName("nameTotalFolder") },
+        native: {},
+      });
+    } catch (e) {
+      // A failure here costs a name, never the startup.
+      this.log.debug(`Could not refresh the manifest objects: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /** Validate the configuration, clean up stale objects and start the engine. */
   private async onReady(): Promise<void> {
     try {
       // First: without this the whole shutdown path stays dead on an updated install.
@@ -570,6 +702,9 @@ export class AiUsageAdapter extends utils.Adapter {
       if (await this.clearStopInstanceFlag()) {
         return;
       }
+      // Before anything creates an object — every name below comes from here.
+      this.loadTranslations();
+      await this.refreshManifestObjects();
       const accounts = parseAccounts(this.config.accounts);
       const interval = clampPollInterval(this.config.pollInterval);
       await this.migrateTokenFiles();
@@ -596,9 +731,8 @@ export class AiUsageAdapter extends utils.Adapter {
       this.engine = new PollEngine(accounts, providers, interval, {
         upsertObject: async def => {
           await this.extendObject(def.id, { type: def.type, common: def.common as ioBroker.ObjectCommon, native: {} });
-          if (def.type === "state" && !this.knownStateIds.has(def.id)) {
-            this.knownStateIds.add(def.id);
-            this.createdStates++;
+          if (def.type === "state") {
+            this.countUpsert(def.id);
           }
         },
         setState: (id, value) => {
@@ -648,6 +782,17 @@ export class AiUsageAdapter extends utils.Adapter {
           error: m => this.log.error(m),
         },
         afterFirstRound: () => this.logDatapointBalance(),
+        authState: (accountId, rejected) => {
+          const provider = PROVIDER_BY_ACCOUNT_ID[accountId];
+          if (!provider) {
+            return; // key accounts have no sign-in card
+          }
+          if (rejected) {
+            this.rejectedTokens.add(provider);
+          } else {
+            this.rejectedTokens.delete(provider);
+          }
+        },
         notify: this.config.notifications
           ? (_account, message) =>
               void this.registerNotification("ai-usage", "userActionRequired", message).catch(e =>
@@ -686,11 +831,13 @@ export class AiUsageAdapter extends utils.Adapter {
       }
       case "openai": {
         const key = await this.resolveKey(account);
-        return key ? openAiProvider(key) : undefined;
+        return key ? openAiProvider(key, getJson, Date.now, m => this.log.warn(`${account.name}: ${m}`)) : undefined;
       }
       case "anthropic-api": {
         const key = await this.resolveKey(account);
-        return key ? anthropicApiProvider(key) : undefined;
+        return key
+          ? anthropicApiProvider(key, getJson, Date.now, m => this.log.warn(`${account.name}: ${m}`))
+          : undefined;
       }
       default:
         return undefined;

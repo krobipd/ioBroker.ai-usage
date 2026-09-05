@@ -63,8 +63,23 @@ describe("parseGeminiQuota", () => {
     expect(snapshot.limits).toEqual([
       // Marked as model windows: the fullest one speaks for the account, and the
       // warning names it — not every single model raising its own alarm.
-      { name: "gemini-2_5-pro", label: "gemini-2.5-pro", percent: 25, resetAt: "2026-08-27T16:01:15Z", scoped: true },
-      { name: "gemini-2_5-flash", label: "gemini-2.5-flash", percent: 80, scoped: true },
+      {
+        name: "gemini-2_5-pro",
+        label: "gemini-2.5-pro",
+        labelKey: "nameWindowQuota",
+        labelArg: "gemini-2.5-pro",
+        percent: 25,
+        resetAt: "2026-08-27T16:01:15Z",
+        scoped: true,
+      },
+      {
+        name: "gemini-2_5-flash",
+        label: "gemini-2.5-flash",
+        labelKey: "nameWindowQuota",
+        labelArg: "gemini-2.5-flash",
+        percent: 80,
+        scoped: true,
+      },
     ]);
   });
 

@@ -32,8 +32,14 @@ describe("parseChatgptUsage", () => {
       credits: { has_credits: true, unlimited: false, balance: 150 },
     });
     expect(snapshot.limits).toEqual([
-      { name: "session", label: "Session (5 h)", percent: 15, resetAt: "2024-12-28T16:00:00.000Z" },
-      { name: "week", label: "Week", percent: 5, resetAt: "2025-01-03T16:00:00.000Z" },
+      {
+        name: "session",
+        label: "Session (5 h)",
+        labelKey: "nameWindowSession",
+        percent: 15,
+        resetAt: "2024-12-28T16:00:00.000Z",
+      },
+      { name: "week", label: "Week", labelKey: "nameWindowWeekShort", percent: 5, resetAt: "2025-01-03T16:00:00.000Z" },
     ]);
     expect(snapshot.credits).toEqual({ remaining: 150, currency: "USD" });
   });
@@ -42,7 +48,9 @@ describe("parseChatgptUsage", () => {
     const snapshot = parseChatgptUsage({
       rate_limit: { primary_window: { used_percent: 42 }, secondary_window: null },
     });
-    expect(snapshot.limits).toEqual([{ name: "session", label: "Session (5 h)", percent: 42 }]);
+    expect(snapshot.limits).toEqual([
+      { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 42 },
+    ]);
   });
 
   test("unlimited credits produce no credit values", () => {
@@ -56,8 +64,15 @@ describe("parseChatgptUsage", () => {
       additional_rate_limits: [{ limit_name: "GPT-5 Pro", rate_limit: { used_percent: 60 } }],
     });
     expect(snapshot.limits).toEqual([
-      { name: "session", label: "Session (5 h)", percent: 10 },
-      { name: "gpt-5-pro", label: "GPT-5 Pro", percent: 60, scoped: true },
+      { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 10 },
+      {
+        name: "gpt-5-pro",
+        label: "GPT-5 Pro",
+        labelKey: "nameWindowOther",
+        labelArg: "GPT-5 Pro",
+        percent: 60,
+        scoped: true,
+      },
     ]);
   });
 
@@ -66,7 +81,9 @@ describe("parseChatgptUsage", () => {
       rate_limit: { primary_window: { used_percent: 10 } },
       additional_rate_limits: [{ limit_name: "Session", rate_limit: { used_percent: 99 } }],
     });
-    expect(snapshot.limits).toEqual([{ name: "session", label: "Session (5 h)", percent: 10 }]);
+    expect(snapshot.limits).toEqual([
+      { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 10 },
+    ]);
   });
 
   test("an extra limit whose name carries no usable characters is skipped", () => {
@@ -135,7 +152,6 @@ describe("chatgptSubProvider", () => {
     // carries the account id too, plus the two headers OpenAI's own client sends.
     expect(seen[1]["ChatGPT-Account-Id"]).toBe("acc-1");
     expect(seen[1]["OpenAI-Beta"]).toBe("codex-1");
-    expect(seen[1].originator).toBe("Codex Desktop");
 
     const withoutAccount = chatgptSubProvider(
       memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
@@ -148,6 +164,29 @@ describe("chatgptSubProvider", () => {
     );
     await withoutAccount.fetch();
     expect(seen[2]["ChatGPT-Account-Id"]).toBeUndefined();
+  });
+
+  test("both calls carry the Codex identity — not our own name", async () => {
+    // Design decision 20, applied to ChatGPT: the backend gates these routes on the
+    // originator (openai/codex `DEFAULT_ORIGINATOR`), and before 0.11.0 the usage
+    // call sent "ioBroker.ai-usage" with no originator at all while the voucher call
+    // on the same route claimed to be a Codex client. One identity, both calls.
+    const seen: Record<string, string>[] = [];
+    const provider = chatgptSubProvider(
+      memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
+      () => Promise.resolve({}),
+      (_url, headers) => {
+        seen.push(headers);
+        return Promise.resolve({ rate_limit: { primary_window: { used_percent: 1 } } });
+      },
+      () => 0,
+    );
+    await provider.fetch();
+    for (const headers of seen) {
+      expect(headers.originator).toBe("codex_cli_rs");
+      expect(headers["User-Agent"]).toMatch(/^codex_cli_rs\//);
+      expect(headers["User-Agent"]).not.toContain("ioBroker");
+    }
   });
 
   test("a failing voucher call never discards the usage snapshot", async () => {

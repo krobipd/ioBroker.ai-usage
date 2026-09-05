@@ -1,3 +1,4 @@
+import { tName } from "./i18n";
 import type { AccountConfig } from "./pure-helpers";
 import { FetchError, type UsageProvider, type UsageSnapshot } from "./provider";
 import { limitingWindow, mapSnapshot, orphanObjectIds, type ObjectDef } from "./snapshot-tree";
@@ -64,6 +65,18 @@ export interface EngineDeps {
   /** Raise a user-facing notification (threshold crossing, broken credentials). */
   notify?(accountName: string, message: string): void;
   /**
+   * Report whether an account's stored sign-in was REJECTED by the provider.
+   *
+   * Called on every state change of that fact, so the settings page can tell a
+   * live sign-in from a token file that merely still exists. Without it the card
+   * read "signed in" off file existence alone and showed a green check next to an
+   * amber "Sign-in rejected" badge.
+   *
+   * @param accountId the account's object id
+   * @param rejected true when the last query failed with `auth`
+   */
+  authState?(accountId: string, rejected: boolean): void;
+  /**
    * Called once, when every account has finished its FIRST poll.
    *
    * The first round is staggered on purpose, so the adapter cannot report what the
@@ -86,6 +99,8 @@ interface AccountRuntime {
   backoffMs: number;
   /** Whether the auth-broken notification has been raised (reset on success). */
   authNotified: boolean;
+  /** Whether the last query was rejected as unauthorized — reported to the sign-in card. */
+  authRejected: boolean;
   /** Whether the AI service itself answered on the last attempt. */
   serviceOnline: boolean;
   /** The account's one-word state. */
@@ -156,6 +171,7 @@ export class PollEngine {
         skipUntil: 0,
         backoffMs: BACKOFF_START_MS,
         authNotified: false,
+        authRejected: false,
         serviceOnline: false,
         state: "no-connection",
         // Nothing known until the service says something; the skeleton writes
@@ -253,6 +269,7 @@ export class PollEngine {
     if (runtime) {
       // A fresh sign-in clears a previous auth failure and any backoff.
       runtime.authNotified = false;
+      runtime.authRejected = false;
       runtime.skipUntil = 0;
       await this.pollAccount(runtime);
     }
@@ -313,6 +330,10 @@ export class PollEngine {
       runtime.serviceOnline = true;
       runtime.state = "ok";
       runtime.error = "";
+      if (runtime.authRejected) {
+        runtime.authRejected = false;
+        this.deps.authState?.(config.id, false);
+      }
       await this.applySnapshot(runtime, snapshot);
     } catch (e) {
       this.handleFailure(runtime, e);
@@ -415,6 +436,10 @@ export class PollEngine {
       runtime.serviceOnline = true;
       runtime.state = "unauthorized";
       runtime.error = `Sign-in rejected — ${message}`;
+      if (!runtime.authRejected) {
+        runtime.authRejected = true;
+        this.deps.authState?.(config.id, true);
+      }
       if (!runtime.authNotified) {
         runtime.authNotified = true;
         const text = `${config.name}: credentials rejected — ${message}`;
@@ -529,7 +554,7 @@ export class PollEngine {
           statusStates: { offlineId: "info.unreach" },
         },
       },
-      { id: `${config.id}.info`, type: "channel", common: { name: "Info" } },
+      { id: `${config.id}.info`, type: "channel", common: { name: tName("nameAccountInfo") } },
       {
         // The two slots ioBroker itself provides for this — measured against
         // @iobroker/type-detector 6.0.0: `unreach` is the offline marker every
@@ -538,7 +563,7 @@ export class PollEngine {
         id: `${config.id}.info.unreach`,
         type: "state",
         common: {
-          name: "AI service not reachable",
+          name: tName("nameUnreach"),
           type: "boolean",
           role: "indicator.maintenance.unreach",
           read: true,
@@ -551,23 +576,23 @@ export class PollEngine {
         // boolean only (E1009). Validity wins, so the message rides on `text`.
         id: `${config.id}.info.error`,
         type: "state",
-        common: { name: "Last error", type: "string", role: "text", read: true, write: false },
+        common: { name: tName("nameLastError"), type: "string", role: "text", read: true, write: false },
       },
       {
         id: `${config.id}.info.lastUpdate`,
         type: "state",
-        common: { name: "Last successful update", type: "string", role: "date", read: true, write: false },
+        common: { name: tName("nameLastUpdate"), type: "string", role: "date", read: true, write: false },
       },
       {
         id: `${config.id}.warning`,
         type: "state",
-        common: { name: "Above warn threshold", type: "boolean", role: "indicator", read: true, write: false },
+        common: { name: tName("nameWarning"), type: "boolean", role: "indicator", read: true, write: false },
       },
       {
         id: `${config.id}.limitReached`,
         type: "state",
         common: {
-          name: "A plan-wide limit window is full",
+          name: tName("nameLimitReached"),
           type: "boolean",
           role: "indicator",
           read: true,
@@ -599,12 +624,12 @@ export class PollEngine {
   /** The totals skeleton (channel + states). */
   private async createTotalsSkeleton(): Promise<void> {
     const defs: ObjectDef[] = [
-      { id: "total.costs", type: "channel", common: { name: "Costs (USD accounts)" } },
+      { id: "total.costs", type: "channel", common: { name: tName("nameTotalCosts") } },
       {
         id: "total.costs.today",
         type: "state",
         common: {
-          name: "Costs today (all accounts)",
+          name: tName("nameTotalCostsToday"),
           type: "number",
           role: "value",
           read: true,
@@ -616,7 +641,7 @@ export class PollEngine {
         id: "total.costs.month",
         type: "state",
         common: {
-          name: "Costs this month (all accounts)",
+          name: tName("nameTotalCostsMonth"),
           type: "number",
           role: "value",
           read: true,
@@ -628,7 +653,7 @@ export class PollEngine {
         id: "total.costs.projectedMonth",
         type: "state",
         common: {
-          name: "Costs projected month-end (computed)",
+          name: tName("nameTotalCostsProjected"),
           type: "number",
           role: "value",
           read: true,
@@ -640,7 +665,11 @@ export class PollEngine {
         id: "total.maxLimitPercent",
         type: "state",
         common: {
-          name: "Highest plan-wide utilisation of any account",
+          // NOT "plan-wide utilisation": the value is whatever speaks for an
+          // account (fullest plan-wide window OR its granted budget, see
+          // limitingWindow) — the old name promised something narrower than the
+          // number ever was.
+          name: tName("nameTotalMaxPercent"),
           type: "number",
           role: "value",
           read: true,
@@ -652,7 +681,7 @@ export class PollEngine {
         id: "total.warningsActive",
         type: "state",
         common: {
-          name: "Accounts above their warn threshold",
+          name: tName("nameTotalWarnings"),
           type: "number",
           role: "value",
           read: true,
@@ -663,7 +692,7 @@ export class PollEngine {
         id: "total.limitReached",
         type: "state",
         common: {
-          name: "Any plan-wide limit window full",
+          name: tName("nameTotalLimitReached"),
           type: "boolean",
           role: "indicator",
           read: true,
@@ -673,12 +702,12 @@ export class PollEngine {
       {
         id: "total.accountsReachable",
         type: "state",
-        common: { name: "Reachable accounts", type: "number", role: "value", read: true, write: false },
+        common: { name: tName("nameTotalReachable"), type: "number", role: "value", read: true, write: false },
       },
       {
         id: "total.accounts",
         type: "state",
-        common: { name: "Configured accounts", type: "number", role: "value", read: true, write: false },
+        common: { name: tName("nameTotalAccounts"), type: "number", role: "value", read: true, write: false },
       },
     ];
     for (const def of defs) {

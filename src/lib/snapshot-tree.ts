@@ -1,3 +1,4 @@
+import { tName } from "./i18n";
 import type { UsageSnapshot } from "./provider";
 import { sanitizeId } from "./pure-helpers";
 
@@ -9,7 +10,7 @@ export interface ObjectDef {
   type: "device" | "channel" | "state";
   /** The object's common. */
   common: {
-    name: string | Record<string, string>;
+    name: ioBroker.StringOrTranslated;
     type?: "boolean" | "number" | "string";
     role?: string;
     read?: boolean;
@@ -40,7 +41,7 @@ export interface StateWrite {
  * A read-only state definition plus its value — the tree builder's working unit.
  *
  * @param id the state id
- * @param name the object name
+ * @param name the object name (translation object)
  * @param type the value type
  * @param role the state role
  * @param value the current value
@@ -49,7 +50,7 @@ export interface StateWrite {
  */
 function state(
   id: string,
-  name: string,
+  name: ioBroker.StringOrTranslated,
   type: "boolean" | "number" | "string",
   role: string,
   value: boolean | number | string,
@@ -94,20 +95,30 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
     objects.push(pair.def);
     writes.push(pair.write);
   };
-  const channel = (id: string, name: string): void => {
+  const channel = (id: string, name: ioBroker.StringOrTranslated): void => {
     objects.push({ id, type: "channel", common: { name } });
   };
 
   if (snapshot.limits && snapshot.limits.length > 0) {
-    channel(`${accountId}.limits`, "Limit windows");
+    channel(`${accountId}.limits`, tName("nameLimits"));
     for (const limit of snapshot.limits) {
       const windowId = sanitizeId(limit.name);
       if (!windowId) {
         continue;
       }
-      channel(`${accountId}.limits.${windowId}`, limit.label);
+      // The window name is a translation object; the percent/reset datapoints put it
+      // into their own frame IN EVERY LANGUAGE, not the English one everywhere.
+      const windowName = tName(limit.labelKey, limit.labelArg);
+      channel(`${accountId}.limits.${windowId}`, windowName);
       add(
-        state(`${accountId}.limits.${windowId}.percent`, `${limit.label} used`, "number", "value", limit.percent, "%"),
+        state(
+          `${accountId}.limits.${windowId}.percent`,
+          tName("nameWindowPercent", windowName),
+          "number",
+          "value",
+          limit.percent,
+          "%",
+        ),
       );
       // resetAt is a FIXED part of every window, not an optional extra. Providers
       // omit the timestamp whenever no window is currently running (Anthropic
@@ -118,7 +129,7 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
       add(
         state(
           `${accountId}.limits.${windowId}.resetAt`,
-          `${limit.label} resets at`,
+          tName("nameWindowResetAt", windowName),
           "string",
           "date",
           limit.resetAt ?? "",
@@ -129,42 +140,47 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
 
   const credits = snapshot.credits;
   if (credits) {
-    channel(`${accountId}.credits`, "Credits");
+    channel(`${accountId}.credits`, tName("nameCredits"));
     const unit = credits.pieces ? "" : credits.currency;
     if (credits.used !== undefined) {
-      add(state(`${accountId}.credits.used`, "Credits used", "number", "value", credits.used, unit));
+      add(state(`${accountId}.credits.used`, tName("nameCreditsUsed"), "number", "value", credits.used, unit));
     }
     if (credits.limit !== undefined) {
-      add(state(`${accountId}.credits.limit`, "Credits limit", "number", "value", credits.limit, unit));
+      add(state(`${accountId}.credits.limit`, tName("nameCreditsLimit"), "number", "value", credits.limit, unit));
     }
     if (credits.remaining !== undefined) {
-      add(state(`${accountId}.credits.remaining`, "Credits remaining", "number", "value", credits.remaining, unit));
+      add(
+        state(
+          `${accountId}.credits.remaining`,
+          tName("nameCreditsRemaining"),
+          "number",
+          "value",
+          credits.remaining,
+          unit,
+        ),
+      );
     }
     if (credits.percent !== undefined) {
-      add(state(`${accountId}.credits.percent`, "Credits used (percent)", "number", "value", credits.percent, "%"));
+      add(state(`${accountId}.credits.percent`, tName("nameCreditsPercent"), "number", "value", credits.percent, "%"));
     }
     if (credits.granted !== undefined) {
-      add(state(`${accountId}.credits.granted`, "Granted balance", "number", "value", credits.granted, unit));
+      add(state(`${accountId}.credits.granted`, tName("nameCreditsGranted"), "number", "value", credits.granted, unit));
     }
     if (credits.toppedUp !== undefined) {
-      add(state(`${accountId}.credits.toppedUp`, "Topped-up balance", "number", "value", credits.toppedUp, unit));
+      add(
+        state(`${accountId}.credits.toppedUp`, tName("nameCreditsToppedUp"), "number", "value", credits.toppedUp, unit),
+      );
     }
     if (credits.resetCredits !== undefined) {
       add(
-        state(
-          `${accountId}.credits.resetCredits`,
-          "Available limit-reset credits",
-          "number",
-          "value",
-          credits.resetCredits,
-        ),
+        state(`${accountId}.credits.resetCredits`, tName("nameResetCredits"), "number", "value", credits.resetCredits),
       );
       // Companion timestamp — same fixed-part rule as limits.*.resetAt: always
       // present next to the count, empty while no voucher is held.
       add(
         state(
           `${accountId}.credits.resetCreditsNextExpiry`,
-          "Next reset credit expires at",
+          tName("nameResetCreditsExpiry"),
           "string",
           "date",
           credits.resetCreditsNextExpiry ?? "",
@@ -175,21 +191,21 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
 
   const costs = snapshot.costs;
   if (costs) {
-    channel(`${accountId}.costs`, "Costs");
+    channel(`${accountId}.costs`, tName("nameCosts"));
     if (costs.today !== undefined) {
-      add(state(`${accountId}.costs.today`, "Costs today", "number", "value", costs.today, costs.currency));
+      add(state(`${accountId}.costs.today`, tName("nameCostsToday"), "number", "value", costs.today, costs.currency));
     }
     if (costs.month !== undefined) {
-      add(state(`${accountId}.costs.month`, "Costs this month", "number", "value", costs.month, costs.currency));
+      add(state(`${accountId}.costs.month`, tName("nameCostsMonth"), "number", "value", costs.month, costs.currency));
     }
     if (costs.total !== undefined) {
-      add(state(`${accountId}.costs.total`, "Costs total (lifetime)", "number", "value", costs.total, costs.currency));
+      add(state(`${accountId}.costs.total`, tName("nameCostsTotal"), "number", "value", costs.total, costs.currency));
     }
     if (costs.projectedMonth !== undefined) {
       add(
         state(
           `${accountId}.costs.projectedMonth`,
-          "Costs projected month-end (computed)",
+          tName("nameCostsProjected"),
           "number",
           "value",
           costs.projectedMonth,
@@ -201,15 +217,15 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
 
   const tokens = snapshot.tokens;
   if (tokens) {
-    channel(`${accountId}.tokens`, "Tokens");
+    channel(`${accountId}.tokens`, tName("nameTokens"));
     if (tokens.inputToday !== undefined) {
-      add(state(`${accountId}.tokens.inputToday`, "Input tokens today", "number", "value", tokens.inputToday));
+      add(state(`${accountId}.tokens.inputToday`, tName("nameTokensInput"), "number", "value", tokens.inputToday));
     }
     if (tokens.outputToday !== undefined) {
-      add(state(`${accountId}.tokens.outputToday`, "Output tokens today", "number", "value", tokens.outputToday));
+      add(state(`${accountId}.tokens.outputToday`, tName("nameTokensOutput"), "number", "value", tokens.outputToday));
     }
     if (tokens.perModel && tokens.perModel.length > 0) {
-      channel(`${accountId}.models`, "Per-model usage");
+      channel(`${accountId}.models`, tName("nameModels"));
       for (const model of tokens.perModel) {
         const modelId = sanitizeId(model.model);
         if (!modelId) {
@@ -220,7 +236,7 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
           add(
             state(
               `${accountId}.models.${modelId}.tokensToday`,
-              `${model.model} tokens today`,
+              tName("nameModelTokens", model.model),
               "number",
               "value",
               model.tokens,
@@ -231,7 +247,7 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
           add(
             state(
               `${accountId}.models.${modelId}.costToday`,
-              `${model.model} costs today`,
+              tName("nameModelCosts", model.model),
               "number",
               "value",
               model.cost,
@@ -244,15 +260,23 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
   }
 
   if (snapshot.available !== undefined) {
-    add(state(`${accountId}.available`, "Balance sufficient for calls", "boolean", "indicator", snapshot.available));
+    add(state(`${accountId}.available`, tName("nameAvailable"), "boolean", "indicator", snapshot.available));
   }
 
   return { objects, writes };
 }
 
 /**
- * The window that decides how full an account is: the highest PLAN-WIDE limit, or
- * the granted budget when the account has no windows at all.
+ * What decides how full an account is: the fullest PLAN-WIDE limit window OR the
+ * granted budget — whichever is higher.
+ *
+ * The budget competes ALWAYS, not only when an account has no windows: money that
+ * is nearly spent stops the account just as hard as a full time window, and Claude
+ * with extra usage enabled has both at once. That is deliberate — the previous
+ * wording here claimed the budget only counted "when the account has no windows",
+ * which the code never did (audit 2026-09-04). Whichever side wins gives the
+ * warning its label ("Credits" or the window's name), so the message always says
+ * what it is talking about.
  *
  * Windows marked `scoped` cover a single model and are left out as long as a
  * plan-wide window exists — a model the user never touches may sit at 100 %
@@ -357,10 +381,11 @@ export function orphanObjectIds(
 }
 
 /**
- * The highest plan-wide limit percent in a snapshot, or undefined when it has none.
+ * How full a snapshot's account is — the value {@link limitingWindow} settled on
+ * (fullest plan-wide window or granted budget), or undefined when it has neither.
  *
  * @param snapshot the snapshot
- * @returns the maximum percent
+ * @returns the utilisation percent
  */
 export function maxLimitPercent(snapshot: UsageSnapshot): number | undefined {
   return limitingWindow(snapshot)?.percent;

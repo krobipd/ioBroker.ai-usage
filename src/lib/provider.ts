@@ -19,8 +19,25 @@ export type SignInFlow = "paste-code" | "device-code" | "paste-url";
 export interface LimitWindow {
   /** Window name; becomes the object id segment (session, week, a model name, month). */
   name: string;
-  /** Human-readable label for the object name. */
+  /**
+   * English label — for LOG lines and warning messages, which are English fleet-wide.
+   * The object name does NOT come from here; see {@link LimitWindow.labelKey}.
+   */
   label: string;
+  /**
+   * i18n key for the window's object name, resolved to the full translation object.
+   *
+   * The channel of a limit window is an object like any other and must carry all
+   * eleven languages (live-tree gate 2026-09-05: "Session (5 h)" and
+   * "Week (all models)" sat in the tree as plain English — they are OUR wording, not
+   * a name that came from the provider).
+   */
+  labelKey: string;
+  /**
+   * The foreign part of the name, where there is one — a model or surface the
+   * provider named. It is substituted into the key's `%s` in every language.
+   */
+  labelArg?: string;
   /** Utilisation in percent (0-100+). */
   percent: number;
   /** When the window resets (ISO timestamp), if the source reports it. */

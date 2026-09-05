@@ -3,6 +3,19 @@
     "name": "ai-usage",
     "version": "0.10.0",
     "news": {
+      "NEXT": {
+        "en": "Signing in from the instance settings works again — a leftover setting had closed the adapter's message channel. Object names now come in eleven languages.",
+        "de": "Die Anmeldung aus den Instanz-Einstellungen funktioniert wieder — eine Alt-Einstellung hatte den Nachrichtenkanal geschlossen. Objektnamen gibt es jetzt in elf Sprachen.",
+        "ru": "Вход из настроек экземпляра снова работает — старая настройка закрывала канал сообщений адаптера. Имена объектов теперь доступны на одиннадцати языках.",
+        "pt": "O início de sessão a partir das definições voltou a funcionar — uma definição antiga tinha fechado o canal de mensagens. Os nomes dos objetos existem agora em onze idiomas.",
+        "nl": "Aanmelden vanuit de instantie-instellingen werkt weer — een oude instelling had het berichtenkanaal gesloten. Objectnamen zijn nu in elf talen beschikbaar.",
+        "fr": "La connexion depuis les paramètres de l'instance fonctionne à nouveau — un ancien réglage avait fermé le canal de messages. Les noms d'objets existent maintenant en onze langues.",
+        "it": "L'accesso dalle impostazioni dell'istanza funziona di nuovo — una vecchia impostazione aveva chiuso il canale messaggi. I nomi degli oggetti sono ora in undici lingue.",
+        "es": "El inicio de sesión desde los ajustes de la instancia vuelve a funcionar — un ajuste antiguo había cerrado el canal de mensajes. Los nombres de objetos están ahora en once idiomas.",
+        "pl": "Logowanie z ustawień instancji znowu działa — stare ustawienie zamknęło kanał wiadomości adaptera. Nazwy obiektów są teraz dostępne w jedenastu językach.",
+        "uk": "Вхід із налаштувань екземпляра знову працює — стара настройка закрила канал повідомлень адаптера. Назви обʼєктів тепер доступні одинадцятьма мовами.",
+        "zh-cn": "实例设置中的登录再次可用——旧设置曾关闭了适配器的消息通道。对象名称现在提供十一种语言。"
+      },
       "0.10.0": {
         "en": "The reset-time datapoint no longer disappears and reappears. Claude is read with far fewer rejections, new sign-ins request only the profile permission, and ChatGPT shows its limit-reset credits.",
         "de": "Der Reset-Zeitpunkt verschwindet nicht mehr, die Einstellungsseite zeigt Angemeldeten keinen Anmelde-Bildschirm mehr, Claude wird mit weniger Ablehnungen gelesen, ChatGPT zeigt Reset-Gutschriften.",
@@ -80,19 +93,6 @@
         "pl": "Wylogowanie z subskrypcji naprawdę działa, konta nie są już pokazywane jako offline przed pierwszą odpowiedzią, a zapytania pozostają rozłożone w czasie",
         "uk": "Вихід із підписки тепер справді спрацьовує, облікові записи не вважаються офлайн до першої відповіді, а запити лишаються рознесеними в часі",
         "zh-cn": "退出订阅登录现在真正生效，账户在首次响应前不再显示为离线，各账户的查询也保持错开进行"
-      },
-      "0.7.1": {
-        "en": "Restarting the adapter no longer writes one unchanged value into every status datapoint — a recorded history now stays free of restart noise",
-        "de": "Ein Neustart des Adapters schreibt nicht mehr einmalig einen unveränderten Wert in jeden Status-Datenpunkt — eine Aufzeichnung bleibt frei von Neustart-Rauschen",
-        "ru": "Перезапуск адаптера больше не записывает однократно неизменённое значение в каждую точку состояния — история остаётся без шума от перезапусков",
-        "pt": "Reiniciar o adaptador já não escreve uma vez um valor inalterado em cada ponto de estado — o histórico fica livre do ruído dos reinícios",
-        "nl": "Een herstart van de adapter schrijft niet meer eenmalig een ongewijzigde waarde naar elk statusdatapunt — een opname blijft vrij van herstartruis",
-        "fr": "Un redémarrage de l'adaptateur n'écrit plus une fois une valeur inchangée dans chaque point d'état — l'historique reste exempt de bruit de redémarrage",
-        "it": "Il riavvio dell'adapter non scrive più una volta un valore invariato in ogni punto di stato — la cronologia resta libera dal rumore dei riavvii",
-        "es": "Reiniciar el adaptador ya no escribe una vez un valor sin cambios en cada punto de estado — el historial queda libre del ruido de los reinicios",
-        "pl": "Ponowne uruchomienie adaptera nie zapisuje już jednorazowo niezmienionej wartości w każdym punkcie stanu — historia pozostaje wolna od szumu restartów",
-        "uk": "Перезапуск адаптера більше не записує одноразово незмінене значення в кожну точку стану — історія лишається без шуму від перезапусків",
-        "zh-cn": "重启适配器不再向每个状态数据点写入一次未变化的值，记录的历史不再出现重启噪声"
       }
     },
     "plugins": {
@@ -140,9 +140,7 @@
       "deepseek",
       "monitoring"
     ],
-    "authors": [
-      "krobi <krobi@power-dreams.com>"
-    ],
+    "authors": ["krobi <krobi@power-dreams.com>"],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -162,6 +160,10 @@
     "adminUI": {
       "config": "json"
     },
+    "docs": {
+      "en": ["docs/en/README.md"],
+      "de": ["docs/de/README.md"]
+    },
     "messagebox": true,
     "dependencies": [
       {
@@ -170,7 +172,7 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=8.0.1"
+        "admin": ">=8.0.11"
       }
     ]
   },
@@ -186,7 +188,19 @@
       "_id": "info",
       "type": "channel",
       "common": {
-        "name": "Adapter Information"
+        "name": {
+          "en": "Adapter Information",
+          "de": "Adapter-Informationen",
+          "ru": "Информация об адаптере",
+          "pt": "Informações do adaptador",
+          "nl": "Adapterinformatie",
+          "fr": "Informations sur l'adaptateur",
+          "it": "Informazioni sull'adattatore",
+          "es": "Información del adaptador",
+          "pl": "Informacje o adapterze",
+          "uk": "Інформація про адаптер",
+          "zh-cn": "适配器信息"
+        }
       },
       "native": {}
     },
@@ -194,12 +208,37 @@
       "_id": "info.connection",
       "type": "state",
       "common": {
-        "name": "At least one account reachable",
+        "name": {
+          "en": "At least one account reachable",
+          "de": "Mindestens ein Konto erreichbar",
+          "ru": "Хотя бы один аккаунт доступен",
+          "pt": "Pelo menos uma conta acessível",
+          "nl": "Ten minste één account bereikbaar",
+          "fr": "Au moins un compte joignable",
+          "it": "Almeno un account raggiungibile",
+          "es": "Al menos una cuenta accesible",
+          "pl": "Co najmniej jedno konto osiągalne",
+          "uk": "Щонайменше один акаунт доступний",
+          "zh-cn": "至少一个账户可访问"
+        },
         "type": "boolean",
         "role": "indicator.connected",
         "read": true,
         "write": false,
-        "def": false
+        "def": false,
+        "desc": {
+          "en": "True as soon as at least one AI account is delivering data.",
+          "de": "Wahr, sobald mindestens ein KI-Konto Daten liefert.",
+          "ru": "Истина, как только хотя бы один аккаунт ИИ передаёт данные.",
+          "pt": "Verdadeiro assim que pelo menos uma conta de IA fornece dados.",
+          "nl": "Waar zodra ten minste één AI-account gegevens levert.",
+          "fr": "Vrai dès qu'au moins un compte IA fournit des données.",
+          "it": "Vero non appena almeno un account IA fornisce dati.",
+          "es": "Verdadero en cuanto al menos una cuenta de IA entrega datos.",
+          "pl": "Prawda, gdy co najmniej jedno konto AI dostarcza dane.",
+          "uk": "Істина, щойно принаймні один акаунт ШІ надає дані.",
+          "zh-cn": "只要至少一个 AI 账户正在提供数据即为真。"
+        }
       },
       "native": {}
     },

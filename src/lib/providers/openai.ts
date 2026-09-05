@@ -100,24 +100,38 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
  * @param adminKey the organization ADMIN key
  * @param fetchJson the JSON-GET seam
  * @param now clock (ms) — injected for tests
+ * @param warn where a partial report is reported to
  * @returns the provider
  */
 export function openAiProvider(
   adminKey: string,
   fetchJson: JsonFetch = getJson,
   now: () => number = Date.now,
+  warn: (message: string) => void = () => undefined,
 ): UsageProvider {
   return {
     kind: "openai",
     fetch: async (): Promise<UsageSnapshot> => {
       const headers = { Authorization: `Bearer ${adminKey}` };
       const start = monthStartUnix(now());
+      // A truncated report means the month sums below are incomplete — that has to
+      // reach the user's log, not be swallowed into a wrong number.
+      const truncated = (report: string): ((pages: number) => void) => {
+        return pages =>
+          warn(`the ${report} report was still offering more after ${pages} pages — this month's figures are partial`);
+      };
       const usage = await fetchAllPages(
         `${BASE}/usage/completions?start_time=${start}&bucket_width=1d&limit=31&group_by=model`,
         headers,
         fetchJson,
+        truncated("usage"),
       );
-      const costs = await fetchAllPages(`${BASE}/costs?start_time=${start}&limit=31`, headers, fetchJson);
+      const costs = await fetchAllPages(
+        `${BASE}/costs?start_time=${start}&limit=31`,
+        headers,
+        fetchJson,
+        truncated("cost"),
+      );
       return parseOpenAiReports(usage, costs, now());
     },
   };
