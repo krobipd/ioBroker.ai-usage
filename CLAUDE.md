@@ -347,6 +347,14 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     `total.maxLimitPercent` (beide berechnet, nicht vom Anbieter). Die übrigen 45 bleiben LEER —
     „Kosten heute" erklärt sich selbst, und ein Satz, der den Namen wiederholt, ist schlechter als
     keiner. Inventar: 51 von 96 Datenpunkten mit Beschreibung.
+42. **Der Konto-Knoten heißt IMMER „<Name> (<Anbieter>)" — auch wenn beides gleich ist** (krobi
+    2026-09-06, nach dem 0.12.0-Deploy entschieden): live liest sich das als „Claude (Claude)", und
+    das Inventar zeigt, dass die Dopplung der NORMALFALL ist — die Konfigseite setzt bei den drei
+    Abos den Namen fest auf den Anbieter-Namen, und ein Schlüssel-Konto trägt den Namen des
+    Admin-Speicher-Eintrags, den man üblicherweise nach dem Anbieter benennt. Ich hatte vorgeschlagen,
+    die Klammer wegzulassen, sobald Name == Label; krobi hat sich die vier Möglichkeiten angesehen und
+    entschieden: **so lassen** („dann macht es auch durchaus sinn"). Der Anbieter steht damit ausnahmslos
+    im Namen — auch bei einem frei benannten Zugang („Arbeitskonto (OpenRouter)"). Nicht erneut vorschlagen.
 41. **Die Konfigseite ABONNIERT die Statuswerte** (0.12.0): vorher fragte sie alle vier Sekunden je
     Abo eine Nachricht und je Konto zwei Zustände ab, solange sie offen war. `subscribeState` liefert
     den aktuellen Wert beim Abonnieren gleich mit; gepollt wird nur noch der Anmelde-Status — alle

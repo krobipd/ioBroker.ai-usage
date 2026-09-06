@@ -633,6 +633,13 @@ export class PollEngine {
         common: {
           // The readable provider name, never the internal kind: the node used to
           // read "Claude (claude-sub)" and "My key (anthropic-api)" in the tree.
+          //
+          // The bracket stays even when it repeats the name ("Claude (Claude)") —
+          // krobi decided that on 2026-09-06 after seeing that the repetition is
+          // the normal case (the settings page names a subscription row after its
+          // provider, and a key account inherits the name of its credential entry).
+          // The provider is then always visible, including for a freely named
+          // access ("Arbeitskonto (OpenRouter)"). Do not propose dropping it again.
           name: `${config.name} (${PROVIDER_LABELS[config.provider] ?? config.provider})`,
           // The admin's object tree draws its connection icon from this link and
           // from nothing else — govee, beszel, homewizard and nut2 all do the same.
