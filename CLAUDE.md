@@ -224,14 +224,15 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     `supported === undefined || supported === null`. Polling und `onUnload` waren nie betroffen —
     ohne stopInstance-Unterstützung nimmt der Host den normalen Entlade-Weg. Zwei Mutationen
     verteidigen beide Hälften.
-    ⚠️ **Offener Flotten-Punkt, NICHT hier entschieden:** `.claude/rules/coding.md` kennt einen
-    zweiten Fall — ein Adapter, der den Schlüssel legitim braucht (`deviceManager: true`), müsste
-    nur den einen Eintrag entfernen, weil das Löschen des ganzen Schlüssels gegen das Manifest
-    arbeitet, das ihn beim nächsten Start wieder setzt (Neustart-Schleife). Das Konsistenz-Gate
-    verlangt die einfache Form (Auslöser = Schlüssel existiert, geschrieben wird `null`), und die
-    ist für DIESEN Adapter richtig: er darf den Schlüssel nie deklarieren (Entscheidung 19a, per
-    Test festgenagelt). Eine gehärtete Fassung wurde am 2026-09-04 gebaut und wieder
-    zurückgenommen — Gate und Regel gehören der Flotte, nicht diesem Adapter. An krobi gemeldet.
+    **Der zweite Fall ist im Flotten-Gate erledigt, nichts offen** (nachgeprüft 2026-09-06 in
+    `audit-krobi-consistency.py`): das Gate fährt ZWEI Regime, und das MANIFEST entscheidet, welches
+    gilt. Regime A — kein `supportedMessages` im Manifest oder nur `false`-Werte — ist der Regelfall
+    und verlangt genau diese Korrektur. Regime B gilt für einen Adapter, der die Positivliste
+    legitim führt (`deviceManager: true`); dort prüft das Gate das Gegenteil, weil ein `null` die
+    Liste löschen und die Box abschalten würde. **ai-usage ist Regime A** und darf den Schlüssel nie
+    deklarieren (Entscheidung 19a, per Test festgenagelt) — die 2026-09-04 gebaute und wieder
+    zurückgenommene gehärtete Fassung im Adapter war deshalb richtig zurückgenommen: die
+    Fallunterscheidung gehört der Flotte, und dort steht sie.
 23. **Objektnamen kommen aus `admin/i18n`, gelesen OHNE adapter-core** (0.11.0): der Flotten-Standard
     verlangt das volle Übersetzungsobjekt in `common.name`/`desc` für JEDEN Objekttyp (Kernteam,
     nut2 #15) — der Adapter darf nicht selbst in die Systemsprache auflösen, weil das Objekt die
