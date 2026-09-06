@@ -200,3 +200,10 @@ jobs:
           node-version: "24.x"
           build: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          sentry: true
+          sentry-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          sentry-url: https://de.sentry.io
+          sentry-org: power-dreams
+          sentry-project: iobroker
+          sentry-version-prefix: iobroker.ai-usage
+          sentry-sourcemap-paths: build/

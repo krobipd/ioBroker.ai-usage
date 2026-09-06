@@ -3,6 +3,19 @@
     "name": "ai-usage",
     "version": "0.11.0",
     "news": {
+      "NEXT": {
+        "en": "An account that is not signed in yet no longer reports a rejected sign-in, every limit window shows whether it is the one in force, and reset times stop flooding a recording.",
+        "de": "Ein noch nicht angemeldetes Konto meldet keine abgelehnte Anmeldung mehr, jedes Limit-Fenster zeigt, ob es gerade das gültige ist, und Reset-Zeiten fluten keine Aufzeichnung mehr.",
+        "ru": "Ещё не подключённый аккаунт больше не сообщает об отклонённом входе, каждое окно лимита показывает, действует ли оно сейчас, а время сброса больше не засоряет запись.",
+        "pt": "Uma conta ainda sem sessão iniciada deixa de indicar um início de sessão recusado, cada janela de limite mostra se está em vigor e as horas de reposição já não inundam um registo.",
+        "nl": "Een account zonder aanmelding meldt geen geweigerde aanmelding meer, elk limietvenster laat zien of het de geldende is, en resettijden overspoelen een registratie niet langer.",
+        "fr": "Un compte pas encore connecté ne signale plus une connexion refusée, chaque fenêtre de limite indique si elle est en vigueur, et les heures de réinitialisation n'inondent plus un enregistrement.",
+        "it": "Un account non ancora collegato non segnala più un accesso rifiutato, ogni finestra di limite mostra se è quella in vigore e gli orari di reset non inondano più una registrazione.",
+        "es": "Una cuenta aún sin sesión ya no informa de un inicio de sesión rechazado, cada ventana de límite muestra si es la vigente y las horas de reinicio ya no inundan un registro.",
+        "pl": "Konto bez logowania nie zgłasza już odrzuconego logowania, każde okno limitu pokazuje, czy właśnie obowiązuje, a czasy resetu nie zalewają już zapisu historii.",
+        "uk": "Акаунт без входу більше не повідомляє про відхилений вхід, кожне вікно ліміту показує, чи воно чинне, а час скидання більше не засмічує запис історії.",
+        "zh-cn": "尚未登录的账户不再报告登录被拒绝，每个限额窗口都会显示它是否为当前生效的限额，重置时间也不再刷屏历史记录。"
+      },
       "0.11.0": {
         "en": "Signing in from the instance settings works again — a leftover setting had closed the adapter's message channel. Object names now come in eleven languages.",
         "de": "Die Anmeldung aus den Instanz-Einstellungen funktioniert wieder — eine Alt-Einstellung hatte den Nachrichtenkanal geschlossen. Objektnamen gibt es jetzt in elf Sprachen.",
@@ -80,19 +93,6 @@
         "pl": "Zatrzymanie instancji naprawdę oznacza teraz każde konto jako offline, a po awarii żadne konto nie twierdzi już, że dostarcza dane",
         "uk": "Зупинка екземпляра тепер справді позначає кожен обліковий запис як офлайн, а після збою жоден із них більше не стверджує, що передає дані",
         "zh-cn": "停止实例现在会真正把每个账户标记为离线，崩溃之后账户也不再声称自己仍在提供数据"
-      },
-      "0.8.0": {
-        "en": "Signing out of a subscription really stops it now, accounts are no longer shown offline before their first answer, and queries stay spread out",
-        "de": "Das Abmelden eines Abos wirkt jetzt wirklich, Konten gelten vor der ersten Antwort nicht mehr als offline, und die Abfragen bleiben entzerrt",
-        "ru": "Выход из подписки теперь действительно срабатывает, аккаунты не считаются офлайн до первого ответа, а запросы остаются разнесёнными во времени",
-        "pt": "Terminar sessão numa subscrição passa a ter efeito real, as contas já não aparecem offline antes da primeira resposta e as consultas mantêm-se espaçadas",
-        "nl": "Uitloggen bij een abonnement werkt nu echt, accounts gelden niet meer als offline vóór hun eerste antwoord en de opvragingen blijven gespreid",
-        "fr": "La déconnexion d'un abonnement prend enfin effet, les comptes ne sont plus affichés hors ligne avant leur première réponse et les requêtes restent échelonnées",
-        "it": "La disconnessione da un abbonamento ora ha davvero effetto, gli account non risultano più offline prima della prima risposta e le richieste restano scaglionate",
-        "es": "Cerrar sesión en una suscripción ya surte efecto real, las cuentas dejan de aparecer sin conexión antes de su primera respuesta y las consultas siguen escalonadas",
-        "pl": "Wylogowanie z subskrypcji naprawdę działa, konta nie są już pokazywane jako offline przed pierwszą odpowiedzią, a zapytania pozostają rozłożone w czasie",
-        "uk": "Вихід із підписки тепер справді спрацьовує, облікові записи не вважаються офлайн до першої відповіді, а запити лишаються рознесеними в часі",
-        "zh-cn": "退出订阅登录现在真正生效，账户在首次响应前不再显示为离线，各账户的查询也保持错开进行"
       }
     },
     "plugins": {
@@ -140,7 +140,9 @@
       "deepseek",
       "monitoring"
     ],
-    "authors": ["krobi <krobi@power-dreams.com>"],
+    "authors": [
+      "krobi <krobi@power-dreams.com>"
+    ],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -161,8 +163,12 @@
       "config": "json"
     },
     "docs": {
-      "en": ["docs/en/README.md"],
-      "de": ["docs/de/README.md"]
+      "en": [
+        "docs/en/README.md"
+      ],
+      "de": [
+        "docs/de/README.md"
+      ]
     },
     "messagebox": true,
     "dependencies": [
@@ -174,7 +180,8 @@
       {
         "admin": ">=8.0.11"
       }
-    ]
+    ],
+    "nogit": true
   },
   "encryptedNative": [],
   "protectedNative": [],
