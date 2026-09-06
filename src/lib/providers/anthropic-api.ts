@@ -1,6 +1,6 @@
 import { getJson, type JsonFetch } from "../http";
 import type { UsageProvider, UsageSnapshot } from "../provider";
-import { round2 } from "../pure-helpers";
+import { finiteNumber, round2 } from "../pure-helpers";
 import { fetchAllPages, isToday, monthStartIso, projectMonth } from "./report-utils";
 
 /**
@@ -33,8 +33,8 @@ export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unkn
     }
     let sum = 0;
     for (const result of entry.results) {
-      const amount = Number((result as { amount?: unknown })?.amount);
-      if (Number.isFinite(amount)) {
+      const amount = finiteNumber((result as { amount?: unknown })?.amount);
+      if (amount !== undefined) {
         sum += amount;
       }
     }
@@ -55,12 +55,12 @@ export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unkn
     sawUsageToday = true;
     for (const result of entry.results) {
       const data = result as { uncached_input_tokens?: unknown; output_tokens?: unknown };
-      const input = Number(data.uncached_input_tokens);
-      const output = Number(data.output_tokens);
-      if (Number.isFinite(input)) {
+      const input = finiteNumber(data.uncached_input_tokens);
+      const output = finiteNumber(data.output_tokens);
+      if (input !== undefined) {
         inputToday += input;
       }
-      if (Number.isFinite(output)) {
+      if (output !== undefined) {
         outputToday += output;
       }
     }

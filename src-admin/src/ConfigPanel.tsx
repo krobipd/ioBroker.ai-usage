@@ -76,8 +76,17 @@ interface PanelState extends ConfigGenericState {
  * message channel; each provider gets the instructions that actually apply to it,
  * because the three flows genuinely differ.
  */
+/** How often the sign-in status is asked while a device code is waiting (ms). */
+const DEVICE_POLL_MS = 4000;
+/** How often it is asked otherwise (ms). */
+const IDLE_POLL_MS = 30000;
+
 export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, PanelState> {
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  /** The state ids this card is subscribed to, so it can unsubscribe cleanly. */
+  private subscribed: string[] = [];
+  /** True once the card is gone — a late answer must not call setState. */
+  private unmounted = false;
 
   constructor(props: ConfigGenericProps) {
     super(props);
@@ -98,18 +107,102 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     // In parallel: the subscription rows must not wait for the credential-storage
     // scan. Serialised, a slow object view kept the Claude row on its spinner for
     // the whole scan although the adapter could have answered instantly.
-    await Promise.all([this.loadCredentials(), this.refresh()]);
-    // A device-code sign-in finishes in the adapter, not here — poll while the card is open.
-    this.timer = setInterval(() => void this.refresh(), 4000);
+    await Promise.all([this.loadCredentials(), this.refreshSignIn(), this.syncSubscriptions()]);
+    this.scheduleSignInPoll();
+  }
+
+  componentDidUpdate(): void {
+    // Rows come and go while the user switches accounts on and off.
+    void this.syncSubscriptions();
   }
 
   componentWillUnmount(): void {
+    this.unmounted = true;
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = null;
     }
+    this.unsubscribeAll();
     super.componentWillUnmount?.();
   }
+
+  /**
+   * Ask the adapter for the sign-in status again — fast while a device code is
+   * waiting for the user, slowly otherwise.
+   *
+   * The card used to ask every four seconds for everything, for as long as it was
+   * open: one message per subscription plus two state reads per account, whether
+   * anything had changed or not. Only the device-code flow finishes elsewhere and
+   * genuinely needs a short beat; the status values arrive through a subscription
+   * now and need none at all.
+   */
+  private scheduleSignInPoll(): void {
+    if (this.unmounted) {
+      return;
+    }
+    const waiting = Object.values(this.state.signIn).some(state => state?.status === "awaiting-device");
+    this.timer = setTimeout(
+      () => {
+        void this.refreshSignIn().then(() => this.scheduleSignInPoll());
+      },
+      waiting ? DEVICE_POLL_MS : IDLE_POLL_MS,
+    );
+  }
+
+  /**
+   * Keep the state subscriptions in step with the switched-on accounts.
+   *
+   * `subscribeState` hands the current value to the same callback right after
+   * subscribing, so the badge is filled without a single extra read.
+   */
+  private async syncSubscriptions(): Promise<void> {
+    const ctx = this.props.oContext;
+    const wanted: string[] = [];
+    for (const row of this.accounts()) {
+      const id = accountId(row.provider, row.credentialId);
+      if (id) {
+        wanted.push(`${ctx.adapterName}.${ctx.instance}.${id}.info.unreach`);
+        wanted.push(`${ctx.adapterName}.${ctx.instance}.${id}.info.error`);
+      }
+    }
+    if (wanted.length === this.subscribed.length && wanted.every(id => this.subscribed.includes(id))) {
+      return;
+    }
+    this.unsubscribeAll();
+    this.subscribed = wanted;
+    if (wanted.length === 0) {
+      return;
+    }
+    try {
+      await ctx.socket.subscribeState(wanted, this.onStateChange);
+    } catch {
+      // No subscription: the badges stay on whatever they last showed rather than
+      // blanking out — a socket hiccup is not an account without a status.
+    }
+  }
+
+  /** Drop every running subscription. */
+  private unsubscribeAll(): void {
+    if (this.subscribed.length > 0) {
+      this.props.oContext.socket.unsubscribeState(this.subscribed, this.onStateChange);
+      this.subscribed = [];
+    }
+  }
+
+  /**
+   * One status value arrived.
+   *
+   * @param id the full state id
+   * @param state the new state, or null when it was deleted
+   */
+  private onStateChange = (id: string, state: ioBroker.State | null | undefined): void => {
+    if (this.unmounted || !state || state.val === null || state.val === undefined) {
+      return;
+    }
+    const parts = id.split(".");
+    const key = `${parts[2]}.${parts[parts.length - 1]}`;
+    this.setState(prev => ({ serviceState: { ...prev.serviceState, [key]: state.val } }));
+  };
 
   /** Read the AI entries of the admin's central credential storage. */
   private async loadCredentials(): Promise<void> {
@@ -140,66 +233,6 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     } catch {
       this.setState({ credentialsLoaded: true });
     }
-  }
-
-  /** One poll round: sign-in state of the subscriptions plus every row's service status. */
-  private async refresh(): Promise<void> {
-    await this.refreshSignIn();
-    await this.refreshServiceState();
-  }
-
-  /**
-   * Read the two status states of every switched-on row.
-   *
-   * This is what makes the online indicator visible where the user actually looks —
-   * the datapoints alone answer the question only for someone who browses the object
-   * tree (krobi 2026-08-26).
-   *
-   * A row whose read FAILED keeps the value it had: rebuilding the whole map every
-   * four seconds made a single socket hiccup blank the badge — the same mistake the
-   * sign-in poll made until 2026-09-01.
-   */
-  private async refreshServiceState(): Promise<void> {
-    const ctx = this.props.oContext;
-    const serviceState: Record<string, unknown> = {};
-    /** Rows whose state could not be read this round — their known value survives. */
-    const missed = new Set<string>();
-    // All rows in one burst — the previous one-after-another loop stretched a
-    // poll round to 2×rows round-trips every 4 s while the card is open.
-    await Promise.all(
-      this.accounts().map(async row => {
-        const id = accountId(row.provider, row.credentialId);
-        if (!id) {
-          return;
-        }
-        try {
-          const [unreach, error] = await Promise.all([
-            ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.unreach`),
-            ctx.socket.getState(`${ctx.adapterName}.${ctx.instance}.${id}.info.error`),
-          ]);
-          if (unreach && unreach.val !== null && unreach.val !== undefined) {
-            serviceState[`${id}.unreach`] = unreach.val;
-            serviceState[`${id}.error`] = error?.val ?? "";
-          }
-        } catch {
-          // A read that FAILED is not "no status": the instance may simply have been
-          // busy. Keep what the row already showed — the same rule the sign-in poll
-          // learned on 2026-09-01, applied to the badge.
-          missed.add(id);
-        }
-      }),
-    );
-    this.setState(prev => {
-      const merged = { ...serviceState };
-      for (const id of missed) {
-        for (const key of [`${id}.unreach`, `${id}.error`]) {
-          if (prev.serviceState[key] !== undefined) {
-            merged[key] = prev.serviceState[key];
-          }
-        }
-      }
-      return { serviceState: merged };
-    });
   }
 
   /**

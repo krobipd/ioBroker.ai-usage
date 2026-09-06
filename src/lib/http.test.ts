@@ -120,17 +120,33 @@ describe("the 400 asymmetry between GET and the token POSTs", () => {
     expect(await kindOf(() => getJson("https://example.invalid/x", {}))).toBe("service");
   });
 
-  test("a 400 on postJson is an auth failure — that is how OAuth rejects a dead grant", async () => {
+  test("a 400 is an auth failure where the CALLER says so — that is how OAuth rejects a dead grant", async () => {
     // Claude/ChatGPT token endpoints answer a spent code or a revoked refresh token
     // with 400. Classifying that as `service` would hide "sign in again" behind
     // "the provider is broken".
     respondWith(400);
-    expect(await kindOf(() => postJson("https://example.invalid/token", { grant_type: "refresh_token" }))).toBe("auth");
+    expect(
+      await kindOf(() =>
+        postJson("https://example.invalid/token", { grant_type: "refresh_token" }, { authOn400: true }),
+      ),
+    ).toBe("auth");
+    respondWith(400);
+    expect(await kindOf(() => postForm("https://example.invalid/token", { code: "x" }, { authOn400: true }))).toBe(
+      "auth",
+    );
   });
 
-  test("a 400 on postForm is an auth failure for the same reason", async () => {
+  test("…and NOT on every other post", async () => {
+    // The rule used to be baked into both helpers, so a 400 anywhere read as a
+    // rejected sign-in: the ChatGPT device poll took it for "not confirmed yet"
+    // and waited out its whole window, and Google's Code-Assist call gave up on
+    // its second host.
     respondWith(400);
-    expect(await kindOf(() => postForm("https://example.invalid/token", { code: "x" }))).toBe("auth");
+    expect(await kindOf(() => postJson("https://example.invalid/deviceauth/token", { device_auth_id: "d" }))).toBe(
+      "service",
+    );
+    respondWith(400);
+    expect(await kindOf(() => postForm("https://example.invalid/any", { a: "b" }))).toBe("service");
   });
 });
 
@@ -174,7 +190,11 @@ describe("request shape", () => {
     // The two shapes are separate helpers because ChatGPT/Codex needs BOTH — a
     // wrapper that guessed would send the wrong one half the time.
     const fetchMock = respondWith(200, { access_token: "a" });
-    await postForm("https://example.invalid/token", { code: "c", state: "s" }, { originator: "Codex Desktop" });
+    await postForm(
+      "https://example.invalid/token",
+      { code: "c", state: "s" },
+      { headers: { originator: "Codex Desktop" } },
+    );
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(init.headers).toMatchObject({
       "Content-Type": "application/x-www-form-urlencoded",

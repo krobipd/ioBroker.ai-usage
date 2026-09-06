@@ -1,7 +1,3 @@
-/** The provider kinds the adapter speaks. */
-export type ProviderKind =
-  "claude-sub" | "chatgpt-sub" | "gemini-sub" | "openrouter" | "deepseek" | "openai" | "anthropic-api";
-
 /**
  * How a subscription account is signed in. Each provider dictates its own flow —
  * the admin panel renders the matching instructions, the adapter drives the rest.
@@ -14,6 +10,47 @@ export type ProviderKind =
  *   Google accepts for the usable client; measured 2026-08-26).
  */
 export type SignInFlow = "paste-code" | "device-code" | "paste-url";
+
+/** One entry of the provider catalogue. */
+export interface ProviderEntry {
+  /** The provider kind — the value stored in the account row. */
+  readonly kind: string;
+  /** Readable name for log lines and the admin row; never the internal kind. */
+  readonly label: string;
+  /** How this subscription signs in; absent for key-based accounts. */
+  readonly flow?: SignInFlow;
+  /** Fixed object id of the subscription's account; key accounts derive theirs from the credential. */
+  readonly accountId?: string;
+  /** True where the usage report needs an ORGANISATION admin key, not an ordinary API key. */
+  readonly needsAdminKey?: boolean;
+}
+
+/**
+ * Every provider the adapter speaks, in one table.
+ *
+ * There used to be five: the kind union here, the kind list in `pure-helpers`, the
+ * fixed account ids, and the flow and label maps in `sign-in.ts` — five places to
+ * keep in step for one new provider, with nothing to catch a miss. Everything below
+ * is derived from this table now.
+ */
+const PROVIDER_TABLE = [
+  { kind: "claude-sub", label: "Claude", flow: "paste-code", accountId: "claude" },
+  { kind: "chatgpt-sub", label: "ChatGPT", flow: "device-code", accountId: "chatgpt" },
+  { kind: "gemini-sub", label: "Gemini", flow: "paste-url", accountId: "gemini" },
+  { kind: "openrouter", label: "OpenRouter" },
+  { kind: "deepseek", label: "DeepSeek" },
+  { kind: "openai", label: "OpenAI", needsAdminKey: true },
+  { kind: "anthropic-api", label: "Anthropic", needsAdminKey: true },
+] as const;
+
+/** The provider kinds the adapter speaks — derived, so it can never drift from the table. */
+export type ProviderKind = (typeof PROVIDER_TABLE)[number]["kind"];
+
+/**
+ * The catalogue as a plain list: same entries, widened so the optional fields can
+ * be read on every one of them.
+ */
+export const PROVIDERS: readonly ProviderEntry[] = PROVIDER_TABLE;
 
 /** One limit window (session, week, per-model) — the same shape for every provider. */
 export interface LimitWindow {
@@ -53,6 +90,28 @@ export interface LimitWindow {
    * leave this unset — there the model buckets are the plan.
    */
   scoped?: boolean;
+  /**
+   * True while this window is the one currently in force for the account — the
+   * limit the user runs into next.
+   *
+   * Claude states it per window (`limits[].is_active`, measured 2026-09-06: with
+   * Fable at 97 % the model window is active while session at 8 % and week at
+   * 54 % are not); where a provider does not, the tree builder marks the window
+   * that speaks for the account instead, so the datapoint means the same thing
+   * everywhere. It is an indicator only — the account's warning stays on the
+   * plan-wide windows (krobi 2026-09-06: "fable 100% ist das fable limit, aber
+   * weder das 5h stunden limit noch das wochenlimit").
+   */
+  active?: boolean;
+  /**
+   * The provider's own reason for having CLOSED this window, where it says so
+   * (Claude's `locked_reason` on the session and week windows).
+   *
+   * This is the honest answer to "am I locked out", which the adapter otherwise
+   * has to guess from `percent >= 100`. It carries no datapoint of its own — it
+   * feeds `limitReached` and one log line.
+   */
+  lockedReason?: string;
 }
 
 /** Granted budget (prepaid money or request credits). */
@@ -105,8 +164,12 @@ export interface TokenInfo {
   inputToday?: number;
   /** Output tokens today. */
   outputToday?: number;
-  /** Per-model breakdown. */
-  perModel?: { model: string; tokens?: number; cost?: number }[];
+  /**
+   * Per-model breakdown. Tokens only — the cost field that used to sit here had
+   * no producer: the OpenAI cost report groups by line item, not by model, so
+   * nothing ever filled it and the tree never created the datapoint.
+   */
+  perModel?: { model: string; tokens?: number }[];
 }
 
 /**
@@ -136,8 +199,14 @@ export interface UsageSnapshot {
  * no), `service` means it answered with a server fault of its own, and `network`
  * means we never reached it. Keeping the last two apart is what lets the adapter
  * say whether the AI service is down or the ioBroker host has no connection.
+ *
+ * `no-credentials` is not a failure of the provider at all: nobody has signed in
+ * yet, or no API key is selected. It has to stay apart from `auth`, which means a
+ * sign-in the provider REJECTED — running the two together greeted a new user with
+ * a warning, a notification and a red "the stored sign-in was rejected" before they
+ * ever got to the sign-in button, and did the same after every deliberate sign-out.
  */
-export type FetchErrorKind = "auth" | "rate-limit" | "service" | "network";
+export type FetchErrorKind = "auth" | "rate-limit" | "service" | "network" | "no-credentials";
 
 /** A typed fetch failure. */
 export class FetchError extends Error {

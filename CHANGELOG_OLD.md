@@ -1,6 +1,9 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.9.1 (2026-08-27)
+
+- Changed: While an account has nothing to report — the adapter switched off, or started and not asked yet — the reason now reads "Unknown" instead of a sentence about the adapter
 
 ## 0.9.0 (2026-08-27)
 

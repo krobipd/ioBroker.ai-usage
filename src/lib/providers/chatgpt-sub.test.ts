@@ -1,4 +1,5 @@
 import { FetchError, type TokenSet, type TokenStore } from "../provider";
+import { sanitizeId } from "../pure-helpers";
 import { pollDeviceCode, startDeviceCode, type DeviceCodeStart } from "./chatgpt-auth";
 import { chatgptSubProvider, parseChatgptResetCredits, parseChatgptUsage } from "./chatgpt-sub";
 
@@ -66,7 +67,7 @@ describe("parseChatgptUsage", () => {
     expect(snapshot.limits).toEqual([
       { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 10 },
       {
-        name: "gpt-5-pro",
+        name: "GPT-5_Pro",
         label: "GPT-5 Pro",
         labelKey: "nameWindowOther",
         labelArg: "GPT-5 Pro",
@@ -74,6 +75,15 @@ describe("parseChatgptUsage", () => {
         scoped: true,
       },
     ]);
+  });
+
+  test("the window id follows the adapter's ONE id rule, not a second one", () => {
+    // It used to lower-case and kebab its own way, so the same window name became
+    // a different path here than anywhere else in the tree.
+    const snapshot = parseChatgptUsage({
+      additional_rate_limits: [{ limit_name: "GPT-5 Pro", rate_limit: { used_percent: 60 } }],
+    });
+    expect(snapshot.limits?.[0].name).toBe(sanitizeId("GPT-5 Pro"));
   });
 
   test("an extra limit cannot overwrite a window that is already there", () => {
@@ -272,5 +282,35 @@ describe("parseChatgptResetCredits", () => {
     expect(parseChatgptResetCredits({ available_count: -1 }, NOW)).toEqual({ count: 0, nextExpiry: "" });
     expect(parseChatgptResetCredits(null, NOW)).toEqual({ count: 0, nextExpiry: "" });
     expect(parseChatgptResetCredits("nope", NOW)).toEqual({ count: 0, nextExpiry: "" });
+  });
+});
+
+describe("null is not zero", () => {
+  test("a window whose percentage is null is left out", () => {
+    const snapshot = parseChatgptUsage({ rate_limit: { primary_window: { used_percent: null } } });
+    expect(snapshot.limits).toBeUndefined();
+  });
+
+  test("a null credit balance creates no credit values", () => {
+    expect(parseChatgptUsage({ credits: { balance: null } }).credits).toBeUndefined();
+  });
+});
+
+describe("the device-code start", () => {
+  test("an answer we cannot read is a SERVICE fault, not a missing connection", async () => {
+    // Decision 21: the endpoint answered. Reported as `network` it bought three
+    // tolerated attempts and hid a real fault behind the wrong badge.
+    await expect(startDeviceCode(() => Promise.resolve({ nonsense: true }), 0)).rejects.toMatchObject({
+      kind: "service",
+    });
+  });
+
+  test("the code request asks for no auth-on-400 — a 400 there is not a rejected grant", async () => {
+    const calls: { options?: unknown }[] = [];
+    await startDeviceCode((_url, _body, options) => {
+      calls.push({ options });
+      return Promise.resolve({ device_auth_id: "d", user_code: "C", interval: "5" });
+    }, 0);
+    expect(calls[0].options).toBeUndefined();
   });
 });

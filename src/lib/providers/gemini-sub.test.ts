@@ -110,8 +110,8 @@ describe("geminiSubProvider", () => {
     const calls: { url: string; body: unknown; headers?: Record<string, string> }[] = [];
     const provider = geminiSubProvider(
       memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
-      (url, body, headers) => {
-        calls.push({ url, body, headers });
+      (url, body, options) => {
+        calls.push({ url, body, headers: options?.headers });
         return Promise.resolve(
           url.endsWith("loadCodeAssist")
             ? { cloudaicompanionProject: "proj-1" }
@@ -172,5 +172,26 @@ describe("geminiSubProvider", () => {
     );
     await expect(provider.fetch()).rejects.toThrow(FetchError);
     expect(tried).toHaveLength(1);
+  });
+});
+
+describe("null is not zero", () => {
+  test("a bucket with a null remaining fraction is skipped, not reported as full", () => {
+    // Number(null) is 0, and 1 - 0 is 100 % used — an invented "you are out".
+    expect(parseGeminiQuota({ buckets: [{ modelId: "m", remainingFraction: null }] }).limits).toBeUndefined();
+  });
+});
+
+describe("an account without a Code-Assist project", () => {
+  test("is a service answer, not a rejected sign-in", async () => {
+    // Reported as `auth` it sent the user through a sign-in that cannot change
+    // the answer — the account simply has no Google AI subscription.
+    const provider = geminiSubProvider(
+      memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
+      () => Promise.resolve({}),
+      () => Promise.resolve({}),
+      () => 0,
+    );
+    await expect(provider.fetch()).rejects.toMatchObject({ kind: "service" });
   });
 });

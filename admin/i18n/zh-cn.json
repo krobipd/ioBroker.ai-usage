@@ -1,7 +1,7 @@
 {
   "settingsHeader": "设置",
   "label_pollInterval": "轮询间隔（秒）",
-  "help_pollInterval": "查询每个账户的频率。低于 300 秒可能被提供商限流——Claude 随后会长时间拒绝查询。",
+  "help_pollInterval": "每个账户的查询频率。60 秒的下限可避免供应商限流；对于以小时为单位变化的窗口，300 秒已足够。",
   "label_notifications": "通知",
   "help_notifications": "当账户超过警告阈值或凭据失效时发送一次通知。",
   "supportHeader": "支持开发",
@@ -30,6 +30,7 @@
   "nameLimits": "限额窗口",
   "nameWindowPercent": "%s 已使用",
   "nameWindowResetAt": "%s 重置时间",
+  "nameWindowActive": "%s 是当前生效的限额",
   "nameCredits": "额度",
   "nameCreditsUsed": "已用额度",
   "nameCreditsLimit": "额度上限",
@@ -48,6 +49,7 @@
   "nameTokensInput": "今日输入 Token",
   "nameTokensOutput": "今日输出 Token",
   "nameModels": "各模型用量",
+  "nameModel": "模型 %s",
   "nameModelTokens": "%s 今日 Token",
   "nameModelCosts": "%s 今日费用",
   "nameAvailable": "余额足以发起调用",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "一周",
   "nameWindowModelWeek": "一周（%s）",
   "nameWindowQuota": "%s 配额",
-  "nameWindowOther": "限额：%s"
+  "nameWindowOther": "限额：%s",
+  "descUnreach": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。",
+  "descLastError": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。",
+  "descWarning": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。",
+  "descLimitReached": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。",
+  "descWindowActive": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。",
+  "descWindowResetAt": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。",
+  "descResetCredits": "可购买的额度券，用于重置已用满的限额窗口。按供应商列表统计，已过期的不计入。",
+  "descCostsProjected": "按目前支出推算的月末花费——不是供应商给出的数字。",
+  "descTotalMaxPercent": "最满的账户：其套餐窗口或剩余额度，取较高者。"
 }

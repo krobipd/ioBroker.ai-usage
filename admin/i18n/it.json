@@ -1,7 +1,7 @@
 {
   "settingsHeader": "Impostazioni",
   "label_pollInterval": "Intervallo di polling (s)",
-  "help_pollInterval": "Frequenza di interrogazione di ogni account. Sotto i 300 s si rischia la limitazione del provider — Claude rifiuta poi le richieste a lungo.",
+  "help_pollInterval": "Con quale frequenza viene interrogato ogni account. Il minimo di 60 s evita il throttling dei provider; 300 s bastano per finestre che cambiano nell'arco di ore.",
   "label_notifications": "Notifiche",
   "help_notifications": "Una notifica quando un account supera la soglia di avviso o le credenziali smettono di funzionare.",
   "supportHeader": "Sostieni lo sviluppo",
@@ -30,6 +30,7 @@
   "nameLimits": "Finestre di limite",
   "nameWindowPercent": "%s utilizzato",
   "nameWindowResetAt": "%s si azzera il",
+  "nameWindowActive": "%s è il limite in vigore",
   "nameCredits": "Crediti",
   "nameCreditsUsed": "Crediti utilizzati",
   "nameCreditsLimit": "Limite di crediti",
@@ -48,6 +49,7 @@
   "nameTokensInput": "Token di input di oggi",
   "nameTokensOutput": "Token di output di oggi",
   "nameModels": "Utilizzo per modello",
+  "nameModel": "Modello %s",
   "nameModelTokens": "%s token di oggi",
   "nameModelCosts": "%s costi di oggi",
   "nameAvailable": "Saldo sufficiente per le chiamate",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "Settimana",
   "nameWindowModelWeek": "Settimana (%s)",
   "nameWindowQuota": "Quota %s",
-  "nameWindowOther": "Limite: %s"
+  "nameWindowOther": "Limite: %s",
+  "descUnreach": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+  "descLastError": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+  "descWarning": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+  "descLimitReached": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+  "descWindowActive": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+  "descWindowResetAt": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+  "descResetCredits": "Buoni acquistabili che azzerano una finestra di limite piena. Contati dall'elenco del provider, quelli scaduti esclusi.",
+  "descCostsProjected": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider.",
+  "descTotalMaxPercent": "L'account più pieno: la sua finestra di piano o il budget residuo, a seconda di quale sia maggiore."
 }

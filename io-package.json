@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.11.0",
+    "version": "0.12.0",
     "news": {
-      "NEXT": {
+      "0.12.0": {
         "en": "An account that is not signed in yet no longer reports a rejected sign-in, every limit window shows whether it is the one in force, and reset times stop flooding a recording.",
         "de": "Ein noch nicht angemeldetes Konto meldet keine abgelehnte Anmeldung mehr, jedes Limit-Fenster zeigt, ob es gerade das gültige ist, und Reset-Zeiten fluten keine Aufzeichnung mehr.",
         "ru": "Ещё не подключённый аккаунт больше не сообщает об отклонённом входе, каждое окно лимита показывает, действует ли оно сейчас, а время сброса больше не засоряет запись.",

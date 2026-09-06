@@ -75,10 +75,12 @@ ai-usage.0
 │  ├─ limitReached            bei 100 %
 │  ├─ limits.<fenster>.percent     Auslastung eines Limit-Fensters
 │  ├─ limits.<fenster>.resetAt     wann es zurückgesetzt wird (leer, wenn keins läuft)
-│  ├─ credits.*               verbraucht / Grenze / Rest / Prozent, gewährt / aufgeladen
+│  ├─ limits.<fenster>.active      ob dieses Fenster gerade das gültige Limit ist
+│  ├─ credits.*               verbraucht / Grenze / Rest / Prozent, gewährt / aufgeladen,
+│  │                          und ob das Guthaben noch für Aufrufe reicht
 │  ├─ costs.*                 heute / Monat / gesamt / Monatsend-Prognose
 │  ├─ tokens.*                Eingabe- und Ausgabe-Token heute
-│  └─ models.<modell>.*       Token und Kosten je Modell
+│  └─ models.<modell>.*       Token je Modell
 └─ total
    ├─ costs.today / month / projectedMonth      summiert über alle USD-Konten
    ├─ maxLimitPercent         das vollste Konto (Limit-Fenster oder Budget)

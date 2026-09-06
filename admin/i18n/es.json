@@ -1,7 +1,7 @@
 {
   "settingsHeader": "Ajustes",
   "label_pollInterval": "Intervalo de sondeo (s)",
-  "help_pollInterval": "Con qué frecuencia se consulta cada cuenta. Por debajo de 300 s hay riesgo de limitación del proveedor — Claude rechaza entonces las consultas durante mucho tiempo.",
+  "help_pollInterval": "Con qué frecuencia se consulta cada cuenta. El mínimo de 60 s evita que los proveedores limiten; 300 s bastan para ventanas que cambian a lo largo de horas.",
   "label_notifications": "Notificaciones",
   "help_notifications": "Una notificación cuando una cuenta supera su umbral de aviso o las credenciales dejan de funcionar.",
   "supportHeader": "Apoyar el desarrollo",
@@ -30,6 +30,7 @@
   "nameLimits": "Ventanas de límite",
   "nameWindowPercent": "%s utilizado",
   "nameWindowResetAt": "%s se reinicia el",
+  "nameWindowActive": "%s es el límite vigente",
   "nameCredits": "Créditos",
   "nameCreditsUsed": "Créditos utilizados",
   "nameCreditsLimit": "Límite de créditos",
@@ -48,6 +49,7 @@
   "nameTokensInput": "Tokens de entrada de hoy",
   "nameTokensOutput": "Tokens de salida de hoy",
   "nameModels": "Uso por modelo",
+  "nameModel": "Modelo %s",
   "nameModelTokens": "%s tokens de hoy",
   "nameModelCosts": "%s costes de hoy",
   "nameAvailable": "Saldo suficiente para las llamadas",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "Semana",
   "nameWindowModelWeek": "Semana (%s)",
   "nameWindowQuota": "Cuota de %s",
-  "nameWindowOther": "Límite: %s"
+  "nameWindowOther": "Límite: %s",
+  "descUnreach": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+  "descLastError": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+  "descWarning": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+  "descLimitReached": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+  "descWindowActive": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+  "descWindowResetAt": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+  "descResetCredits": "Vales comprables que reinician una ventana de límite llena. Contados desde la lista del proveedor, los caducados quedan fuera.",
+  "descCostsProjected": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor.",
+  "descTotalMaxPercent": "La cuenta más llena: su ventana del plan o su presupuesto restante, lo que sea mayor."
 }

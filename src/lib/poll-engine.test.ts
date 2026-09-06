@@ -353,16 +353,30 @@ describe("PollEngine", () => {
     expect(fired).toBe(1);
   });
 
-  test("an account without a provider is skipped with a warning", async () => {
+  test("an account without a usable credential still gets its objects and says so", async () => {
+    // It used to be skipped outright: no skeleton, no start stamp. An account whose
+    // key had been removed kept its whole tree standing with the last values AND
+    // the last status — green, on a key that no longer exists.
     const h = makeHarness();
-    const warnings: string[] = [];
-    h.deps.log.warn = m => void warnings.push(m);
-    const engine = new PollEngine([account()], new Map(), 300, h.deps);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map(), 300, h.deps);
     await engine.start();
-    expect(warnings.some(w => w.includes("skipped"))).toBe(true);
-    // Nothing is polled, but the user still configured one account.
     await h.tick();
+    expect(h.objects).toContain("a.info.unreach");
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(String(h.states.get("a.info.error"))).toContain("No API key");
+    // Nothing is polled, but the user still configured one account.
     expect(h.states.get("total.accounts")).toBe(1);
+    expect(h.states.get("total.accountsReachable")).toBe(0);
+    expect(h.intervalCount()).toBe(0);
+  });
+
+  test("a credential-less account does not hold the startup report back", async () => {
+    const h = makeHarness();
+    let reported = 0;
+    h.deps.afterFirstRound = () => void reported++;
+    const engine = new PollEngine([account({ id: "a" })], new Map(), 300, h.deps);
+    await engine.start();
+    expect(reported).toBe(1);
   });
 
   test("a full window raises limitReached on account and totals", async () => {
@@ -515,9 +529,16 @@ describe("PollEngine", () => {
       expect(h.changedWrites).toContain(id);
       expect(plain).not.toContain(id);
     }
-    for (const id of ["a.limits.w.percent", "a.info.lastUpdate", "total.maxLimitPercent"]) {
+    for (const id of ["a.limits.w.percent", "a.info.lastUpdate"]) {
       expect(plain).toContain(id);
       expect(h.changedWrites).not.toContain(id);
+    }
+    // The totals are recomputed after EVERY account's poll — with several accounts
+    // that was one write per account per round, nearly always of the value that
+    // was already there.
+    for (const id of ["total.maxLimitPercent", "total.costs.today", "total.accountsReachable"]) {
+      expect(h.changedWrites).toContain(id);
+      expect(plain).not.toContain(id);
     }
   });
 
@@ -675,5 +696,134 @@ describe("PollEngine", () => {
     await Promise.all([first, second]);
     expect(overlapped).toBe(false);
     expect(calls).toBe(2);
+  });
+
+  test("NOT SIGNED IN is not a rejected sign-in: no warning, no notification, no card error", async () => {
+    // Running the two together greeted a brand-new account with a warning, an
+    // ioBroker notification and a red "the stored sign-in was rejected" — before
+    // the user ever reached the sign-in button, and again after every sign-out.
+    const h = makeHarness();
+    const warnings: string[] = [];
+    h.deps.log.warn = m => void warnings.push(m);
+    const provider = scriptedProvider([
+      () => {
+        throw new FetchError("no-credentials", "Not signed in — start the Claude sign-in in the instance settings");
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "Claude" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.notifications).toEqual([]);
+    expect(h.authStates).toEqual([]);
+    expect(warnings).toEqual([]);
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(String(h.states.get("a.info.error"))).toContain("Not signed in");
+  });
+
+  test("a rejected sign-in still warns and notifies — the other half of the split", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      () => {
+        throw new FetchError("auth", "HTTP 401");
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "Claude" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.notifications).toHaveLength(1);
+    expect(h.authStates).toEqual([{ accountId: "a", rejected: true }]);
+  });
+
+  test("an answer that arrives AFTER the shutdown writes nothing", async () => {
+    // stop() cancels timers; it cannot cancel a request already in flight. The
+    // late answer used to overwrite markAllOffline() and leave a stopped adapter
+    // claiming the account was online.
+    const h = makeHarness();
+    let release: (value: UsageSnapshot) => void = () => undefined;
+    const provider: UsageProvider = {
+      kind: "openrouter",
+      fetch: () => new Promise<UsageSnapshot>(resolve => (release = resolve)),
+    };
+    const engine = new PollEngine([account({ id: "a" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    engine.stop();
+    await engine.markAllOffline();
+    release({ limits: [{ name: "w", label: "W", labelKey: "nameWindowSession", percent: 10 }] });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(h.states.get("a.limits.w.percent")).toBeUndefined();
+  });
+
+  test("the recovery says so too — a warning must not stay the last word", async () => {
+    const h = makeHarness();
+    const infos: string[] = [];
+    h.deps.log.info = m => void infos.push(m);
+    const provider = scriptedProvider([
+      () => {
+        throw new FetchError("service", "HTTP 503");
+      },
+      { limits: [{ name: "w", label: "W", labelKey: "nameWindowSession", percent: 4 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "Router" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(false);
+    expect(infos.some(line => line.includes("delivering again"))).toBe(true);
+  });
+
+  test("a window the provider LOCKED reaches limitReached, whatever the percentage says", async () => {
+    const h = makeHarness();
+    const warnings: string[] = [];
+    h.deps.log.warn = m => void warnings.push(m);
+    const provider = scriptedProvider([
+      {
+        limits: [
+          {
+            name: "week",
+            label: "Week (all models)",
+            labelKey: "nameWindowWeek",
+            percent: 96,
+            lockedReason: "usage_limit_reached",
+          },
+        ],
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "Claude" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.limitReached")).toBe(true);
+    expect(warnings.some(w => w.includes("locked by the provider"))).toBe(true);
+  });
+
+  test("a throttled account counts as delivering everywhere, not only in the icon", async () => {
+    // The icon read the account state while the totals read a second flag: a first
+    // poll that hit a throttle left the account green next to "0 reachable".
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      () => {
+        throw new FetchError("rate-limit", "HTTP 429");
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(false);
+    expect(h.states.get("total.accountsReachable")).toBe(1);
+    expect(h.states.get("info.connection")).toBe(true);
+  });
+
+  test("the account node carries the readable provider name, not the internal kind", async () => {
+    const h = makeHarness();
+    const engine = new PollEngine(
+      [account({ id: "claude", name: "Claude Max", provider: "claude-sub" })],
+      new Map(),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    expect(h.upserted.get("claude")?.common.name).toBe("Claude Max (Claude)");
   });
 });

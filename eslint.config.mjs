@@ -9,7 +9,14 @@ export default [
           // test/standards is ours and is linted; it lives outside the root
           // tsconfig include (which stays at the fleet master), so the parser
           // needs it named here.
-          allowDefaultProject: ["*.mjs", "*.mts", "test/standards/*.test.ts"],
+          allowDefaultProject: [
+            "*.mjs",
+            "*.mts",
+            "test/standards/*.test.ts",
+            // The inventory fixtures: plain CommonJS the adapter process preloads,
+            // outside every tsconfig include but ours to keep clean.
+            "test/fixtures/inventory/*.cjs",
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },

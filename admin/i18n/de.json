@@ -1,7 +1,7 @@
 {
   "settingsHeader": "Einstellungen",
   "label_pollInterval": "Abfrage-Intervall (s)",
-  "help_pollInterval": "Wie oft jedes Konto abgefragt wird. Unter 300 s droht Drosselung durch den Anbieter — Claude lehnt die Abfragen dann längere Zeit ab.",
+  "help_pollInterval": "Wie oft jedes Konto abgefragt wird. Die Untergrenze von 60 s hält die Anbieter davon ab, zu drosseln; 300 s reichen für Fenster, die sich über Stunden bewegen.",
   "label_notifications": "Benachrichtigungen",
   "help_notifications": "Eine Benachrichtigung, wenn ein Konto seine Warnschwelle überschreitet oder die Zugangsdaten nicht mehr funktionieren.",
   "supportHeader": "Entwicklung unterstützen",
@@ -30,6 +30,7 @@
   "nameLimits": "Limit-Fenster",
   "nameWindowPercent": "%s verbraucht",
   "nameWindowResetAt": "%s wird zurückgesetzt am",
+  "nameWindowActive": "%s ist gerade das gültige Limit",
   "nameCredits": "Guthaben",
   "nameCreditsUsed": "Guthaben verbraucht",
   "nameCreditsLimit": "Guthaben-Grenze",
@@ -48,6 +49,7 @@
   "nameTokensInput": "Eingabe-Token heute",
   "nameTokensOutput": "Ausgabe-Token heute",
   "nameModels": "Verbrauch je Modell",
+  "nameModel": "Modell %s",
   "nameModelTokens": "%s Token heute",
   "nameModelCosts": "%s Kosten heute",
   "nameAvailable": "Guthaben reicht für Anfragen",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "Woche",
   "nameWindowModelWeek": "Woche (%s)",
   "nameWindowQuota": "Kontingent %s",
-  "nameWindowOther": "Limit: %s"
+  "nameWindowOther": "Limit: %s",
+  "descUnreach": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+  "descLastError": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+  "descWarning": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+  "descLimitReached": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+  "descWindowActive": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+  "descWindowResetAt": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+  "descResetCredits": "Käufliche Gutscheine, die ein volles Limit-Fenster zurücksetzen. Aus der Liste des Anbieters gezählt, abgelaufene bleiben draußen.",
+  "descCostsProjected": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters.",
+  "descTotalMaxPercent": "Das vollste Konto: sein plan-weites Fenster oder sein Restguthaben, je nachdem, was höher liegt."
 }

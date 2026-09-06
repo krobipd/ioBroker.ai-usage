@@ -1,7 +1,7 @@
 {
   "settingsHeader": "Configurações",
   "label_pollInterval": "Intervalo de consulta (s)",
-  "help_pollInterval": "Com que frequência cada conta é consultada. Abaixo de 300 s há risco de limitação pelo provedor — a Claude passa então a rejeitar as consultas por muito tempo.",
+  "help_pollInterval": "Com que frequência cada conta é consultada. O mínimo de 60 s evita a limitação pelos fornecedores; 300 s chegam para janelas que mudam ao longo de horas.",
   "label_notifications": "Notificações",
   "help_notifications": "Uma notificação quando uma conta ultrapassa o limite de aviso ou as credenciais deixam de funcionar.",
   "supportHeader": "Apoiar o desenvolvimento",
@@ -30,6 +30,7 @@
   "nameLimits": "Janelas de limite",
   "nameWindowPercent": "%s utilizado",
   "nameWindowResetAt": "%s é reiniciado em",
+  "nameWindowActive": "%s é o limite em vigor",
   "nameCredits": "Créditos",
   "nameCreditsUsed": "Créditos utilizados",
   "nameCreditsLimit": "Limite de créditos",
@@ -48,6 +49,7 @@
   "nameTokensInput": "Tokens de entrada hoje",
   "nameTokensOutput": "Tokens de saída hoje",
   "nameModels": "Utilização por modelo",
+  "nameModel": "Modelo %s",
   "nameModelTokens": "%s tokens hoje",
   "nameModelCosts": "%s custos hoje",
   "nameAvailable": "Saldo suficiente para chamadas",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "Semana",
   "nameWindowModelWeek": "Semana (%s)",
   "nameWindowQuota": "Quota de %s",
-  "nameWindowOther": "Limite: %s"
+  "nameWindowOther": "Limite: %s",
+  "descUnreach": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+  "descLastError": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+  "descWarning": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+  "descLimitReached": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+  "descWindowActive": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+  "descWindowResetAt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+  "descResetCredits": "Vales compráveis que repõem uma janela de limite cheia. Contados a partir da lista do fornecedor, os expirados ficam de fora.",
+  "descCostsProjected": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor.",
+  "descTotalMaxPercent": "A conta mais cheia: a sua janela do plano ou o orçamento restante, o que for maior."
 }

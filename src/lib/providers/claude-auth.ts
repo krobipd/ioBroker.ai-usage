@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import type { JsonPost } from "../http";
 import { FetchError, type TokenSet } from "../provider";
 
 /**
@@ -47,9 +48,6 @@ export interface PkcePair {
   state: string;
 }
 
-/** The JSON-POST seam (tests inject a fake). */
-export type JsonPost = (url: string, body: Record<string, unknown>) => Promise<unknown>;
-
 /**
  * Generate a PKCE verifier/challenge pair plus CSRF state.
  *
@@ -93,7 +91,7 @@ function tokenSetFrom(body: unknown, now: number, previousRefresh = ""): TokenSe
   const data = body as Record<string, unknown> | null;
   const accessToken = typeof data?.access_token === "string" ? data.access_token : "";
   if (!accessToken) {
-    throw new FetchError("auth", "token response carries no access token");
+    throw new FetchError("auth", "The token response carries no access token");
   }
   const refreshToken =
     typeof data?.refresh_token === "string" && data.refresh_token ? data.refresh_token : previousRefresh;
@@ -122,19 +120,25 @@ export async function exchangeCode(
 ): Promise<TokenSet> {
   const [code, state = ""] = pastedCode.trim().split("#");
   if (!code) {
-    throw new FetchError("auth", "empty authorization code");
+    throw new FetchError("auth", "The pasted code is empty");
   }
   if (state && state !== pkce.state) {
-    throw new FetchError("auth", "state mismatch — start the sign-in again");
+    throw new FetchError("auth", "The pasted code belongs to a different sign-in attempt");
   }
-  const body = await postJson(CLAUDE_OAUTH.tokenUrl, {
-    grant_type: "authorization_code",
-    code,
-    state,
-    client_id: CLAUDE_OAUTH.clientId,
-    redirect_uri: CLAUDE_OAUTH.redirectUri,
-    code_verifier: pkce.verifier,
-  });
+  const body = await postJson(
+    CLAUDE_OAUTH.tokenUrl,
+    {
+      grant_type: "authorization_code",
+      code,
+      state,
+      client_id: CLAUDE_OAUTH.clientId,
+      redirect_uri: CLAUDE_OAUTH.redirectUri,
+      code_verifier: pkce.verifier,
+    },
+    // A token endpoint answers a dead code with 400 — that is a rejected sign-in,
+    // not a broken service.
+    { authOn400: true },
+  );
   return tokenSetFrom(body, now);
 }
 
@@ -148,12 +152,12 @@ export async function exchangeCode(
  */
 export async function refreshTokens(tokens: TokenSet, postJson: JsonPost, now: number): Promise<TokenSet> {
   if (!tokens.refreshToken) {
-    throw new FetchError("auth", "no refresh token — sign in again");
+    throw new FetchError("auth", "No refresh token stored — sign in again");
   }
-  const body = await postJson(CLAUDE_OAUTH.tokenUrl, {
-    grant_type: "refresh_token",
-    refresh_token: tokens.refreshToken,
-    client_id: CLAUDE_OAUTH.clientId,
-  });
+  const body = await postJson(
+    CLAUDE_OAUTH.tokenUrl,
+    { grant_type: "refresh_token", refresh_token: tokens.refreshToken, client_id: CLAUDE_OAUTH.clientId },
+    { authOn400: true },
+  );
   return tokenSetFrom(body, now, tokens.refreshToken);
 }

@@ -39,6 +39,8 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 - ioBroker js-controller >= 7.2.2
 - **ioBroker Admin >= 8.0.11** — the adapter uses the admin's central credential storage
 
+> The adapter CANNOT be installed via GitHub: The adapter must be installed via the ioBroker repository (stable or latest).
+
 ---
 
 ## Configuration
@@ -83,14 +85,14 @@ ai-usage.0.
 │   ├── info.unreach           — account is not delivering (bool) — drives the connection icon
 │   ├── info.error             — why there is no data; empty while all is well, "Unknown" while the adapter itself has nothing to report
 │   ├── info.lastUpdate        — time of the last successful read
-│   ├── limits.<window>.*      — percent + reset time (session, week, per model, …)
+│   ├── limits.<window>.*      — percent, reset time and whether this window is the limit in force
 │   └── credits.*              — where the provider reports a balance
 └── <name>-api                 — one node per key-based account
     ├── warning / limitReached — same triggers as above
     ├── info.*                 — same three status states as above
     ├── credits.* / costs.*    — granted budget and real money
     ├── tokens.*               — token counters
-    └── models.<model>.*        — tokens and costs per model, where the report carries them
+    └── models.<model>.*        — tokens per model, where the report carries them
 ```
 
 Only what an account's source actually delivers is created — and once created, a datapoint stays:
@@ -101,6 +103,10 @@ tree only when the provider stops reporting it entirely.
 green — the last values stay valid while the adapter waits. A rejected sign-in or a broken service
 switch it off at once, an unreachable service after three attempts, so a hiccup does not make it
 flap. `info.error` names the cause whenever the provider gave one.
+
+**Which window is in force** is shown per window: with Claude the provider says so itself, elsewhere it
+is the window that speaks for the account. It tells you what you will run into next — a model window
+can be the one in force while your session and week are nearly empty. It never raises the warning.
 
 **Only plan-wide windows raise the warning** — your session and your week — and the message names
 the window it came from. A window belonging to a single model keeps its own datapoints but stays
@@ -145,6 +151,25 @@ so instead of pretending to be connected; signing in again is all it takes.
     ### **WORK IN PROGRESS**
 -->
 
+### 0.12.0 (2026-09-06)
+
+- Fixed: An account that has not been signed in yet no longer reports a rejected sign-in — no warning, no notification, and the settings page keeps offering the sign-in button
+- Fixed: An account whose API key is missing or unreadable is now shown as not delivering, instead of leaving its old values standing as though they were current
+- Fixed: An answer arriving while the adapter shuts down can no longer mark an account as online again after the shutdown wrote it offline
+- Fixed: A throttled account counts as delivering everywhere now — the connection icon and the "reachable accounts" total no longer contradict each other
+- Fixed: A limit the provider reports as empty is no longer shown as 0 % used, and a Google quota without a value no longer reads as completely used up
+- Fixed: A rejected ChatGPT sign-in now says so at once instead of leaving you waiting for a quarter of an hour, and a Google account keeps delivering when one route is unavailable
+- Fixed: A Google account without an AI subscription says so, instead of asking for a sign-in that cannot change the answer
+- New: Every limit window shows whether it is the limit currently in force — with Claude the provider states it, elsewhere it is the window that speaks for the account
+- Improved: An account is reported as at its limit when the provider says the window is closed, not only when the percentage happens to reach 100
+- Improved: A window's reset time is written to the minute, so a recording of it no longer gains an entry on every single query, only on real changes
+- Improved: An account that is delivering again says so in the log, instead of leaving the warning about its outage standing as the last word on it
+- Improved: The settings page no longer asks the adapter for every status every four seconds — the values now arrive on their own as they change
+- Changed: "Balance sufficient for calls" now sits under credits, where it belongs; the datapoint at the old place is removed automatically
+- Changed: Each account node shows the readable provider name instead of the internal one — "Claude Max (Claude)" instead of "Claude Max (claude-sub)"
+- Fixed: A per-model folder is now named in your ioBroker language as well, instead of carrying the provider's bare model identifier as its only name
+- New: The datapoints whose meaning is not obvious from their name now carry a short explanation in eleven languages, shown in the object tree
+
 ### 0.11.0 (2026-09-05)
 
 - Fixed: Signing in from the instance settings works again — a leftover setting from an earlier version had silently closed the adapter's message channel, so none of the three flows reached it
@@ -173,10 +198,6 @@ so instead of pretending to be connected; signing in again is all it takes.
 ### 0.9.2 (2026-08-27)
 
 - Fixed: Stopping the instance now marks the accounts as offline on installations that were updated too, not only on fresh ones — the previous version left them showing as online
-
-### 0.9.1 (2026-08-27)
-
-- Changed: While an account has nothing to report — the adapter switched off, or started and not asked yet — the reason now reads "Unknown" instead of a sentence about the adapter
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

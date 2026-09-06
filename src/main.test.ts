@@ -28,9 +28,6 @@ vi.mock("node:fs/promises", () => ({
     }
     return Promise.resolve();
   }),
-  rename: vi.fn(() => {
-    return Promise.reject(new Error("ENOENT"));
-  }),
 }));
 
 // Stub the adapter-core base so the adapter can be built without an ioBroker
@@ -80,24 +77,17 @@ import type { TokenSet, TokenStore } from "./lib/provider";
 /** Typed access to the private members the tests drive. */
 interface Internals {
   tokenStore(provider: string): TokenStore;
-  signOut(provider: string): Promise<unknown>;
-  startSignIn(provider: string): Promise<unknown>;
-  submitSignIn(provider: string, message: unknown): Promise<{ status: string; reason?: string }>;
-  signInState(provider: string): Promise<{ status: string; reason?: string }>;
-  finishSignIn(provider: string, tokens: TokenSet): Promise<void>;
   onMessage(obj: unknown): Promise<void>;
-  removeRetiredStates(accounts: { id: string }[]): Promise<number>;
   clearStopInstanceFlag(): Promise<boolean>;
   loadTranslations(): void;
   refreshManifestObjects(): Promise<void>;
-  cleanupStaleObjects(): Promise<void>;
+  cleanupStaleObjects(accounts: { id: string }[]): Promise<void>;
+  removeMovedStates(accounts: { id: string }[]): Promise<void>;
   snapshotExistingStates(): Promise<void>;
   countUpsert(id: string): void;
   logDatapointBalance(): void;
   knownStateIds: Set<string>;
-  attempts: Map<string, unknown>;
-  signInErrors: Map<string, string>;
-  rejectedTokens: Set<string>;
+  signIn: { state(provider: string): Promise<{ status: string; reason?: string }> };
   onUnload(cb: () => void): void;
 }
 
@@ -128,12 +118,14 @@ describe("token store", () => {
     expect(await store.load()).toBeNull();
   });
 
-  test("signing out drops the tokens even after they were read", async () => {
+  test("clearing drops the tokens even after they were read", async () => {
+    // The cache inside the store is the point: a sign-out that only deleted the
+    // file left the adapter polling with what it still held in memory.
     const adapter = makeAdapter();
     const store = internals(adapter).tokenStore("claude-sub");
     await store.save(tokens);
     await store.load();
-    await internals(adapter).signOut("claude-sub");
+    await store.clear();
     expect(await store.load()).toBeNull();
     expect(files.has(CLAUDE_FILE)).toBe(false);
   });
@@ -162,83 +154,13 @@ describe("token store", () => {
   });
 });
 
-describe("sign-in flow", () => {
-  test("a paste submitted after the window closed says so instead of failing later", async () => {
-    const adapter = makeAdapter();
-    await internals(adapter).startSignIn("claude-sub");
-    const attempt = internals(adapter).attempts.get("claude-sub") as { expiresAt: number };
-    attempt.expiresAt = Date.now() - 1;
-    const result = await internals(adapter).submitSignIn("claude-sub", { value: "code" });
-    expect(result.status).toBe("failed");
-    expect(result.reason).toContain("expired");
-    // The dead attempt is gone, so the next start begins cleanly.
-    expect(internals(adapter).attempts.has("claude-sub")).toBe(false);
-  });
-
-  test("submitting without a started sign-in is refused", async () => {
-    const adapter = makeAdapter();
-    const result = await internals(adapter).submitSignIn("claude-sub", { value: "code" });
-    expect(result.status).toBe("failed");
-  });
-
-  test("the state of a signed-in subscription comes from the store", async () => {
+describe("messages", () => {
+  test("the sign-in state of a stored subscription comes through the adapter", async () => {
+    // The wiring, not the flow: the manager has its own suite. What is proven
+    // here is that the adapter hands it the store it owns.
     const adapter = makeAdapter();
     await internals(adapter).tokenStore("claude-sub").save(tokens);
-    expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-in");
-    await internals(adapter).signOut("claude-sub");
-    expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-out");
-  });
-
-  test("a valid sign-in wins over a remembered failure", async () => {
-    // The krobi case (2026-09-01): a stale error from an earlier attempt made the
-    // settings row show the sign-in screen although working tokens existed.
-    const adapter = makeAdapter();
-    await internals(adapter).tokenStore("claude-sub").save(tokens);
-    internals(adapter).signInErrors.set("claude-sub", "old failure");
-    expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-in");
-    // The stale failure is dropped for good, not just outvoted.
-    expect(internals(adapter).signInErrors.has("claude-sub")).toBe(false);
-  });
-
-  test("a rejected sign-in is NOT reported as signed in, even with tokens on disk", async () => {
-    // The inverse of the 2026-09-01 bug: a revoked refresh token leaves the file in
-    // place, so "the store has something" used to read as "signed in" — a green check
-    // next to an amber "Sign-in rejected" badge.
-    const adapter = makeAdapter();
-    await internals(adapter).tokenStore("claude-sub").save(tokens);
-    expect((await internals(adapter).signInState("claude-sub")).status).toBe("signed-in");
-
-    internals(adapter).rejectedTokens.add("claude-sub");
-    internals(adapter).signInErrors.set("claude-sub", "HTTP 401");
-    const state = await internals(adapter).signInState("claude-sub");
-    expect(state.status).toBe("failed");
-    expect(state.reason).toBe("HTTP 401");
-    // The file stays: a provider hiccup must not sign the user out behind their back.
-    expect(await internals(adapter).tokenStore("claude-sub").load()).not.toBeNull();
-  });
-
-  test("a rejected sign-in without a remembered reason still says what to do", async () => {
-    const adapter = makeAdapter();
-    await internals(adapter).tokenStore("claude-sub").save(tokens);
-    internals(adapter).rejectedTokens.add("claude-sub");
-    const state = await internals(adapter).signInState("claude-sub");
-    expect(state.status).toBe("failed");
-    expect(state.reason).toContain("sign in again");
-  });
-
-  test("starting, finishing or signing out clears the rejection", async () => {
-    const adapter = makeAdapter();
-    internals(adapter).rejectedTokens.add("claude-sub");
-    await internals(adapter).startSignIn("claude-sub");
-    expect(internals(adapter).rejectedTokens.has("claude-sub")).toBe(false);
-
-    internals(adapter).rejectedTokens.add("claude-sub");
-    await internals(adapter).finishSignIn("claude-sub", tokens);
-    expect(internals(adapter).rejectedTokens.has("claude-sub")).toBe(false);
-
-    internals(adapter).rejectedTokens.add("claude-sub");
-    await internals(adapter).signOut("claude-sub");
-    expect(internals(adapter).rejectedTokens.has("claude-sub")).toBe(false);
+    expect((await internals(adapter).signIn.state("claude-sub")).status).toBe("signed-in");
   });
 
   test("every message is answered, including an unknown one", async () => {
@@ -451,31 +373,29 @@ describe("manifest objects reach an existing installation", () => {
 });
 
 describe("object housekeeping", () => {
-  test("retired status states are only touched when the startup snapshot saw them", async () => {
-    const adapter = makeAdapter();
-    internals(adapter).knownStateIds = new Set(["claude.info.state", "claude.limits.week.percent"]);
-    const removed = await internals(adapter).removeRetiredStates([{ id: "claude" }]);
-    expect(removed).toBe(1);
-    expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
-    expect(adapter.delObjectAsync).toHaveBeenCalledWith("claude.info.state");
-    // Nothing left to do on the next start — and no lookups either.
-    expect(await internals(adapter).removeRetiredStates([{ id: "claude" }])).toBe(0);
-    expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
-  });
-
   test("an empty account table deletes nothing — the guard against wiping the tree", async () => {
     const adapter = makeAdapter();
-    adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
     adapter.getAdapterObjectsAsync = vi.fn(() => Promise.resolve({ "ai-usage.0.claude": {} } as never));
-    await internals(adapter).cleanupStaleObjects();
+    await internals(adapter).cleanupStaleObjects([]);
     expect(adapter.delObjectAsync).not.toHaveBeenCalled();
+  });
+
+  test("a state that MOVED in 0.12.0 is deleted at its old id", async () => {
+    // `available` went from the account root under `credits`. ioBroker never
+    // removes an id an adapter stops writing, so the old one would sit there
+    // frozen on its last value.
+    const adapter = makeAdapter();
+    internals(adapter).knownStateIds = new Set(["deep-api.available", "deep-api.credits.remaining"]);
+    await internals(adapter).removeMovedStates([{ id: "deep-api" }]);
+    expect(adapter.delObjectAsync).toHaveBeenCalledWith("deep-api.available");
+    expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
+    // Done after the first start — the snapshot no longer holds the id.
+    await internals(adapter).removeMovedStates([{ id: "deep-api" }]);
+    expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
   });
 
   test("a branch of an account that is no longer in the table goes", async () => {
     const adapter = makeAdapter();
-    adapter.config = {
-      accounts: [{ name: "Claude", provider: "claude-sub", credentialId: "", warnThreshold: 80 }],
-    } as unknown as ioBroker.AdapterConfig;
     adapter.getAdapterObjectsAsync = vi.fn(() =>
       Promise.resolve({
         "ai-usage.0.claude": {},
@@ -485,7 +405,7 @@ describe("object housekeeping", () => {
         "ai-usage.0.total": {},
       } as never),
     );
-    await internals(adapter).cleanupStaleObjects();
+    await internals(adapter).cleanupStaleObjects([{ id: "claude" }]);
     expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
     expect(adapter.delObjectAsync).toHaveBeenCalledWith("old-api", { recursive: true });
   });

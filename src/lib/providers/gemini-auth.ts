@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
+import type { FormPost } from "../http";
 import { FetchError, type TokenSet } from "../provider";
-import type { FormPost } from "./chatgpt-auth";
 
 /**
  * Constants of the Google sign-in that actually works for consumer subscriptions.
@@ -92,7 +92,7 @@ export function buildGeminiAuthorizeUrl(pkce: GeminiPkce): string {
 export function extractGeminiCode(pasted: string, expectedState: string): string {
   const trimmed = pasted.trim();
   if (!trimmed) {
-    throw new FetchError("auth", "nothing pasted");
+    throw new FetchError("auth", "Nothing pasted");
   }
   if (!trimmed.includes("?") && !trimmed.includes("&")) {
     return trimmed;
@@ -105,11 +105,11 @@ export function extractGeminiCode(pasted: string, expectedState: string): string
   }
   const code = params.get("code");
   if (!code) {
-    throw new FetchError("auth", "the pasted address carries no code");
+    throw new FetchError("auth", "The pasted address carries no code");
   }
   const state = params.get("state");
   if (state && state !== expectedState) {
-    throw new FetchError("auth", "the pasted address belongs to a different sign-in attempt");
+    throw new FetchError("auth", "The pasted address belongs to a different sign-in attempt");
   }
   return code;
 }
@@ -129,14 +129,18 @@ export async function exchangeGeminiCode(
   post: FormPost,
   now: number,
 ): Promise<TokenSet> {
-  const body = await post(GEMINI_OAUTH.tokenUrl, {
-    grant_type: "authorization_code",
-    client_id: GEMINI_OAUTH.clientId,
-    client_secret: GEMINI_OAUTH.clientSecret,
-    code,
-    code_verifier: pkce.verifier,
-    redirect_uri: GEMINI_OAUTH.redirectUri,
-  });
+  const body = await post(
+    GEMINI_OAUTH.tokenUrl,
+    {
+      grant_type: "authorization_code",
+      client_id: GEMINI_OAUTH.clientId,
+      client_secret: GEMINI_OAUTH.clientSecret,
+      code,
+      code_verifier: pkce.verifier,
+      redirect_uri: GEMINI_OAUTH.redirectUri,
+    },
+    { authOn400: true },
+  );
   return toTokenSet(body, now, "");
 }
 
@@ -149,12 +153,16 @@ export async function exchangeGeminiCode(
  * @returns the refreshed token set
  */
 export async function refreshGeminiTokens(tokens: TokenSet, post: FormPost, now: number): Promise<TokenSet> {
-  const body = await post(GEMINI_OAUTH.tokenUrl, {
-    grant_type: "refresh_token",
-    client_id: GEMINI_OAUTH.clientId,
-    client_secret: GEMINI_OAUTH.clientSecret,
-    refresh_token: tokens.refreshToken,
-  });
+  const body = await post(
+    GEMINI_OAUTH.tokenUrl,
+    {
+      grant_type: "refresh_token",
+      client_id: GEMINI_OAUTH.clientId,
+      client_secret: GEMINI_OAUTH.clientSecret,
+      refresh_token: tokens.refreshToken,
+    },
+    { authOn400: true },
+  );
   return toTokenSet(body, now, tokens.refreshToken, tokens.accountRef);
 }
 
@@ -171,7 +179,7 @@ function toTokenSet(body: unknown, now: number, previousRefresh: string, previou
   const raw = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
   const accessToken = typeof raw.access_token === "string" ? raw.access_token : "";
   if (!accessToken) {
-    throw new FetchError("auth", "no access token in the answer");
+    throw new FetchError("auth", "The token response carries no access token");
   }
   const lifetime = Number(raw.expires_in);
   return {

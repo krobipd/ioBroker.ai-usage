@@ -38,3 +38,8 @@ CLAUDE.local.md
 # Admin custom component build intermediates (admin/custom itself IS tracked — GitHub install)
 src-admin/build/
 src-admin/.__mf__temp/
+# Module-Federation build diagnostics — generated on every build, like coverage/
+src-admin/.mf/
+
+# Build output is not versioned: the CI builds before test and publish (common.nogit)
+build/

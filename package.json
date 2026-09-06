@@ -1,6 +1,6 @@
 {
   "name": "iobroker.ai-usage",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "ioBroker adapter monitoring usage, limits and costs of AI accounts (Claude, ChatGPT, Gemini, OpenAI, Anthropic, OpenRouter, DeepSeek)",
   "author": {
     "name": "krobi",

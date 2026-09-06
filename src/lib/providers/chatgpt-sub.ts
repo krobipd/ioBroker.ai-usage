@@ -1,4 +1,4 @@
-import { getJson, type JsonFetch } from "../http";
+import { getJson, type JsonFetch, type JsonPost } from "../http";
 import {
   FetchError,
   type LimitWindow,
@@ -7,7 +7,8 @@ import {
   type UsageProvider,
   type UsageSnapshot,
 } from "../provider";
-import { CHATGPT_IDENTITY, CHATGPT_OAUTH, refreshChatgptTokens, type JsonPost } from "./chatgpt-auth";
+import { finiteNumber, sanitizeId } from "../pure-helpers";
+import { CHATGPT_IDENTITY, refreshChatgptTokens } from "./chatgpt-auth";
 
 /** Where the subscription usage lives (the endpoint OpenAI's own Codex client uses). */
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
@@ -46,16 +47,18 @@ function readWindow(
     return undefined;
   }
   const entry = raw as Record<string, unknown>;
-  const percent = Number(entry.used_percent);
-  if (!Number.isFinite(percent)) {
+  // `finiteNumber`, not `Number`: a window the account does not have arrives as
+  // null, and `Number(null)` is 0 — reported as "nothing used yet".
+  const percent = finiteNumber(entry.used_percent);
+  if (percent === undefined) {
     return undefined;
   }
   const window: LimitWindow = { name, label, percent, labelKey };
   if (labelArg !== undefined) {
     window.labelArg = labelArg;
   }
-  const resetAt = Number(entry.reset_at);
-  if (Number.isFinite(resetAt) && resetAt > 0) {
+  const resetAt = finiteNumber(entry.reset_at) ?? 0;
+  if (resetAt > 0) {
     const ms = resetAt > 1e12 ? resetAt : resetAt * 1000;
     window.resetAt = new Date(ms).toISOString();
   }
@@ -97,12 +100,14 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
     const label = typeof entry.limit_name === "string" ? entry.limit_name : "";
     // The name becomes an object-id segment, so it must survive sanitizing and must
     // not collide with a window already collected — a name of "Session" would
-    // otherwise overwrite the 5-hour window with an unrelated counter.
-    const name = label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-    if (!name || limits.some(window => window.name === name)) {
+    // otherwise overwrite the 5-hour window with an unrelated counter. `sanitizeId`
+    // is the adapter's ONE id rule; this used to be a second, lower-cased one, so
+    // the same window name produced a different path here than anywhere else.
+    const name = sanitizeId(label);
+    // Case-insensitive: ioBroker ids are case-sensitive, so "Session" and
+    // "session" would both be created — two nodes for one thing, and the reader
+    // has to guess which is the 5-hour window.
+    if (!name || limits.some(window => window.name.toLowerCase() === name.toLowerCase())) {
       continue;
     }
     // The provider named this one — it rides in as the `%s` of a translated frame.
@@ -121,8 +126,8 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
   }
 
   const credits = (raw.credits ?? {}) as Record<string, unknown>;
-  const balance = Number(credits.balance);
-  if (Number.isFinite(balance) && credits.unlimited !== true) {
+  const balance = finiteNumber(credits.balance);
+  if (balance !== undefined && credits.unlimited !== true) {
     snapshot.credits = { remaining: balance, currency: "USD" };
   }
   return snapshot;
@@ -145,8 +150,8 @@ export function parseChatgptResetCredits(body: unknown, nowMs: number): { count:
   const raw = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
   const list = Array.isArray(raw.credits) ? raw.credits : null;
   if (!list) {
-    const serverCount = Number(raw.available_count);
-    return { count: Number.isFinite(serverCount) && serverCount >= 0 ? serverCount : 0, nextExpiry: "" };
+    const serverCount = finiteNumber(raw.available_count) ?? -1;
+    return { count: serverCount >= 0 ? serverCount : 0, nextExpiry: "" };
   }
   let count = 0;
   let nextExpiry = "";
@@ -196,7 +201,7 @@ export function chatgptSubProvider(
     fetch: async (): Promise<UsageSnapshot> => {
       let tokens: TokenSet | null = await store.load();
       if (!tokens) {
-        throw new FetchError("auth", "not signed in — start the ChatGPT sign-in in the instance settings");
+        throw new FetchError("no-credentials", "Not signed in — start the ChatGPT sign-in in the instance settings");
       }
       if (now() >= tokens.expiresAt - 60_000) {
         tokens = await refreshChatgptTokens(tokens, postJson, now());
@@ -239,5 +244,3 @@ export function chatgptSubProvider(
     },
   };
 }
-
-export { CHATGPT_IDENTITY, CHATGPT_OAUTH };

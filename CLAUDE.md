@@ -21,7 +21,7 @@ auf (Abgrenzung zu ai-toolbox/ai-assistant), schreibt nie zum Anbieter.
 src/main.ts                    → Adapter: Engine-Verdrahtung, Credential-Auflösung (zentraler
                                  Admin-Speicher), Anmelde-Nachrichten aller drei Abos
                                  (signInStart/Submit/Status/signOut), je Anbieter eine
-                                 verschlüsselte Token-Datei + Migration der alten, Cleanup
+                                 verschlüsselte Token-Datei, Cleanup
 src/lib/poll-engine.ts         → Orchestrierung (pur, IO injiziert): Zyklen je Konto, Fehlerklassen
                                  (auth=1×Meldung / rate-limit=Backoff / service=sofort offline /
                                  network=3 Versuche), Dienst-Status je Konto,
@@ -41,7 +41,9 @@ src/lib/providers/chatgpt-sub.ts   → /wham/usage: 5-h- + Wochen-Fenster, Gutha
 src/lib/providers/gemini-auth.ts   → Google-Anmeldung (PKCE, Adresszeile auswerten, Erneuern)
 src/lib/providers/gemini-sub.ts    → loadCodeAssist (Projekt) + retrieveUserQuota (Kontingente)
 src/lib/providers/openrouter|deepseek|openai|anthropic-api.ts → je Anbieter fetch+parse (pur)
-src/lib/sign-in.ts             → welcher Anmelde-Fluss je Anbieter + Zeilen-Zustände
+src/lib/sign-in.ts             → Anmelde-Fluss/Label je Anbieter (aus dem Katalog), Zeilen-Zustände
+src/lib/sign-in-manager.ts     → die drei Anmelde-Flüsse: laufende Versuche, Gerätecode-Poller,
+                                 abgelehnte Token, was die Karte sieht (IO injiziert, ohne ioBroker testbar)
 src/lib/jwt.ts                 → Ablaufzeit + ChatGPT-Konto-Kennung aus dem Token lesen
 src/lib/providers/report-utils.ts  → Monatsstart/heute/Hochrechnung + Seiten-Blättern für die
                                  beiden Report-Anbieter (OpenAI, Anthropic)
@@ -138,9 +140,11 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     widersprechen sich (Typ-Erkenner: Text, Gültigkeits-Liste des Prüfbots: nur Ja/Nein → E1009) —
     Gültigkeit gewinnt, der Text läuft auf `text`. Beide nur bei ÄNDERUNG geschrieben — seit 0.7.0 gilt das auch für `warning`, `limitReached`,
     `total.limitReached` und `info.connection` (govee-Lehre, Muster in `CLAUDE_PATTERNS.md`).
-    Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` — beim Start
-    deterministisch gelöscht (feste Liste, kein Zustands-Raten; welche davon es noch gibt, sagt der
-    Start-Schnappschuss aus Punkt 14, nicht 35 Einzelabfragen pro Start).
+    Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` (0.5.0). Die
+    Einmal-Löschung beim Start ist seit 2026-09-06 ausgebaut (krobi: „natürlich aufräumen") — ebenso
+    die Token-Datei-Übernahme aus dem 0.2.0-Layout und der Sonderfall für den alten `auth`-Zweig:
+    alle drei betrafen nur Versionen VOR der Aufnahme ins Latest-Verzeichnis (2026-08-30, ab 0.6.0),
+    und krobis Anlage war live geprüft bereits bereinigt.
     ⚠️ **0.8.0 hatte hier „vor der ersten Antwort wird KEIN Status geschrieben" — das war mein
     Fehler und ist in 0.9.0 zurückgenommen** (siehe Punkt 19): der Weglassen-Ansatz lässt nach
     einem Absturz ein totes Konto grün stehen. Der Start-Stempel ist wieder drin.
@@ -148,8 +152,7 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     „Object tree updated: created N, removed M datapoint(s)", still bei 0/0. Damit sie nicht nach
     jedem Neustart alles als neu meldet, wird VOR Aufräumen und Engine ein Schnappschuss aller
     vorhandenen Zustands-Ids gezogen — der Anlege-Pfad läuft pro Prozess einmal über JEDEN
-    Datenpunkt, auch über bestehende. Die Einmal-Migration der abgeschafften Status-Datenpunkte
-    zählt NICHT mit, sie meldet ihre eigene Summe. Ausgelöst wird die Zeile, wenn das LETZTE Konto
+    Datenpunkt, auch über bestehende. Ausgelöst wird die Zeile, wenn das LETZTE Konto
     seine erste Abfrage hinter sich hat (`afterFirstRound`) — die erste Runde ist bewusst versetzt,
     und ein Konfig-Wechsel startet die Instanz ohnehin neu.
 15. **Der Waisen-Aufräumer entfernt nur STRUKTUR, nie Einzelwerte** (0.8.0, geschärft 0.10.0):
@@ -277,6 +280,78 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     ein Anbieter-Aussetzer darf den Nutzer nicht hinter seinem Rücken abmelden. Nur `auth` zählt —
     Drossel, Dienst-Defekt und Netzfehler nicht.
 
+29. **Der Anbieter-Katalog ist EINE Tabelle** (0.12.0): `PROVIDERS` in `provider.ts` trägt Kennung,
+    Anzeigename, Anmelde-Fluss, feste Konto-Id und „braucht Admin-Schlüssel". Vorher lagen dieselben
+    Angaben an fünf Stellen (Typ-Union, Kennungs-Liste, Id-Tabelle, Fluss- und Label-Tabelle) — für
+    einen neuen Anbieter fünf Änderungen, ohne dass etwas ein Vergessen gefangen hätte. `ProviderKind`
+    wird aus der Tabelle abgeleitet, damit `makeProvider` ohne `default`-Zweig vollständig ist. Die
+    Kopie im Konfig-Panel bleibt (eigenes Bündel, kein Import möglich), ist aber per Test an die
+    Tabelle genagelt: gleiche Anbieter, gleiche Namen, gleiches Admin-Schlüssel-Kennzeichen.
+30. **„Nicht angemeldet" ist eine EIGENE Fehlerklasse** (0.12.0, fünfte neben Entscheidung 11):
+    `no-credentials` heißt, es liegt keine Anmeldung/kein Schlüssel vor — `auth` heißt, der Anbieter
+    hat eine ABGELEHNT. Zusammengeworfen empfing ein neuer Nutzer vor seiner ersten Anmeldung eine
+    Warnung, eine ioBroker-Benachrichtigung und ein rotes „the stored sign-in was rejected"; nach
+    jedem bewussten Abmelden dasselbe binnen fünf Minuten. Die neue Klasse meldet still (info),
+    benachrichtigt nicht und lässt die Karte den Anmelde-Knopf zeigen.
+31. **Ein Konto ohne brauchbaren Zugang bekommt trotzdem sein Skelett** (0.12.0): vorher wurde es im
+    Engine-Konstruktor übersprungen — kein Objekt, kein Start-Stempel. Ein Konto, dessen Schlüssel
+    aus dem Admin-Speicher verschwand, blieb mit altem Wert UND altem (grünem) Status stehen.
+    Entscheidung 19c gilt für JEDES Konto, nicht nur für abfragbare: Skelett + `unreach=true` +
+    Grundtext, nie eine Abfrage.
+32. **Nach jedem `await` im Abfragepfad wird der Stopp erneut geprüft** (0.12.0): `stop()` bricht
+    Zeitgeber ab, keine laufende Anfrage. Die späte Antwort schrieb nach `markAllOffline()` wieder
+    „online" — genau der Zustand, gegen den Entscheidung 19 gebaut ist. Fenster: bis zu 15 s.
+33. **EINE Antwort auf „liefert das Konto"** (0.12.0): `isDelivering(state)`. Symbol und Fehlertext
+    lasen den Konto-Zustand, Totals und `info.connection` ein zweites Flag — eine erste Abfrage in
+    der Drossel ließ das Konto grün stehen und meldete daneben „0 Konten erreichbar".
+34. **`authOn400` steht am AUFRUF, nicht im Helfer** (0.12.0): richtig für die Token-Endpunkte, falsch
+    überall sonst. Der ChatGPT-Gerätecode las einen 400 als „noch nicht bestätigt" und wartete sein
+    ganzes Fenster ab, Googles Code-Assist-Aufruf verzichtete deshalb auf seinen Zweit-Host.
+35. **`is_active` wird angezeigt, entscheidet aber nichts** (0.12.0, Rohantwort gemessen 2026-09-06):
+    Anthropic markiert das Fenster, das gerade gilt (Fable 97 % aktiv, Sitzung 8 % und Woche 54 %
+    nicht). Der Baum trägt es als `limits.<fenster>.active`; wo ein Anbieter es nicht liefert
+    (ChatGPT, Google), markiert der Baumbauer das Fenster, das fürs Konto spricht — gleiche Bedeutung
+    überall. **Die Warnung bleibt an den plan-weiten Fenstern** (krobi 2026-09-06: „fable 100% ist das
+    fable limit, aber weder das 5h stunden limit noch das wochenlimit").
+36. **`locked_reason` ist das echte Gesperrt-Signal** (0.12.0): es sitzt nur an `five_hour`/`seven_day`
+    und sagt, dass der Anbieter das Fenster geschlossen hat. `limitReached` hing bis dahin allein an
+    `percent >= 100`. Kein eigener Datenpunkt (krobi 2026-09-06) — es speist `limitReached` und eine
+    Protokollzeile beim Übergang.
+37. **Fenster-Enden werden auf die MINUTE geschrieben** (0.12.0): Anthropic rechnet den Zeitpunkt je
+    Anfrage neu (…59.898Z / …00.364Z / …59.539Z). Unverändert übernommen zählte JEDE Abfrage als
+    Änderung — 952 Historien-Einträge in fünf Tagen für 17 echte Fenster (am Server gemessen).
+38. **`available` liegt unter `credits`** (0.12.0): „reicht das Guthaben noch für Aufrufe" ist eine
+    Aussage über das Guthaben; an der Konto-Wurzel stand sie neben `warning`/`limitReached` und las
+    sich wie ein dritter konto-weiter Alarm. Der alte Datenpunkt wird beim Start gelöscht
+    (`MOVED_STATES`) — der Adapter räumt seinen Bestand selbst auf.
+39. **Das Objekt-Inventar kommt aus einem ECHTEN Lauf, ohne Test-Naht im Produktivcode** (0.12.0):
+    ai-usage spricht sieben feste Fremd-Adressen — die Flotten-Vorlage füttert ihre Fixtures aber in
+    den laufenden Adapter. Lösung: `test/inventory.js` startet den Adapter im Wegwerf-Controller mit
+    `NODE_OPTIONS=--require test/fixtures/inventory/fetch-hook.cjs`; der Haken ersetzt im
+    ADAPTER-Prozess das globale `fetch` durch die Fixture-Tabelle und WEIST alles andere ab (kein
+    Aufruf verlässt die Maschine). Die vier Schlüssel-Konten bekommen echte
+    `system.credentials.*`-Objekte — unverschlüsselt, weil `getCredentials` nur entschlüsselt, was in
+    `native.encryptedFields` steht. Die drei Abos melden sich über die echte Nachrichtenbox an
+    (`sendTo`), der Adapter schreibt seine Token selbst: damit sind der Gerätecode- und der
+    Google-Fluss zum ersten Mal automatisiert abgedeckt. Gewartet wird auf
+    `total.accountsReachable == 7`, nicht auf „der Baum wächst nicht mehr" — beim ersten Lauf
+    schrieb genau das ein Skelett für vier von sieben Konten. Ergebnis: 137 Objekte, zwei Läufe
+    byte-gleich. **Der erste Lauf fand sofort einen Fehler:** die Modell-Kanäle trugen den
+    Anbieter-Namen als festen String (`nameModel`-Rahmen statt `model.model`) — für das statische
+    Namens-Gate unsichtbar, weil Laufzeitwert.
+40. **Beschreibungen gibt es nur, wo der Name nicht reicht** (0.12.0, Flotten-Standard): neun
+    `desc`-Schlüssel × 11 Sprachen für die Datenpunkte, deren Bedeutung man dem Namen nicht ansieht —
+    `info.unreach`/`info.error` (was „leer" und was „Unknown" heißt), `warning`/`limitReached`
+    (warum ein Modell-Fenster sie NICHT auslöst), `limits.*.active`, `limits.*.resetAt` (was ein
+    leerer Wert bedeutet), `credits.resetCredits`, `costs.projectedMonth` und
+    `total.maxLimitPercent` (beide berechnet, nicht vom Anbieter). Die übrigen 45 bleiben LEER —
+    „Kosten heute" erklärt sich selbst, und ein Satz, der den Namen wiederholt, ist schlechter als
+    keiner. Inventar: 51 von 96 Datenpunkten mit Beschreibung.
+41. **Die Konfigseite ABONNIERT die Statuswerte** (0.12.0): vorher fragte sie alle vier Sekunden je
+    Abo eine Nachricht und je Konto zwei Zustände ab, solange sie offen war. `subscribeState` liefert
+    den aktuellen Wert beim Abonnieren gleich mit; gepollt wird nur noch der Anmelde-Status — alle
+    vier Sekunden ausschließlich während eines laufenden Gerätecode-Flusses, sonst alle 30 s.
+
 ## Tests
 
 ```
@@ -285,6 +360,9 @@ src/**/*.test.ts               → vitest: Anbieter-Parser gegen echte Antwort-F
 test/package.js                → standard: @iobroker/testing packageFiles
 test/integration.js            → standard: @iobroker/testing integration (CI)
 test/standards/                → iobroker-adapter-checks (Repo-Standards)
+test/inventory.js              → Objekt-Inventar aus Fixtures ÜBER ALLE SIEBEN KONTOARTEN
+                                 (`npm run test:inventory`) + Upgrade-Suite (INVENTORY_PREVIOUS)
+test/fixtures/inventory/       → die Anbieter-Antworten + der `fetch`-Ersatz für den Adapter-Prozess
 ```
 
 `src/lib/http.test.ts` (seit 0.11.0) nagelt die Status→Fehlerklasse-Abbildung fest, das Rückgrat der
@@ -296,6 +374,12 @@ Zeilen-Logik im Konfig-Panel — die Datei liegt bei ihrem Code, wird vom ROOT-T
 `coverage.include`: vitest 5 wertet das Muster STRIKT aus, ohne die zweite Zeile fiel die Datei
 still aus der Messung ([[reference_vitest5_deckung_und_pool]]); `src/lib/i18n.test.ts` beweist Vollständigkeit und
 Platzhalter-Konsistenz der elf Sprachdateien und dass jeder im Quelltext benutzte Schlüssel existiert.
+
+`src/lib/sign-in-manager.test.ts` (seit 0.12.0, 17 Tests) deckt die drei Anmelde-Flüsse ab — bis dahin
+lagen sie in `main.ts` und damit außerhalb jedes Tests: der Gerätecode-Fluss, der Zeitfenster-Ablauf,
+die Überlappungs-Sperre des Pollers, „abgelehnt schlägt Datei-Existenz" und das Zurücksetzen einer
+Ablehnung. Zwei der drei Abos sind nie an einem echten Konto gelaufen — das war die einzige Stelle,
+an der das kein Gate auffing.
 
 `src/main.test.ts` (seit 0.8.0) deckt die Adapter-Schicht ab — Zugangsdaten-Ablage, Anmelde-Wege,
 Aufräumen, Start-Schnappschuss, Abschalten; ai-usage war der einzige Adapter der Flotte ohne, und

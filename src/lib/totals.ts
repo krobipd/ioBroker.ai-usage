@@ -20,8 +20,6 @@ export interface Totals {
   costsMonth: number;
   /** Summed projected month-end spend. */
   costsProjectedMonth: number;
-  /** The currency the sums are in. */
-  currency: string;
   /**
    * The highest utilisation of any account (percent) — per account the fullest
    * plan-wide window or its granted budget, whichever is higher. Model-scoped
@@ -89,7 +87,6 @@ export function computeTotals(statuses: readonly AccountStatus[], configured: nu
     costsToday: round2(costsToday),
     costsMonth: round2(costsMonth),
     costsProjectedMonth: round2(costsProjectedMonth),
-    currency: TOTAL_CURRENCY,
     maxLimitPercent: round2(maxPercent),
     warningsActive,
     limitReached,

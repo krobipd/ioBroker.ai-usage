@@ -1,7 +1,8 @@
 import { tName } from "./i18n";
 import type { AccountConfig } from "./pure-helpers";
+import { PROVIDER_LABELS } from "./sign-in";
 import { FetchError, type UsageProvider, type UsageSnapshot } from "./provider";
-import { limitingWindow, mapSnapshot, orphanObjectIds, type ObjectDef } from "./snapshot-tree";
+import { limitingWindow, lockedWindows, mapSnapshot, orphanObjectIds, type ObjectDef } from "./snapshot-tree";
 import { computeTotals, type AccountStatus } from "./totals";
 
 /**
@@ -11,7 +12,24 @@ import { computeTotals, type AccountStatus } from "./totals";
  * `unauthorized` means it is up but rejects our sign-in, `service-down` means the
  * service itself answered with a fault, `no-connection` means we never reached it.
  */
-export type AccountState = "ok" | "unauthorized" | "rate-limited" | "service-down" | "no-connection";
+export type AccountState = "ok" | "unauthorized" | "rate-limited" | "service-down" | "no-connection" | "not-signed-in";
+
+/**
+ * Whether an account is delivering usable numbers right now.
+ *
+ * ONE answer for the whole engine. The connection icon read it off the account's
+ * state while the totals and `info.connection` read a second flag, so a first poll
+ * that hit a throttle left the account green next to "0 accounts reachable".
+ *
+ * A throttle keeps the last values and the service is fine — that stays green; a
+ * missing sign-in, a rejected one, a broken service and no connection do not.
+ *
+ * @param state the account's state
+ * @returns true while the account counts as delivering
+ */
+export function isDelivering(state: AccountState): boolean {
+  return state === "ok" || state === "rate-limited";
+}
 
 /** Consecutive network failures after which an account is judged unreachable. */
 const MAX_NETWORK_FAILURES = 3;
@@ -31,6 +49,9 @@ const STAGGER_MS = 3000;
  * names the reason, it does not explain itself.
  */
 const REASON_UNKNOWN = "Unknown";
+
+/** What `info.error` says for an account the adapter has no usable credential for. */
+const NO_CREDENTIAL_REASON = "No API key selected — pick one in the instance settings";
 
 /** The adapter callbacks the engine drives — narrow, so tests need no adapter mock. */
 export interface EngineDeps {
@@ -89,7 +110,17 @@ export interface EngineDeps {
 /** One account's runtime state inside the engine. */
 interface AccountRuntime {
   config: AccountConfig;
-  provider: UsageProvider;
+  /**
+   * The account's source, or null when there is none to build — a key account
+   * whose credential is missing or unreadable.
+   *
+   * Such an account still gets its objects and its start stamp. Skipping it
+   * outright left the tree of a previously working account standing with its last
+   * values AND its last status, so a key that had been removed showed as online
+   * for as long as nobody looked (decision 19c applies to every account, not only
+   * to the ones that can be polled).
+   */
+  provider: UsageProvider | null;
   status: AccountStatus;
   /** Consecutive network failures. */
   failCount: number;
@@ -101,6 +132,8 @@ interface AccountRuntime {
   authNotified: boolean;
   /** Whether the last query was rejected as unauthorized — reported to the sign-in card. */
   authRejected: boolean;
+  /** Whether a plan-wide window was reported as CLOSED by the provider on the last answer. */
+  locked: boolean;
   /** Whether the AI service itself answered on the last attempt. */
   serviceOnline: boolean;
   /** The account's one-word state. */
@@ -158,10 +191,11 @@ export class PollEngine {
   ) {
     this.configuredAccounts = accounts.length;
     for (const config of accounts) {
-      const provider = providers.get(config.id);
+      const provider = providers.get(config.id) ?? null;
       if (!provider) {
-        deps.log.warn(`${config.name}: provider "${config.provider}" is not available — account skipped`);
-        continue;
+        // No warning here: the adapter already said which credential it could not
+        // read, with the reason. A second line would only repeat it.
+        deps.log.debug(`${config.name}: no usable credential — the account is shown as not delivering`);
       }
       this.runtimes.push({
         config,
@@ -173,10 +207,12 @@ export class PollEngine {
         authNotified: false,
         authRejected: false,
         serviceOnline: false,
-        state: "no-connection",
+        state: provider ? "no-connection" : "not-signed-in",
         // Nothing known until the service says something; the skeleton writes
-        // REASON_UNKNOWN, and the first answer replaces it.
-        error: REASON_UNKNOWN,
+        // REASON_UNKNOWN, and the first answer replaces it. An account without a
+        // credential has its answer already.
+        error: provider ? REASON_UNKNOWN : NO_CREDENTIAL_REASON,
+        locked: false,
         createdObjects: new Set(),
         firstPollDone: false,
         polling: false,
@@ -200,6 +236,13 @@ export class PollEngine {
       return;
     }
     this.runtimes.forEach((runtime, index) => {
+      if (!runtime.provider) {
+        // Nothing to ask. The skeleton above has already said so; count it as
+        // been-through so it cannot hold the first-round report back for ever.
+        runtime.firstPollDone = true;
+        this.reportFirstRoundOnce();
+        return;
+      }
       // The repeating timer is armed INSIDE the staggered first poll, not next to
       // it: armed here it would start counting for every account in the same
       // instant, and from the second round on all of them would fire together —
@@ -286,7 +329,7 @@ export class PollEngine {
    * @param runtime the account's runtime
    */
   private async pollAccount(runtime: AccountRuntime): Promise<void> {
-    if (this.stopped) {
+    if (this.stopped || !runtime.provider) {
       return;
     }
     if (runtime.polling) {
@@ -320,13 +363,20 @@ export class PollEngine {
       this.reportFirstRoundOnce();
       return;
     }
+    const wasFailing = runtime.state !== "ok";
     try {
-      const snapshot = await runtime.provider.fetch();
+      const snapshot = await (runtime.provider as UsageProvider).fetch();
+      // The answer can arrive AFTER onUnload: `stop()` cancels the timers, it
+      // cannot cancel a request already in flight. Writing now would undo
+      // `markAllOffline()` and leave a stopped adapter claiming the account is
+      // online — the exact state decision 19 exists to prevent.
+      if (this.stopped) {
+        return;
+      }
       runtime.failCount = 0;
       runtime.backoffMs = BACKOFF_START_MS;
       runtime.authNotified = false;
       runtime.status.snapshot = snapshot;
-      runtime.status.reachable = true;
       runtime.serviceOnline = true;
       runtime.state = "ok";
       runtime.error = "";
@@ -334,10 +384,19 @@ export class PollEngine {
         runtime.authRejected = false;
         this.deps.authState?.(config.id, false);
       }
+      if (wasFailing) {
+        // The failure said so in the log; the recovery has to as well, or the
+        // last word on this account stays a warning that is no longer true.
+        this.deps.log.info(`${config.name}: delivering again`);
+      }
       await this.applySnapshot(runtime, snapshot);
     } catch (e) {
+      if (this.stopped) {
+        return;
+      }
       this.handleFailure(runtime, e);
     }
+    runtime.status.reachable = isDelivering(runtime.state);
     this.writeAccountInfo(runtime);
     this.writeTotals();
     runtime.firstPollDone = true;
@@ -377,14 +436,23 @@ export class PollEngine {
       writes.map(write => write.id),
     );
     // Only PLAN-WIDE windows speak for the account — a per-model bucket at 100 %
-    // must not read as "this AI is full" (krobi 2026-08-26).
+    // must not read as "this AI is full" (krobi 2026-08-26, again 2026-09-06:
+    // "fable 100% ist das fable limit, aber weder das 5h stunden limit noch das
+    // wochenlimit").
     const driver = limitingWindow(snapshot);
     const percent = driver?.percent ?? 0;
     const wasWarning = runtime.status.warning;
     runtime.status.warning = percent >= config.warnThreshold;
+    // A provider that CLOSED a plan-wide window has said outright what the
+    // percentage only implies. Both count.
+    const locked = lockedWindows(snapshot);
+    if (locked.length > 0 && !runtime.locked) {
+      this.deps.log.warn(`${config.name}: ${locked[0].label} is locked by the provider — ${locked[0].reason}`);
+    }
+    runtime.locked = locked.length > 0;
     // Indicators go through the changed-write, measurements through the normal one.
     void this.deps.setStateChanged(`${config.id}.warning`, runtime.status.warning);
-    void this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100);
+    void this.deps.setStateChanged(`${config.id}.limitReached`, percent >= 100 || runtime.locked);
     if (runtime.status.warning && !wasWarning) {
       // Always name the window: "usage at 100 %" without it was misleading whenever
       // several windows existed.
@@ -431,8 +499,20 @@ export class PollEngine {
   private handleFailure(runtime: AccountRuntime, error: unknown): void {
     const { config } = runtime;
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof FetchError && error.kind === "no-credentials") {
+      // Nobody has signed in yet, or the key is gone. That is not a rejected
+      // sign-in: no notification, no warning, and the settings page keeps
+      // offering the sign-in button instead of an error.
+      runtime.serviceOnline = true;
+      runtime.state = "not-signed-in";
+      runtime.error = message;
+      if (!runtime.authNotified) {
+        runtime.authNotified = true;
+        this.deps.log.info(`${config.name}: ${message}`);
+      }
+      return;
+    }
     if (error instanceof FetchError && error.kind === "auth") {
-      runtime.status.reachable = false;
       runtime.serviceOnline = true;
       runtime.state = "unauthorized";
       runtime.error = `Sign-in rejected — ${message}`;
@@ -448,6 +528,7 @@ export class PollEngine {
       }
       return;
     }
+
     if (error instanceof FetchError && error.kind === "rate-limit") {
       runtime.serviceOnline = true;
       runtime.state = "rate-limited";
@@ -460,7 +541,6 @@ export class PollEngine {
       return;
     }
     if (error instanceof FetchError && error.kind === "service") {
-      runtime.status.reachable = false;
       runtime.failCount = 0;
       if (runtime.serviceOnline) {
         this.deps.log.warn(`${config.name}: the service reports a fault (${message}) — values kept`);
@@ -473,7 +553,6 @@ export class PollEngine {
     runtime.failCount++;
     this.deps.log.debug(`${config.name}: fetch failed (${message}), attempt ${runtime.failCount}`);
     if (runtime.failCount >= MAX_NETWORK_FAILURES) {
-      runtime.status.reachable = false;
       if (runtime.serviceOnline) {
         this.deps.log.warn(`${config.name}: not reachable after ${runtime.failCount} attempts (${message})`);
       }
@@ -510,7 +589,7 @@ export class PollEngine {
    */
   private async writeAccountStatus(runtime: AccountRuntime): Promise<void> {
     const { config } = runtime;
-    const delivering = runtime.state === "ok" || runtime.state === "rate-limited";
+    const delivering = isDelivering(runtime.state);
     await Promise.all([
       this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering),
       this.deps.setStateChanged(`${config.id}.info.error`, runtime.error),
@@ -523,13 +602,17 @@ export class PollEngine {
       this.runtimes.map(runtime => runtime.status),
       this.configuredAccounts,
     );
-    this.deps.setState("total.costs.today", totals.costsToday);
-    this.deps.setState("total.costs.month", totals.costsMonth);
-    this.deps.setState("total.costs.projectedMonth", totals.costsProjectedMonth);
-    this.deps.setState("total.maxLimitPercent", totals.maxLimitPercent);
-    this.deps.setState("total.warningsActive", totals.warningsActive);
+    // Every total goes through the changed-write. They are recomputed after EVERY
+    // account's poll — with several accounts that meant one write per account per
+    // round, almost always of the value that was already there. What they say only
+    // changes when an account's numbers change, and then the write happens.
+    void this.deps.setStateChanged("total.costs.today", totals.costsToday);
+    void this.deps.setStateChanged("total.costs.month", totals.costsMonth);
+    void this.deps.setStateChanged("total.costs.projectedMonth", totals.costsProjectedMonth);
+    void this.deps.setStateChanged("total.maxLimitPercent", totals.maxLimitPercent);
+    void this.deps.setStateChanged("total.warningsActive", totals.warningsActive);
     void this.deps.setStateChanged("total.limitReached", totals.limitReached);
-    this.deps.setState("total.accountsReachable", totals.accountsReachable);
+    void this.deps.setStateChanged("total.accountsReachable", totals.accountsReachable);
     // The configured count only ever changes with the configuration, which restarts
     // the instance — rewriting it every cycle would be pure noise in a recording.
     void this.deps.setStateChanged("total.accounts", totals.accounts);
@@ -548,7 +631,9 @@ export class PollEngine {
         id: config.id,
         type: "device",
         common: {
-          name: `${config.name} (${config.provider})`,
+          // The readable provider name, never the internal kind: the node used to
+          // read "Claude (claude-sub)" and "My key (anthropic-api)" in the tree.
+          name: `${config.name} (${PROVIDER_LABELS[config.provider] ?? config.provider})`,
           // The admin's object tree draws its connection icon from this link and
           // from nothing else — govee, beszel, homewizard and nut2 all do the same.
           statusStates: { offlineId: "info.unreach" },
@@ -564,6 +649,7 @@ export class PollEngine {
         type: "state",
         common: {
           name: tName("nameUnreach"),
+          desc: tName("descUnreach"),
           type: "boolean",
           role: "indicator.maintenance.unreach",
           read: true,
@@ -576,7 +662,14 @@ export class PollEngine {
         // boolean only (E1009). Validity wins, so the message rides on `text`.
         id: `${config.id}.info.error`,
         type: "state",
-        common: { name: tName("nameLastError"), type: "string", role: "text", read: true, write: false },
+        common: {
+          name: tName("nameLastError"),
+          desc: tName("descLastError"),
+          type: "string",
+          role: "text",
+          read: true,
+          write: false,
+        },
       },
       {
         id: `${config.id}.info.lastUpdate`,
@@ -586,13 +679,21 @@ export class PollEngine {
       {
         id: `${config.id}.warning`,
         type: "state",
-        common: { name: tName("nameWarning"), type: "boolean", role: "indicator", read: true, write: false },
+        common: {
+          name: tName("nameWarning"),
+          desc: tName("descWarning"),
+          type: "boolean",
+          role: "indicator",
+          read: true,
+          write: false,
+        },
       },
       {
         id: `${config.id}.limitReached`,
         type: "state",
         common: {
           name: tName("nameLimitReached"),
+          desc: tName("descLimitReached"),
           type: "boolean",
           role: "indicator",
           read: true,
@@ -618,7 +719,10 @@ export class PollEngine {
     // state, success or failure. Only the marker — `info.error` belongs to the AI
     // service, and "we have not asked yet" is not something it said.
     void this.deps.setStateChanged(`${config.id}.info.unreach`, true);
-    void this.deps.setStateChanged(`${config.id}.info.error`, REASON_UNKNOWN);
+    // REASON_UNKNOWN while nothing has been asked yet — but an account without a
+    // usable credential has its answer already, and repeating "Unknown" there
+    // would hide it.
+    void this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
   }
 
   /** The totals skeleton (channel + states). */
@@ -654,6 +758,7 @@ export class PollEngine {
         type: "state",
         common: {
           name: tName("nameTotalCostsProjected"),
+          desc: tName("descCostsProjected"),
           type: "number",
           role: "value",
           read: true,
@@ -670,6 +775,7 @@ export class PollEngine {
           // limitingWindow) — the old name promised something narrower than the
           // number ever was.
           name: tName("nameTotalMaxPercent"),
+          desc: tName("descTotalMaxPercent"),
           type: "number",
           role: "value",
           read: true,
@@ -693,6 +799,7 @@ export class PollEngine {
         type: "state",
         common: {
           name: tName("nameTotalLimitReached"),
+          desc: tName("descLimitReached"),
           type: "boolean",
           role: "indicator",
           read: true,

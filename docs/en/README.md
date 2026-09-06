@@ -75,10 +75,12 @@ ai-usage.0
 │  ├─ limitReached            at 100 %
 │  ├─ limits.<window>.percent      utilisation of a limit window
 │  ├─ limits.<window>.resetAt      when it resets (empty while no window runs)
-│  ├─ credits.*               used / limit / remaining / percent, granted / topped up
+│  ├─ limits.<window>.active       whether this window is the limit in force
+│  ├─ credits.*               used / limit / remaining / percent, granted / topped up,
+│  │                          and whether the balance still covers calls
 │  ├─ costs.*                 today / month / total / projected month-end
 │  ├─ tokens.*                input and output tokens today
-│  └─ models.<model>.*        per-model tokens and costs
+│  └─ models.<model>.*        per-model tokens
 └─ total
    ├─ costs.today / month / projectedMonth      summed over all USD accounts
    ├─ maxLimitPercent         the fullest account (limit window or budget)

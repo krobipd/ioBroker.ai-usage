@@ -1,7 +1,7 @@
 {
   "settingsHeader": "Instellingen",
   "label_pollInterval": "Peilinterval (s)",
-  "help_pollInterval": "Hoe vaak elk account wordt bevraagd. Onder 300 s dreigt beperking door de aanbieder — Claude wijst de verzoeken dan lange tijd af.",
+  "help_pollInterval": "Hoe vaak elk account wordt opgevraagd. De ondergrens van 60 s voorkomt dat aanbieders gaan beperken; 300 s volstaat voor vensters die over uren bewegen.",
   "label_notifications": "Meldingen",
   "help_notifications": "Eén melding wanneer een account de waarschuwingsdrempel overschrijdt of de inloggegevens niet meer werken.",
   "supportHeader": "Ontwikkeling steunen",
@@ -30,6 +30,7 @@
   "nameLimits": "Limietvensters",
   "nameWindowPercent": "%s verbruikt",
   "nameWindowResetAt": "%s wordt gereset op",
+  "nameWindowActive": "%s is de geldende limiet",
   "nameCredits": "Tegoed",
   "nameCreditsUsed": "Tegoed verbruikt",
   "nameCreditsLimit": "Tegoedlimiet",
@@ -48,6 +49,7 @@
   "nameTokensInput": "Invoertokens vandaag",
   "nameTokensOutput": "Uitvoertokens vandaag",
   "nameModels": "Verbruik per model",
+  "nameModel": "Model %s",
   "nameModelTokens": "%s tokens vandaag",
   "nameModelCosts": "%s kosten vandaag",
   "nameAvailable": "Tegoed voldoende voor aanvragen",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "Week",
   "nameWindowModelWeek": "Week (%s)",
   "nameWindowQuota": "Quotum %s",
-  "nameWindowOther": "Limiet: %s"
+  "nameWindowOther": "Limiet: %s",
+  "descUnreach": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+  "descLastError": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+  "descWarning": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+  "descLimitReached": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+  "descWindowActive": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+  "descWindowResetAt": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+  "descResetCredits": "Koopbare vouchers die een vol limietvenster resetten. Geteld uit de lijst van de aanbieder, verlopen exemplaren tellen niet mee.",
+  "descCostsProjected": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder.",
+  "descTotalMaxPercent": "Het volste account: zijn planbrede venster of zijn resterende budget, wat hoger is."
 }

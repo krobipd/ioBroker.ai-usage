@@ -1,4 +1,4 @@
-import { getJson, type JsonFetch } from "../http";
+import { getJson, type JsonFetch, type JsonPost } from "../http";
 import {
   FetchError,
   type LimitWindow,
@@ -7,8 +7,8 @@ import {
   type UsageProvider,
   type UsageSnapshot,
 } from "../provider";
-import { sanitizeId } from "../pure-helpers";
-import { CLAUDE_OAUTH, refreshTokens, type JsonPost } from "./claude-auth";
+import { finiteNumber, sanitizeId } from "../pure-helpers";
+import { CLAUDE_OAUTH, refreshTokens } from "./claude-auth";
 
 /**
  * Parse a Claude subscription `GET /api/oauth/usage` response into a snapshot.
@@ -41,10 +41,15 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
     scoped = false,
     labelKey = "nameWindowOther",
     labelArg?: string,
+    active?: unknown,
+    lockedReason?: unknown,
   ): void => {
     const id = sanitizeId(name);
-    const value = Number(percent);
-    if (!id || seen.has(id) || !Number.isFinite(value)) {
+    // `finiteNumber`, not `Number`: the API sends null for a bucket that does not
+    // apply, and `Number(null)` is 0 — a window nobody has an allowance for would
+    // have been reported as "0 % used".
+    const value = finiteNumber(percent);
+    if (!id || seen.has(id) || value === undefined) {
       return;
     }
     seen.add(id);
@@ -58,7 +63,21 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
     if (scoped) {
       window.scoped = true;
     }
+    if (typeof active === "boolean") {
+      window.active = active;
+    }
+    if (typeof lockedReason === "string" && lockedReason) {
+      window.lockedReason = lockedReason;
+    }
     limits.push(window);
+  };
+
+  // The plan-wide blocks carry one thing the limits[] entries do not: the reason
+  // the provider CLOSED a window. Read it here and hand it to the matching bucket
+  // — measured 2026-09-06, `locked_reason` sits on five_hour/seven_day only.
+  const lockedReasonOf = (key: string): unknown => {
+    const block = raw[key];
+    return typeof block === "object" && block !== null ? (block as Record<string, unknown>).locked_reason : undefined;
   };
 
   // The live meters: limits[] — buckets keyed by kind + model + surface.
@@ -107,6 +126,14 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
         scoped,
         labelKey,
         labelKey === "nameWindowModelWeek" ? foreign || kind.replace(/_/g, " ") : undefined,
+        // The provider names the window that is in force right now — no guessing
+        // needed for the account that has the flag.
+        limit.is_active,
+        kind === "session"
+          ? lockedReasonOf("five_hour")
+          : kind === "weekly_all"
+            ? lockedReasonOf("seven_day")
+            : undefined,
       );
     }
   }
@@ -124,7 +151,7 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
       const block = raw[key];
       if (typeof block === "object" && block !== null) {
         const data = block as Record<string, unknown>;
-        push(name, label, data.utilization, data.resets_at, scoped, labelKey, labelArg);
+        push(name, label, data.utilization, data.resets_at, scoped, labelKey, labelArg, undefined, data.locked_reason);
       }
     };
     flat("five_hour", "session", "Session (5 h)", "nameWindowSession");
@@ -212,7 +239,10 @@ export function claudeSubProvider(
     fetch: async (): Promise<UsageSnapshot> => {
       let tokens: TokenSet | null = await store.load();
       if (!tokens) {
-        throw new FetchError("auth", "not signed in — run the Claude sign-in in the instance settings");
+        // NOT `auth`: nobody has signed in yet. `auth` means the provider REJECTED
+        // a sign-in, and treating the two alike greeted a new user with a warning,
+        // a notification and a red error before they reached the sign-in button.
+        throw new FetchError("no-credentials", "Not signed in — start the Claude sign-in in the instance settings");
       }
       if (now() >= tokens.expiresAt - 60_000) {
         tokens = await refreshTokens(tokens, postJson, now());

@@ -1,4 +1,14 @@
-import { accountId, clampPollInterval, datapointBalanceLine, parseAccounts, sanitizeId } from "./pure-helpers";
+import { PROVIDERS } from "./provider";
+import {
+  accountId,
+  clampPollInterval,
+  datapointBalanceLine,
+  parseAccounts,
+  PROVIDER_KINDS,
+  sanitizeId,
+  SUBSCRIPTION_IDS,
+} from "./pure-helpers";
+import { PROVIDER_LABELS, SIGN_IN_FLOWS } from "./sign-in";
 
 describe("sanitizeId", () => {
   test("keeps safe characters and collapses the rest to single underscores", () => {
@@ -126,5 +136,40 @@ describe("the admin panel's copy of the id rule", () => {
     for (const [provider, credentialId] of cases) {
       expect(panel.accountId(provider, credentialId)).toBe(accountId(provider, credentialId));
     }
+  });
+});
+
+describe("the provider catalogue is the single source", () => {
+  test("kinds, ids, labels and flows all come from the same table", () => {
+    // They used to live in five places — the kind union, the kind list, the id map
+    // and the flow and label maps — with nothing to catch a half-added provider.
+    expect(PROVIDER_KINDS).toEqual(PROVIDERS.map(entry => entry.kind));
+    expect(SUBSCRIPTION_IDS).toEqual({ "claude-sub": "claude", "chatgpt-sub": "chatgpt", "gemini-sub": "gemini" });
+    for (const entry of PROVIDERS) {
+      // Exactly the subscriptions have a sign-in flow and a fixed account id.
+      expect(SIGN_IN_FLOWS[entry.kind] !== undefined).toBe(entry.accountId !== undefined);
+      expect(PROVIDER_LABELS[entry.kind]).toBe(entry.label);
+      expect(entry.label).not.toContain("-sub");
+    }
+  });
+
+  test("the panel offers the same providers under the same names", async () => {
+    // Second copy on purpose — the panel is its own bundle and cannot import from
+    // the adapter. Nothing but this test makes the two agree.
+    const panel = (await import("../../src-admin/src/rows.js")) as {
+      SUBSCRIPTIONS: { provider: string; label: string }[];
+      KEY_PROVIDERS: { provider: string; label: string; needsAdminKey: boolean }[];
+    };
+    for (const row of [...panel.SUBSCRIPTIONS, ...panel.KEY_PROVIDERS]) {
+      const entry = PROVIDERS.find(candidate => candidate.kind === row.provider);
+      expect(entry, `panel offers unknown provider ${row.provider}`).toBeDefined();
+      expect(row.label).toBe(entry?.label);
+    }
+    for (const key of panel.KEY_PROVIDERS) {
+      expect(key.needsAdminKey).toBe(PROVIDERS.find(entry => entry.kind === key.provider)?.needsAdminKey === true);
+    }
+    // Every provider is offered somewhere, or a user could never switch it on.
+    const offered = [...panel.SUBSCRIPTIONS, ...panel.KEY_PROVIDERS].map(row => row.provider);
+    expect(offered.sort()).toEqual(PROVIDERS.map(entry => entry.kind).sort());
   });
 });

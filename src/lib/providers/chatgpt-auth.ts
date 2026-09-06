@@ -1,3 +1,4 @@
+import type { FormPost, JsonPost } from "../http";
 import { jwtExpiry, chatgptAccountId } from "../jwt";
 import { FetchError, type TokenSet } from "../provider";
 
@@ -43,19 +44,6 @@ export const CHATGPT_IDENTITY = {
   userAgent: "codex_cli_rs/0.153.2",
 } as const;
 
-/** A JSON POST seam (injected so the modules stay testable). */
-export type JsonPost = (
-  url: string,
-  body: Record<string, unknown>,
-  headers?: Record<string, string>,
-) => Promise<unknown>;
-/** A form POST seam. */
-export type FormPost = (
-  url: string,
-  form: Record<string, string>,
-  headers?: Record<string, string>,
-) => Promise<unknown>;
-
 /** What the device-code start handed back — the user-facing half plus the polling handle. */
 export interface DeviceCodeStart {
   /** The short code the user types on {@link CHATGPT_OAUTH.verificationUrl}. */
@@ -95,7 +83,9 @@ export async function startDeviceCode(post: JsonPost, now: number): Promise<Devi
   const userCode = str(body, "user_code");
   const deviceAuthId = str(body, "device_auth_id");
   if (!userCode || !deviceAuthId) {
-    throw new FetchError("network", "unexpected device-code response");
+    // "service", not "network": the endpoint ANSWERED, we just cannot read it —
+    // the same rule the usage parsers follow (design decision 21).
+    throw new FetchError("service", "Unexpected device-code response");
   }
   // The server sends the interval as a STRING; never poll faster than once a second.
   const advised = Number(str(body, "interval"));
@@ -156,13 +146,17 @@ export async function exchangeDeviceCode(
   post: FormPost,
   now: number,
 ): Promise<TokenSet> {
-  const body = await post(CHATGPT_OAUTH.tokenUrl, {
-    grant_type: "authorization_code",
-    client_id: CHATGPT_OAUTH.clientId,
-    code,
-    code_verifier: codeVerifier,
-    redirect_uri: CHATGPT_OAUTH.deviceRedirectUri,
-  });
+  const body = await post(
+    CHATGPT_OAUTH.tokenUrl,
+    {
+      grant_type: "authorization_code",
+      client_id: CHATGPT_OAUTH.clientId,
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: CHATGPT_OAUTH.deviceRedirectUri,
+    },
+    { authOn400: true },
+  );
   return toTokenSet(body, now, "");
 }
 
@@ -176,11 +170,11 @@ export async function exchangeDeviceCode(
  * @returns the refreshed token set
  */
 export async function refreshChatgptTokens(tokens: TokenSet, post: JsonPost, now: number): Promise<TokenSet> {
-  const body = await post(CHATGPT_OAUTH.tokenUrl, {
-    client_id: CHATGPT_OAUTH.clientId,
-    grant_type: "refresh_token",
-    refresh_token: tokens.refreshToken,
-  });
+  const body = await post(
+    CHATGPT_OAUTH.tokenUrl,
+    { client_id: CHATGPT_OAUTH.clientId, grant_type: "refresh_token", refresh_token: tokens.refreshToken },
+    { authOn400: true },
+  );
   return toTokenSet(body, now, tokens.refreshToken, tokens.accountRef);
 }
 
@@ -196,7 +190,7 @@ export async function refreshChatgptTokens(tokens: TokenSet, post: JsonPost, now
 function toTokenSet(body: unknown, now: number, previousRefresh: string, previousAccount?: string): TokenSet {
   const accessToken = str(body, "access_token");
   if (!accessToken) {
-    throw new FetchError("auth", "no access token in the answer");
+    throw new FetchError("auth", "The token response carries no access token");
   }
   const idToken = str(body, "id_token");
   return {

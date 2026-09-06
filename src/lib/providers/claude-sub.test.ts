@@ -143,14 +143,16 @@ describe("claudeSubProvider", () => {
     return store;
   }
 
-  test("without stored tokens the fetch is an auth error (sign-in required)", async () => {
+  test("without stored tokens the fetch says NO CREDENTIALS, not rejected", async () => {
     const provider = claudeSubProvider(
       memoryStore(null),
       () => Promise.resolve({}),
       () => Promise.resolve({}),
       () => 0,
     );
-    await expect(provider.fetch()).rejects.toMatchObject({ kind: "auth" });
+    // The split that keeps a brand-new account out of the warning/notification
+    // path: nobody has signed in yet, the provider has rejected nothing.
+    await expect(provider.fetch()).rejects.toMatchObject({ kind: "no-credentials" });
   });
 
   test("a valid token fetches usage with bearer + beta header", async () => {
@@ -191,5 +193,51 @@ describe("claudeSubProvider", () => {
     await provider.fetch();
     expect(usedTokens[0]).toBe("Bearer fresh");
     expect(store.saved[0]).toMatchObject({ accessToken: "fresh", refreshToken: "rt2" });
+  });
+});
+
+describe("the fields 0.12.0 started reading", () => {
+  const payload = {
+    five_hour: { utilization: 8, resets_at: "2026-09-06T14:09:59.898660+00:00", locked_reason: null },
+    seven_day: { utilization: 54, resets_at: "2026-09-07T18:59:59.898682+00:00", locked_reason: null },
+    limits: [
+      { kind: "session", group: "session", percent: 8, severity: "normal", is_active: false, scope: null },
+      { kind: "weekly_all", group: "weekly", percent: 54, severity: "normal", is_active: false, scope: null },
+      {
+        kind: "weekly_scoped",
+        group: "weekly",
+        percent: 97,
+        severity: "critical",
+        is_active: true,
+        scope: { model: { id: null, display_name: "Fable" }, surface: null },
+      },
+    ],
+  };
+
+  test("is_active is carried through per window (live payload, 2026-09-06)", () => {
+    const snapshot = parseClaudeUsage(payload);
+    expect(snapshot.limits?.map(limit => [limit.name, limit.active])).toEqual([
+      ["session", false],
+      ["week", false],
+      ["weekly_scoped-Fable", true],
+    ]);
+  });
+
+  test("locked_reason rides in from the flat block onto its window", () => {
+    // It sits on five_hour/seven_day only — the limits[] entries do not carry it.
+    const snapshot = parseClaudeUsage({
+      ...payload,
+      seven_day: { ...payload.seven_day, locked_reason: "usage_limit_reached" },
+    });
+    const week = snapshot.limits?.find(limit => limit.name === "week");
+    expect(week?.lockedReason).toBe("usage_limit_reached");
+    expect(snapshot.limits?.find(limit => limit.name === "session")?.lockedReason).toBeUndefined();
+  });
+
+  test("a null percentage is left out instead of counting as 0 %", () => {
+    // Number(null) is 0 — a bucket the account has no allowance for would have
+    // been reported as "nothing used yet".
+    const snapshot = parseClaudeUsage({ limits: [{ kind: "session", percent: null }] });
+    expect(snapshot.limits).toBeUndefined();
   });
 });

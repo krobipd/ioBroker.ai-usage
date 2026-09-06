@@ -6,9 +6,9 @@ import {
   type UsageProvider,
   type UsageSnapshot,
 } from "../provider";
-import type { FormPost } from "./chatgpt-auth";
+import type { FormPost, JsonPost } from "../http";
 import { refreshGeminiTokens } from "./gemini-auth";
-import { sanitizeId } from "../pure-helpers";
+import { finiteNumber, sanitizeId } from "../pure-helpers";
 
 /**
  * Google's internal Code-Assist endpoints. The `daily-` host is tried first:
@@ -31,13 +31,6 @@ export const GEMINI_IDENTITY = {
   userAgent: "antigravity/1.11.3",
 } as const;
 
-/** A JSON POST seam that also reports which host answered. */
-export type GeminiPost = (
-  url: string,
-  body: Record<string, unknown>,
-  headers?: Record<string, string>,
-) => Promise<unknown>;
-
 /**
  * Call a Code-Assist method, falling back to the second host on failure.
  *
@@ -51,7 +44,7 @@ async function callCodeAssist(
   method: string,
   body: Record<string, unknown>,
   accessToken: string,
-  post: GeminiPost,
+  post: JsonPost,
 ): Promise<unknown> {
   const headers = {
     Authorization: `Bearer ${accessToken}`,
@@ -60,7 +53,7 @@ async function callCodeAssist(
   let lastError: unknown;
   for (const host of GEMINI_HOSTS) {
     try {
-      return await post(`${host}:${method}`, body, headers);
+      return await post(`${host}:${method}`, body, { headers });
     } catch (e) {
       // An auth failure is the same on every host — only retry transport trouble.
       if (e instanceof FetchError && e.kind === "auth") {
@@ -117,8 +110,10 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
       continue;
     }
     const bucket = entry as Record<string, unknown>;
-    const fraction = Number(bucket.remainingFraction);
-    if (!Number.isFinite(fraction)) {
+    // `finiteNumber`, not `Number`: `Number(null)` is 0, and a null remaining
+    // fraction would have been reported as a bucket that is 100 % used.
+    const fraction = finiteNumber(bucket.remainingFraction);
+    if (fraction === undefined) {
       continue;
     }
     const model = typeof bucket.modelId === "string" ? bucket.modelId : "";
@@ -161,7 +156,7 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
  */
 export function geminiSubProvider(
   store: TokenStore,
-  post: GeminiPost,
+  post: JsonPost,
   postForm: FormPost,
   now: () => number = Date.now,
 ): UsageProvider {
@@ -170,7 +165,7 @@ export function geminiSubProvider(
     fetch: async (): Promise<UsageSnapshot> => {
       let tokens: TokenSet | null = await store.load();
       if (!tokens) {
-        throw new FetchError("auth", "not signed in — start the Google sign-in in the instance settings");
+        throw new FetchError("no-credentials", "Not signed in — start the Google sign-in in the instance settings");
       }
       if (now() >= tokens.expiresAt - 60_000) {
         tokens = await refreshGeminiTokens(tokens, postForm, now());
@@ -188,8 +183,11 @@ export function geminiSubProvider(
           ),
         );
         if (!info.project) {
+          // NOT `auth`: the sign-in worked, the account simply has no Code-Assist
+          // project. Reporting it as a rejected sign-in sent the user through a
+          // sign-in that cannot change the answer.
           throw new FetchError(
-            "auth",
+            "service",
             "Google returned no project for this account — a Google AI subscription (Pro/Ultra) is required",
           );
         }

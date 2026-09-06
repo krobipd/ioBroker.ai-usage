@@ -1,11 +1,12 @@
-import type { SignInFlow } from "./provider";
+import { PROVIDERS, type SignInFlow } from "./provider";
 
-/** Which sign-in flow a subscription uses — see {@link SignInFlow} for why they differ. */
-export const SIGN_IN_FLOWS: Record<string, SignInFlow> = {
-  "claude-sub": "paste-code",
-  "chatgpt-sub": "device-code",
-  "gemini-sub": "paste-url",
-};
+/**
+ * Which sign-in flow a subscription uses — see {@link SignInFlow} for why they differ.
+ * Derived from the provider catalogue, so a new subscription cannot be half-added.
+ */
+export const SIGN_IN_FLOWS: Record<string, SignInFlow> = Object.fromEntries(
+  PROVIDERS.filter(entry => entry.flow !== undefined).map(entry => [entry.kind, entry.flow as SignInFlow]),
+);
 
 /** The live state of one subscription row, as the admin panel renders it. */
 export type SignInState =
@@ -20,12 +21,19 @@ export type SignInState =
   /** The last attempt failed — reason is user-facing. */
   | { status: "failed"; reason: string };
 
-/** Readable name per subscription — log lines must not show the internal kind. */
-export const SIGN_IN_LABELS: Record<string, string> = {
-  "claude-sub": "Claude",
-  "chatgpt-sub": "ChatGPT",
-  "gemini-sub": "Gemini",
-};
+/** Readable name per provider — log lines must not show the internal kind. */
+export const PROVIDER_LABELS: Record<string, string> = Object.fromEntries(
+  PROVIDERS.map(entry => [entry.kind, entry.label]),
+);
+
+/**
+ * How long a started sign-in stays usable (ms).
+ *
+ * Claude's pasted code and Google's pasted address are good for a quarter of an
+ * hour; ChatGPT's device code says so in its own prompt. One constant, so the
+ * window cannot be fifteen minutes in one flow and something else in the next.
+ */
+export const SIGN_IN_WINDOW_MS = 15 * 60_000;
 
 /**
  * Whether a running sign-in attempt is over.

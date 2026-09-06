@@ -1,7 +1,7 @@
 {
   "settingsHeader": "Settings",
   "label_pollInterval": "Poll interval (s)",
-  "help_pollInterval": "How often each account is queried. Below 300 s you risk provider throttling — Claude then rejects the queries for a long time.",
+  "help_pollInterval": "How often each account is queried. The floor of 60 s keeps the providers from throttling you; 300 s is plenty for windows that move in hours.",
   "label_notifications": "Notifications",
   "help_notifications": "One notification when an account crosses its warn threshold or its credentials stop working.",
   "supportHeader": "Support the development",
@@ -30,6 +30,7 @@
   "nameLimits": "Limit windows",
   "nameWindowPercent": "%s used",
   "nameWindowResetAt": "%s resets at",
+  "nameWindowActive": "%s is the limit in force",
   "nameCredits": "Credits",
   "nameCreditsUsed": "Credits used",
   "nameCreditsLimit": "Credits limit",
@@ -48,6 +49,7 @@
   "nameTokensInput": "Input tokens today",
   "nameTokensOutput": "Output tokens today",
   "nameModels": "Per-model usage",
+  "nameModel": "Model %s",
   "nameModelTokens": "%s tokens today",
   "nameModelCosts": "%s costs today",
   "nameAvailable": "Balance sufficient for calls",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "Week",
   "nameWindowModelWeek": "Week (%s)",
   "nameWindowQuota": "%s quota",
-  "nameWindowOther": "Limit: %s"
+  "nameWindowOther": "Limit: %s",
+  "descUnreach": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+  "descLastError": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+  "descWarning": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+  "descLimitReached": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+  "descWindowActive": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+  "descWindowResetAt": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+  "descResetCredits": "Purchasable vouchers that clear a full limit window. Counted from the provider's list, expired ones left out.",
+  "descCostsProjected": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports.",
+  "descTotalMaxPercent": "The fullest account: its plan-wide window or its remaining budget, whichever is higher."
 }

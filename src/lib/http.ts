@@ -7,6 +7,29 @@ const REQUEST_TIMEOUT_MS = 15000;
 export type JsonFetch = (url: string, headers: Record<string, string>) => Promise<unknown>;
 
 /**
+ * Per-call options of the two POST seams.
+ *
+ * `authOn400` used to be baked into `postJson`/`postForm`, which made EVERY post
+ * read a 400 as a rejected sign-in. That is right for the OAuth token endpoints
+ * and wrong everywhere else: the ChatGPT device-code poll takes an auth failure
+ * as "the user has not confirmed yet" and would have waited out the whole
+ * fifteen minutes on a 400, and Google's Code-Assist call skipped its second
+ * host because it thought the sign-in was gone. The flag belongs at the call.
+ */
+export interface PostOptions {
+  /** Extra request headers. */
+  headers?: Record<string, string>;
+  /** True only for OAuth token endpoints, which answer a dead code or refresh token with 400. */
+  authOn400?: boolean;
+}
+
+/** The JSON-POST seam — one definition for every provider module. */
+export type JsonPost = (url: string, body: Record<string, unknown>, options?: PostOptions) => Promise<unknown>;
+
+/** The form-POST seam (OAuth code redemption). */
+export type FormPost = (url: string, form: Record<string, string>, options?: PostOptions) => Promise<unknown>;
+
+/**
  * Run one request and turn its outcome into the shared failure classification:
  * 401/403 (and 400 where the provider answers a rejected grant that way) become an
  * auth error, 429 a rate-limit error, any other bad status or unparsable body a
@@ -57,18 +80,26 @@ export async function getJson(url: string, headers: Record<string, string>): Pro
 }
 
 /**
- * POST a JSON document. A 400 counts as an auth failure here: the OAuth token
- * endpoints answer a dead code or refresh token with exactly that.
+ * POST a JSON document.
  *
  * @param url the request URL
  * @param body the JSON body
+ * @param options extra headers, and whether a 400 means a rejected grant
  * @returns the parsed JSON response
  */
-export async function postJson(url: string, body: Record<string, unknown>): Promise<unknown> {
+export async function postJson(
+  url: string,
+  body: Record<string, unknown>,
+  options: PostOptions = {},
+): Promise<unknown> {
   return request(
     url,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
-    true,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options.headers },
+      body: JSON.stringify(body),
+    },
+    options.authOn400 === true,
   );
 }
 
@@ -81,21 +112,17 @@ export async function postJson(url: string, body: Record<string, unknown>): Prom
  *
  * @param url the request URL
  * @param form the form fields
- * @param headers extra headers
+ * @param options extra headers, and whether a 400 means a rejected grant
  * @returns the parsed JSON body
  */
-export async function postForm(
-  url: string,
-  form: Record<string, string>,
-  headers: Record<string, string> = {},
-): Promise<unknown> {
+export async function postForm(url: string, form: Record<string, string>, options: PostOptions = {}): Promise<unknown> {
   return request(
     url,
     {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...options.headers },
       body: new URLSearchParams(form).toString(),
     },
-    true,
+    options.authOn400 === true,
   );
 }

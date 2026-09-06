@@ -1,6 +1,6 @@
 import * as utils from "@iobroker/adapter-core";
 import { Credentials } from "@iobroker/adapter-core";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getJson, postForm, postJson } from "./lib/http";
 import { loadCatalogue, tName } from "./lib/i18n";
@@ -13,34 +13,20 @@ import {
   type AccountConfig,
 } from "./lib/pure-helpers";
 import type { TokenSet, TokenStore, UsageProvider } from "./lib/provider";
-
-/** Reverse of {@link SUBSCRIPTION_IDS}: which subscription owns an account id. */
-const PROVIDER_BY_ACCOUNT_ID: Record<string, string> = Object.fromEntries(
-  Object.entries(SUBSCRIPTION_IDS).map(([provider, id]) => [id, provider]),
-);
-import { SIGN_IN_FLOWS, SIGN_IN_LABELS, attemptExpired, type SignInState } from "./lib/sign-in";
-import { buildAuthorizeUrl, exchangeCode, generatePkce, type PkcePair } from "./lib/providers/claude-auth";
+import { PROVIDER_LABELS, SIGN_IN_FLOWS, type SignInState } from "./lib/sign-in";
+import { SignInManager } from "./lib/sign-in-manager";
 import { claudeSubProvider } from "./lib/providers/claude-sub";
-import {
-  CHATGPT_OAUTH,
-  exchangeDeviceCode,
-  pollDeviceCode,
-  startDeviceCode,
-  type DeviceCodeStart,
-} from "./lib/providers/chatgpt-auth";
 import { chatgptSubProvider } from "./lib/providers/chatgpt-sub";
-import {
-  buildGeminiAuthorizeUrl,
-  exchangeGeminiCode,
-  extractGeminiCode,
-  generateGeminiPkce,
-  type GeminiPkce,
-} from "./lib/providers/gemini-auth";
 import { geminiSubProvider } from "./lib/providers/gemini-sub";
 import { anthropicApiProvider } from "./lib/providers/anthropic-api";
 import { deepSeekProvider } from "./lib/providers/deepseek";
 import { openAiProvider } from "./lib/providers/openai";
 import { openRouterProvider } from "./lib/providers/openrouter";
+
+/** Reverse of {@link SUBSCRIPTION_IDS}: which subscription owns an account id. */
+const PROVIDER_BY_ACCOUNT_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(SUBSCRIPTION_IDS).map(([provider, id]) => [id, provider]),
+);
 
 /**
  * High sort-end marker for object-view key ranges (`startkey: prefix, endkey:
@@ -54,41 +40,20 @@ type TimerHandle =
   | { kind: "interval"; handle: ioBroker.Interval | undefined }
   | { kind: "timeout"; handle: ioBroker.Timeout | undefined };
 
-/** One running sign-in attempt (secrets live in memory only, never on disk). */
-type Attempt =
-  | { flow: "paste-code"; pkce: PkcePair; url: string; expiresAt: number }
-  | { flow: "paste-url"; pkce: GeminiPkce; url: string; expiresAt: number }
-  | { flow: "device-code"; start: DeviceCodeStart };
-
 /**
  * AI Usage adapter — reads usage windows, credits and costs of AI accounts into
  * read-only states. Three subscriptions sign in with the user's own account
  * (Claude, ChatGPT, Google), the other accounts use a key from the admin's central
- * credential storage. Orchestration lives in the unit-tested {@link PollEngine};
- * this class wires ioBroker IO, the sign-in flows and the token files to it.
+ * credential storage. Orchestration lives in the unit-tested {@link PollEngine},
+ * the sign-in flows in {@link SignInManager}; this class wires ioBroker IO and the
+ * token files to them.
  */
 export class AiUsageAdapter extends utils.Adapter {
   private engine: PollEngine | null = null;
-  /** Running sign-in attempts, keyed by provider kind. */
-  private readonly attempts = new Map<string, Attempt>();
-  /** Last failure reason per provider, shown in the admin row. */
-  private readonly signInErrors = new Map<string, string>();
-  /**
-   * Providers whose last query was rejected with `auth` — the stored tokens exist but
-   * no longer work.
-   *
-   * Without this the settings page reads "signed in" off the mere EXISTENCE of the
-   * token file: a dead refresh token left a green check next to an amber badge saying
-   * "Sign-in rejected". That is the exact inverse of the bug krobi found on
-   * 2026-09-01, and just as much a lie. The file is deliberately NOT deleted — a
-   * provider hiccup must not silently sign the user out — the card is simply told the
-   * truth so the sign-in button is there when it is needed.
-   */
-  private readonly rejectedTokens = new Set<string>();
-  /** Device-code pollers, so they can be stopped on unload. */
-  private readonly devicePollers = new Map<string, TimerHandle>();
   /** One token store per subscription — see {@link tokenStore} for why it is shared. */
   private readonly tokenStores = new Map<string, TokenStore>();
+  /** The three sign-in flows, their running attempts and what the settings page shows. */
+  private readonly signIn: SignInManager;
 
   /**
    * Every state id that already existed when this process started.
@@ -101,73 +66,43 @@ export class AiUsageAdapter extends utils.Adapter {
   private knownStateIds = new Set<string>();
   /** Datapoints created since the snapshot. */
   private createdStates = 0;
-  /** Datapoints removed since the snapshot — excluding the one-shot migration, which reports itself. */
+  /** Datapoints removed since the snapshot. */
   private removedStates = 0;
   /** Whether the startup balance was already logged. */
   private balanceLogged = false;
-
-  /**
-   * Read every existing state id once, before anything creates or deletes.
-   *
-   * @returns nothing; fills {@link knownStateIds}
-   */
-  private async snapshotExistingStates(): Promise<void> {
-    try {
-      const view = await this.getObjectViewAsync("system", "state", {
-        startkey: `${this.namespace}.`,
-        endkey: `${this.namespace}.${SORT_KEY_END}`,
-      });
-      for (const row of view?.rows ?? []) {
-        this.knownStateIds.add(row.id.substring(this.namespace.length + 1));
-      }
-    } catch (e) {
-      this.log.debug(`Could not snapshot existing states: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-
-  /**
-   * Count one state the create path just touched — but only if it is genuinely new.
-   *
-   * The create path runs `extendObject` for EVERY state once per process, including
-   * the ones that were already in the database. "The create path touched it" would
-   * therefore report the whole tree as new after every restart, and the balance line
-   * would be noise within a day. Only what the startup snapshot did not hold counts.
-   *
-   * @param id the state id, relative to the instance
-   */
-  private countUpsert(id: string): void {
-    if (!this.knownStateIds.has(id)) {
-      this.knownStateIds.add(id);
-      this.createdStates++;
-    }
-  }
-
-  /**
-   * Report what the object tree gained and lost in this startup — one line, both
-   * sides, silent when nothing changed. A normal restart must stay quiet.
-   */
-  private logDatapointBalance(): void {
-    if (this.balanceLogged) {
-      return;
-    }
-    this.balanceLogged = true;
-    const line = datapointBalanceLine(this.createdStates, this.removedStates);
-    if (line) {
-      this.log.info(line);
-    }
-  }
 
   /**
    * @param options the adapter options
    */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "ai-usage" });
+    this.signIn = new SignInManager({
+      store: provider => this.tokenStore(provider),
+      postJson,
+      postForm,
+      now: () => Date.now(),
+      schedule: (cb, ms) => this.setInterval(cb, ms),
+      cancel: handle => this.clearInterval(handle as ioBroker.Interval),
+      log: { info: m => this.log.info(m), debug: m => this.log.debug(m) },
+      onSignedIn: provider => {
+        const id = SUBSCRIPTION_IDS[provider];
+        if (!id) {
+          return;
+        }
+        // Started, not awaited: the settings page must confirm the sign-in at once,
+        // and a first query that has to wait for a provider can take up to the full
+        // request timeout. The values arrive a moment later on their own.
+        void this.engine?.pollNow(id).catch(e => {
+          this.log.debug(`First query after sign-in failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
+      },
+    });
     this.on("ready", this.onReady.bind(this));
     this.on("message", this.onMessage.bind(this));
     this.on("unload", this.onUnload.bind(this));
   }
 
-  // ---------------------------------------------------------------- sign-in
+  // ---------------------------------------------------------------- messages
 
   /**
    * Handle admin messages: the three sign-in flows plus their status.
@@ -179,16 +114,14 @@ export class AiUsageAdapter extends utils.Adapter {
       const provider = this.providerFrom(obj.message);
       switch (obj.command) {
         case "signInStart":
-          this.respond(obj, provider ? await this.startSignIn(provider) : { error: "unknown provider" });
-          return;
         case "signInSubmit":
-          this.respond(obj, provider ? await this.submitSignIn(provider, obj.message) : { error: "unknown provider" });
-          return;
         case "signInStatus":
-          this.respond(obj, provider ? await this.signInState(provider) : { error: "unknown provider" });
-          return;
         case "signOut":
-          this.respond(obj, provider ? await this.signOut(provider) : { error: "unknown provider" });
+          if (!provider) {
+            this.respond(obj, { error: "unknown provider" });
+            return;
+          }
+          this.respond(obj, await this.runSignIn(obj.command, provider, this.valueFrom(obj.message)));
           return;
         default:
           // Always answer, or the caller's callback dangles until timeout.
@@ -201,12 +134,33 @@ export class AiUsageAdapter extends utils.Adapter {
   }
 
   /**
+   * Run one sign-in command.
+   *
+   * @param command the message command
+   * @param provider the subscription kind
+   * @param value the pasted value, for signInSubmit
+   * @returns the resulting state
+   */
+  private async runSignIn(command: string, provider: string, value: string): Promise<SignInState> {
+    switch (command) {
+      case "signInStart":
+        return this.signIn.start(provider);
+      case "signInSubmit":
+        return this.signIn.submit(provider, value);
+      case "signOut":
+        return this.signIn.signOut(provider);
+      default:
+        return this.signIn.state(provider);
+    }
+  }
+
+  /**
    * Send a message response, when the caller expects one.
    *
    * @param obj the request message
    * @param response the response payload
    */
-  private respond(obj: ioBroker.Message, response: unknown): void {
+  private respond(obj: ioBroker.Message, response: SignInState | { error: string }): void {
     if (obj.callback) {
       this.sendTo(obj.from, obj.command, response, obj.callback);
     }
@@ -227,216 +181,13 @@ export class AiUsageAdapter extends utils.Adapter {
   }
 
   /**
-   * Begin a sign-in: build the link (Claude/Google) or fetch a device code (ChatGPT).
+   * The pasted value carried by a message (API boundary — anything can arrive).
    *
-   * @param provider the subscription kind
-   * @returns what the admin panel has to show
-   */
-  private async startSignIn(provider: string): Promise<SignInState | { error: string }> {
-    this.signInErrors.delete(provider);
-    this.rejectedTokens.delete(provider);
-    this.stopDevicePoller(provider);
-    const flow = SIGN_IN_FLOWS[provider];
-    const now = Date.now();
-    try {
-      if (flow === "paste-code") {
-        const pkce = generatePkce();
-        const url = buildAuthorizeUrl(pkce);
-        this.attempts.set(provider, { flow, pkce, url, expiresAt: now + 15 * 60_000 });
-        return { status: "awaiting-paste", url, flow };
-      }
-      if (flow === "paste-url") {
-        const pkce = generateGeminiPkce();
-        const url = buildGeminiAuthorizeUrl(pkce);
-        this.attempts.set(provider, { flow, pkce, url, expiresAt: now + 15 * 60_000 });
-        return { status: "awaiting-paste", url, flow };
-      }
-      const start = await startDeviceCode(postJson, now);
-      this.attempts.set(provider, { flow: "device-code", start });
-      this.armDevicePoller(provider, start);
-      return {
-        status: "awaiting-device",
-        userCode: start.userCode,
-        verificationUrl: CHATGPT_OAUTH.verificationUrl,
-        expiresAt: start.expiresAt,
-      };
-    } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
-      this.signInErrors.set(provider, reason);
-      return { status: "failed", reason };
-    }
-  }
-
-  /**
-   * Finish a paste-based sign-in (Claude code, Google address).
-   *
-   * @param provider the subscription kind
    * @param message the message payload ({ value })
-   * @returns the resulting state
+   * @returns the string, or ""
    */
-  private async submitSignIn(provider: string, message: unknown): Promise<SignInState> {
-    const attempt = this.attempts.get(provider);
-    const value =
-      typeof (message as { value?: unknown })?.value === "string" ? (message as { value: string }).value.trim() : "";
-    if (!attempt || attempt.flow === "device-code") {
-      return { status: "failed", reason: "start the sign-in first" };
-    }
-    // The 15-minute window was stored but never enforced — a stale attempt used to
-    // fail with the provider's own cryptic answer instead of a clear instruction.
-    if (attemptExpired(attempt.expiresAt, Date.now())) {
-      this.attempts.delete(provider);
-      return { status: "failed", reason: "the sign-in window expired — start the sign-in again" };
-    }
-    if (!value) {
-      return { status: "failed", reason: "nothing pasted" };
-    }
-    try {
-      const now = Date.now();
-      const tokens =
-        attempt.flow === "paste-code"
-          ? await exchangeCode(value, attempt.pkce, postJson, now)
-          : await exchangeGeminiCode(extractGeminiCode(value, attempt.pkce.state), attempt.pkce, postForm, now);
-      await this.finishSignIn(provider, tokens);
-      return { status: "signed-in" };
-    } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
-      this.signInErrors.set(provider, reason);
-      return { status: "failed", reason };
-    }
-  }
-
-  /**
-   * Store fresh tokens, mark the account signed in and poll it right away — waiting
-   * up to a full interval after a successful sign-in reads as "it did not work".
-   *
-   * @param provider the subscription kind
-   * @param tokens the token set
-   */
-  private async finishSignIn(provider: string, tokens: TokenSet): Promise<void> {
-    await this.tokenStore(provider).save(tokens);
-    this.attempts.delete(provider);
-    this.signInErrors.delete(provider);
-    this.rejectedTokens.delete(provider);
-    this.stopDevicePoller(provider);
-    const id = SUBSCRIPTION_IDS[provider];
-    if (id) {
-      // Started, not awaited: the settings page must confirm the sign-in at once,
-      // and a first query that has to wait for a provider can take up to the full
-      // request timeout. The values arrive a moment later on their own.
-      void this.engine?.pollNow(id).catch(e => {
-        this.log.debug(`First query after sign-in failed: ${e instanceof Error ? e.message : String(e)}`);
-      });
-    }
-    this.log.info(`${SIGN_IN_LABELS[provider] ?? provider}: signed in`);
-  }
-
-  /**
-   * Poll the device-code endpoint until the user confirmed, the window closed or
-   * the adapter stops. The handle lives in memory only — a restart mid-flow just
-   * means the user starts again, which is cheaper than persisting a 15-minute secret.
-   *
-   * @param provider the subscription kind
-   * @param start the device-code handle
-   */
-  private armDevicePoller(provider: string, start: DeviceCodeStart): void {
-    const tick = async (): Promise<void> => {
-      try {
-        if (attemptExpired(start.expiresAt, Date.now())) {
-          this.stopDevicePoller(provider);
-          this.attempts.delete(provider);
-          this.signInErrors.set(provider, "the code expired — start the sign-in again");
-          return;
-        }
-        const result = await pollDeviceCode(start, postJson);
-        if (result.status === "ready") {
-          this.stopDevicePoller(provider);
-          const tokens = await exchangeDeviceCode(result.code, result.codeVerifier, postForm, Date.now());
-          await this.finishSignIn(provider, tokens);
-        }
-      } catch (e) {
-        this.stopDevicePoller(provider);
-        this.attempts.delete(provider);
-        this.signInErrors.set(provider, e instanceof Error ? e.message : String(e));
-      }
-    };
-    this.devicePollers.set(provider, {
-      kind: "interval",
-      handle: this.setInterval(() => void tick(), Math.max(start.intervalSec, 1) * 1000),
-    });
-  }
-
-  /**
-   * Stop a running device-code poller.
-   *
-   * @param provider the subscription kind
-   */
-  private stopDevicePoller(provider: string): void {
-    const handle = this.devicePollers.get(provider);
-    if (handle?.kind === "interval") {
-      this.clearInterval(handle.handle);
-    }
-    this.devicePollers.delete(provider);
-  }
-
-  /**
-   * The current sign-in state of one subscription, for the admin row.
-   *
-   * @param provider the subscription kind
-   * @returns the state
-   */
-  private async signInState(provider: string): Promise<SignInState> {
-    const failure = this.signInErrors.get(provider);
-    const attempt = this.attempts.get(provider);
-    if (attempt?.flow === "device-code") {
-      return {
-        status: "awaiting-device",
-        userCode: attempt.start.userCode,
-        verificationUrl: CHATGPT_OAUTH.verificationUrl,
-        expiresAt: attempt.start.expiresAt,
-      };
-    }
-    if (attempt) {
-      if (attemptExpired(attempt.expiresAt, Date.now())) {
-        this.attempts.delete(provider);
-        return { status: "failed", reason: "the sign-in window expired — start the sign-in again" };
-      }
-      return { status: "awaiting-paste", url: attempt.url, flow: attempt.flow };
-    }
-    // A valid sign-in WINS over a remembered failure: working tokens mean the
-    // account is signed in, whatever an earlier attempt left behind — showing
-    // the sign-in screen to a signed-in user was the bug (krobi 2026-09-01).
-    // The stale failure is dropped so it cannot resurface later.
-    //
-    // "Valid" means the tokens are there AND the last query was not rejected: a
-    // refresh token the provider has revoked still sits on disk, and reporting that
-    // as "signed in" put a green check next to an amber "Sign-in rejected" badge.
-    // File existence is not liveness.
-    if ((await this.tokenStore(provider).load()) && !this.rejectedTokens.has(provider)) {
-      this.signInErrors.delete(provider);
-      return { status: "signed-in" };
-    }
-    if (this.rejectedTokens.has(provider)) {
-      return { status: "failed", reason: failure ?? "the stored sign-in was rejected — sign in again" };
-    }
-    if (failure) {
-      return { status: "failed", reason: failure };
-    }
-    return { status: "signed-out" };
-  }
-
-  /**
-   * Forget the tokens of one subscription.
-   *
-   * @param provider the subscription kind
-   * @returns the resulting state
-   */
-  private async signOut(provider: string): Promise<SignInState> {
-    await this.tokenStore(provider).clear();
-    this.attempts.delete(provider);
-    this.signInErrors.delete(provider);
-    this.rejectedTokens.delete(provider);
-    this.stopDevicePoller(provider);
-    return { status: "signed-out" };
+  private valueFrom(message: unknown): string {
+    return typeof (message as { value?: unknown })?.value === "string" ? (message as { value: string }).value : "";
   }
 
   // ------------------------------------------------------------ token files
@@ -464,7 +215,7 @@ export class AiUsageAdapter extends utils.Adapter {
   /**
    * Build the store for one subscription: an encrypted file in the instance data
    * directory, named after the PROVIDER. Keying by provider (not by account name)
-   * keeps a sign-in alive when an account is renamed — the previous scheme lost it.
+   * keeps a sign-in alive when an account is renamed.
    *
    * @param provider the subscription kind
    * @returns the store
@@ -518,9 +269,9 @@ export class AiUsageAdapter extends utils.Adapter {
       raw = await readFile(file, "utf8");
     } catch (e) {
       if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") {
-        this.log.warn(`${SIGN_IN_LABELS[provider] ?? provider}: cannot open the stored sign-in (${String(e)})`);
+        this.log.warn(`${PROVIDER_LABELS[provider] ?? provider}: cannot open the stored sign-in (${String(e)})`);
       }
-      return null; // never signed in — the provider reports auth-required
+      return null; // never signed in — the provider reports that no sign-in exists
     }
     try {
       const parsed = JSON.parse(this.decrypt(raw)) as Partial<TokenSet>;
@@ -535,36 +286,11 @@ export class AiUsageAdapter extends utils.Adapter {
       };
     } catch (e) {
       this.log.warn(
-        `${SIGN_IN_LABELS[provider] ?? provider}: the stored sign-in cannot be read (${
+        `${PROVIDER_LABELS[provider] ?? provider}: the stored sign-in cannot be read (${
           e instanceof Error ? e.message : String(e)
         }) — sign in again in the instance settings`,
       );
       return null;
-    }
-  }
-
-  /**
-   * Carry a sign-in from the pre-0.3.0 layout over: tokens used to be stored per
-   * ACCOUNT NAME (`claude-tokens-<name>.json`). Without this the rename to fixed
-   * account ids would silently sign the user out.
-   */
-  private async migrateTokenFiles(): Promise<void> {
-    const dir = utils.getAbsoluteInstanceDataDir(this);
-    const target = join(dir, "tokens-claude-sub.json");
-    try {
-      await readFile(target, "utf8");
-      return; // already migrated
-    } catch {
-      // not there yet — look for an old file
-    }
-    for (const legacy of ["claude-tokens-Claude.json", "claude-tokens-claude.json"]) {
-      try {
-        await rename(join(dir, legacy), target);
-        this.log.info("Carried the existing Claude sign-in over to the new layout");
-        return;
-      } catch {
-        // try the next candidate
-      }
     }
   }
 
@@ -633,6 +359,8 @@ export class AiUsageAdapter extends utils.Adapter {
 
   /**
    * The directory holding `i18n/<lang>.json` — `admin/`, one level above `build/`.
+   *
+   * @returns the absolute path
    */
   private i18nRoot(): string {
     return join(__dirname, "..", "admin");
@@ -705,17 +433,16 @@ export class AiUsageAdapter extends utils.Adapter {
       // Before anything creates an object — every name below comes from here.
       this.loadTranslations();
       await this.refreshManifestObjects();
+      // Parsed ONCE and handed on: the cleanup used to parse the same table a second
+      // time, so a change in the parser could have been applied to one and not the
+      // other.
       const accounts = parseAccounts(this.config.accounts);
       const interval = clampPollInterval(this.config.pollInterval);
-      await this.migrateTokenFiles();
       // Baseline first: the cleanup deletes and the engine creates, both are counted
       // against this snapshot.
       await this.snapshotExistingStates();
-      await this.cleanupStaleObjects();
-      const retired = await this.removeRetiredStates(accounts);
-      if (retired > 0) {
-        this.log.info(`Object tree updated: removed ${retired} obsolete status datapoint(s)`);
-      }
+      await this.cleanupStaleObjects(accounts);
+      await this.removeMovedStates(accounts);
       if (accounts.length === 0) {
         this.log.info("No AI accounts configured — add accounts in the instance settings");
         await this.setState("info.connection", { val: false, ack: true });
@@ -784,13 +511,8 @@ export class AiUsageAdapter extends utils.Adapter {
         afterFirstRound: () => this.logDatapointBalance(),
         authState: (accountId, rejected) => {
           const provider = PROVIDER_BY_ACCOUNT_ID[accountId];
-          if (!provider) {
-            return; // key accounts have no sign-in card
-          }
-          if (rejected) {
-            this.rejectedTokens.add(provider);
-          } else {
-            this.rejectedTokens.delete(provider);
+          if (provider) {
+            this.signIn.setRejected(provider, rejected);
           }
         },
         notify: this.config.notifications
@@ -808,10 +530,61 @@ export class AiUsageAdapter extends utils.Adapter {
   }
 
   /**
+   * Read every existing state id once, before anything creates or deletes.
+   *
+   * @returns nothing; fills {@link knownStateIds}
+   */
+  private async snapshotExistingStates(): Promise<void> {
+    try {
+      const view = await this.getObjectViewAsync("system", "state", {
+        startkey: `${this.namespace}.`,
+        endkey: `${this.namespace}.${SORT_KEY_END}`,
+      });
+      for (const row of view?.rows ?? []) {
+        this.knownStateIds.add(row.id.substring(this.namespace.length + 1));
+      }
+    } catch (e) {
+      this.log.debug(`Could not snapshot existing states: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /**
+   * Count one state the create path just touched — but only if it is genuinely new.
+   *
+   * The create path runs `extendObject` for EVERY state once per process, including
+   * the ones that were already in the database. "The create path touched it" would
+   * therefore report the whole tree as new after every restart, and the balance line
+   * would be noise within a day. Only what the startup snapshot did not hold counts.
+   *
+   * @param id the state id, relative to the instance
+   */
+  private countUpsert(id: string): void {
+    if (!this.knownStateIds.has(id)) {
+      this.knownStateIds.add(id);
+      this.createdStates++;
+    }
+  }
+
+  /**
+   * Report what the object tree gained and lost in this startup — one line, both
+   * sides, silent when nothing changed. A normal restart must stay quiet.
+   */
+  private logDatapointBalance(): void {
+    if (this.balanceLogged) {
+      return;
+    }
+    this.balanceLogged = true;
+    const line = datapointBalanceLine(this.createdStates, this.removedStates);
+    if (line) {
+      this.log.info(line);
+    }
+  }
+
+  /**
    * Build the provider for one account.
    *
    * @param account the validated account config
-   * @returns the provider, or undefined to skip the account
+   * @returns the provider, or undefined to leave the account unpolled
    */
   private async makeProvider(account: AccountConfig): Promise<UsageProvider | undefined> {
     switch (account.provider) {
@@ -839,8 +612,6 @@ export class AiUsageAdapter extends utils.Adapter {
           ? anthropicApiProvider(key, getJson, Date.now, m => this.log.warn(`${account.name}: ${m}`))
           : undefined;
       }
-      default:
-        return undefined;
     }
   }
 
@@ -872,66 +643,55 @@ export class AiUsageAdapter extends utils.Adapter {
   }
 
   /**
-   * Status states retired in 0.5.0 — `provider` (visible in the node name anyway),
-   * `reachable`/`serviceOnline`/`state` (three spellings of one fact) and `signedIn`
-   * (the settings page asks the adapter directly).
+   * States that moved to a new path in 0.12.0.
    *
-   * ioBroker never garbage-collects an object whose id the adapter stopped writing:
-   * it would sit there frozen on its last value and keep lying. So the old ids are
-   * deleted from a fixed list — no state reading, no heuristics.
+   * `available` (DeepSeek's "balance still covers calls") sat at the account root
+   * next to `warning` and `limitReached`, where it read as a third account-wide
+   * alarm; it belongs to the balance and now lives under `credits`. ioBroker never
+   * removes an object whose id an adapter stopped writing, so the old one would sit
+   * there frozen on its last value — the adapter cleans up after itself.
    */
-  private static readonly RETIRED_INFO_STATES = [
-    "info.provider",
-    "info.reachable",
-    "info.serviceOnline",
-    "info.state",
-    "info.signedIn",
-  ];
+  private static readonly MOVED_STATES = ["available"];
 
   /**
-   * Remove the retired status states of every configured account.
+   * Delete the old ids of states that moved, for every configured account.
    *
-   * Which of them still exist is answered by the startup snapshot that was read a
-   * moment earlier — asking the database for every id on every start would keep
-   * costing 35 lookups forever for a migration that is done after the first one.
+   * Which of them still exist is answered by the startup snapshot read a moment
+   * earlier — asking the database for every id on every start would keep costing
+   * lookups forever for a migration that is done after the first one.
    *
    * @param accounts the configured accounts
-   * @returns how many objects were actually deleted
    */
-  private async removeRetiredStates(accounts: readonly AccountConfig[]): Promise<number> {
-    let removed = 0;
+  private async removeMovedStates(accounts: readonly AccountConfig[]): Promise<void> {
     for (const account of accounts) {
-      for (const suffix of AiUsageAdapter.RETIRED_INFO_STATES) {
+      for (const suffix of AiUsageAdapter.MOVED_STATES) {
         const id = `${account.id}.${suffix}`;
         if (!this.knownStateIds.has(id)) {
           continue;
         }
         try {
           await this.delObjectAsync(id);
-          removed++;
-          // Deliberately NOT counted in the startup balance: this one-shot migration
-          // reports its own sum, and the same deletion must not appear in two lines
-          // that mean different things.
           this.knownStateIds.delete(id);
+          this.removedStates++;
         } catch (e) {
           this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
     }
-    return removed;
   }
 
   /**
-   * Delete object trees that no longer belong to a configured account, plus the
-   * `auth` branch of the pre-0.3.0 layout. An EMPTY table deletes nothing — the
-   * guard against wiping everything through an accidental clear.
+   * Delete object trees that no longer belong to a configured account. An EMPTY
+   * table deletes nothing — the guard against wiping everything through an
+   * accidental clear.
+   *
+   * @param accounts the configured accounts
    */
-  private async cleanupStaleObjects(): Promise<void> {
-    const keepIds = parseAccounts(this.config.accounts).map(account => account.id);
-    if (keepIds.length === 0) {
+  private async cleanupStaleObjects(accounts: readonly AccountConfig[]): Promise<void> {
+    if (accounts.length === 0) {
       return;
     }
-    const keep = new Set([...keepIds, "info", "total"]);
+    const keep = new Set([...accounts.map(account => account.id), "info", "total"]);
     try {
       const objects = await this.getAdapterObjectsAsync();
       const roots = new Set<string>();
@@ -942,11 +702,7 @@ export class AiUsageAdapter extends utils.Adapter {
         }
       }
       for (const root of roots) {
-        this.log.info(
-          root === "auth"
-            ? "Removing the old sign-in branch — the sign-in state now lives inside each account"
-            : `Removing objects of no longer configured account "${root}"`,
-        );
+        this.log.info(`Removing objects of no longer configured account "${root}"`);
         // Count the datapoints BEFORE they are gone — afterwards there is nothing to count.
         for (const id of [...this.knownStateIds]) {
           if (id === root || id.startsWith(`${root}.`)) {
@@ -983,9 +739,7 @@ export class AiUsageAdapter extends utils.Adapter {
    */
   private onUnload(callback: () => void): void {
     try {
-      for (const provider of [...this.devicePollers.keys()]) {
-        this.stopDevicePoller(provider);
-      }
+      this.signIn.stopAll();
       const engine = this.engine;
       this.engine?.stop();
       this.engine = null;

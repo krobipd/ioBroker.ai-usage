@@ -1,6 +1,30 @@
 import { tName } from "./i18n";
-import type { UsageSnapshot } from "./provider";
+import type { LimitWindow, UsageSnapshot } from "./provider";
 import { sanitizeId } from "./pure-helpers";
+
+/**
+ * A window end, rounded to the minute.
+ *
+ * Anthropic re-computes the timestamp on every request, so the same window end
+ * arrives as ...59.898Z, ...00.364Z, ...59.539Z — sub-second noise that made every
+ * single poll look like a change: 952 history entries in five days for seventeen
+ * real windows (measured on the live server 2026-09-06). A window end is a wall
+ * clock time a user reads and an automation waits for; the minute is the honest
+ * precision, and it is stable.
+ *
+ * @param iso the provider's timestamp
+ * @returns the timestamp rounded to the minute, or "" when it is unusable
+ */
+export function windowEnd(iso: string | undefined): string {
+  if (!iso) {
+    return "";
+  }
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) {
+    return "";
+  }
+  return new Date(Math.round(ms / 60_000) * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
 
 /** An object to create: id (relative to the instance), type and common. */
 export interface ObjectDef {
@@ -11,6 +35,8 @@ export interface ObjectDef {
   /** The object's common. */
   common: {
     name: ioBroker.StringOrTranslated;
+    /** A short explanation — only where the name does not already say it. */
+    desc?: ioBroker.StringOrTranslated;
     type?: "boolean" | "number" | "string";
     role?: string;
     read?: boolean;
@@ -46,6 +72,7 @@ export interface StateWrite {
  * @param role the state role
  * @param value the current value
  * @param unit optional unit
+ * @param desc a short explanation, where the name does not already give one
  * @returns the def/value pair
  */
 function state(
@@ -55,12 +82,28 @@ function state(
   role: string,
   value: boolean | number | string,
   unit?: string,
+  desc?: ioBroker.StringOrTranslated,
 ): { def: ObjectDef; write: StateWrite } {
   const common: ObjectDef["common"] = { name, type, role, read: true, write: false };
   if (unit !== undefined) {
     common.unit = unit;
   }
+  // Only where there is something to explain. A description that repeats the name
+  // is worse than none (fleet standard) — most datapoints here say what they are.
+  if (desc !== undefined) {
+    common.desc = desc;
+  }
   return { def: { id, type: "state", common }, write: { id, value } };
+}
+
+/** What speaks for an account: a percentage, its label, and the window it came from. */
+export interface LimitDriver {
+  /** Utilisation in percent. */
+  percent: number;
+  /** English label for log lines and warning messages. */
+  label: string;
+  /** The window itself; absent when the granted budget won. */
+  window?: LimitWindow;
 }
 
 /** The result of mapping one snapshot: objects to upsert (parents first) and values to write. */
@@ -98,6 +141,13 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
   const channel = (id: string, name: ioBroker.StringOrTranslated): void => {
     objects.push({ id, type: "channel", common: { name } });
   };
+  // Who says which window is in force: the provider when it marks one itself
+  // (Claude's `is_active`), otherwise the window that speaks for the account —
+  // the same one the warning uses. Both answers mean the same thing to a reader,
+  // which is the point: one datapoint, one meaning, every provider.
+  const marked = (snapshot.limits ?? []).some(limit => limit.active !== undefined);
+  const driver = marked ? undefined : limitingWindow(snapshot)?.window;
+  const inForce = (limit: LimitWindow): boolean => (marked ? limit.active === true : limit === driver);
 
   if (snapshot.limits && snapshot.limits.length > 0) {
     channel(`${accountId}.limits`, tName("nameLimits"));
@@ -132,7 +182,22 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
           tName("nameWindowResetAt", windowName),
           "string",
           "date",
-          limit.resetAt ?? "",
+          windowEnd(limit.resetAt),
+          undefined,
+          tName("descWindowResetAt"),
+        ),
+      );
+      // Which window is actually in force. Same meaning for every provider: the
+      // one the account runs into next.
+      add(
+        state(
+          `${accountId}.limits.${windowId}.active`,
+          tName("nameWindowActive", windowName),
+          "boolean",
+          "indicator",
+          inForce(limit),
+          undefined,
+          tName("descWindowActive"),
         ),
       );
     }
@@ -173,7 +238,15 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
     }
     if (credits.resetCredits !== undefined) {
       add(
-        state(`${accountId}.credits.resetCredits`, tName("nameResetCredits"), "number", "value", credits.resetCredits),
+        state(
+          `${accountId}.credits.resetCredits`,
+          tName("nameResetCredits"),
+          "number",
+          "value",
+          credits.resetCredits,
+          undefined,
+          tName("descResetCredits"),
+        ),
       );
       // Companion timestamp — same fixed-part rule as limits.*.resetAt: always
       // present next to the count, empty while no voucher is held.
@@ -183,7 +256,7 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
           tName("nameResetCreditsExpiry"),
           "string",
           "date",
-          credits.resetCreditsNextExpiry ?? "",
+          windowEnd(credits.resetCreditsNextExpiry),
         ),
       );
     }
@@ -210,6 +283,7 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
           "value",
           costs.projectedMonth,
           costs.currency,
+          tName("descCostsProjected"),
         ),
       );
     }
@@ -231,7 +305,11 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
         if (!modelId) {
           continue;
         }
-        channel(`${accountId}.models.${modelId}`, model.model);
+        // A translated frame around the provider's model name — the fleet standard
+        // wants a translation object on EVERY object type, and the plain string
+        // here was invisible to the static name gate because it is a runtime
+        // value (found by the object inventory on its first run, 2026-09-06).
+        channel(`${accountId}.models.${modelId}`, tName("nameModel", model.model));
         if (model.tokens !== undefined) {
           add(
             state(
@@ -243,24 +321,19 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
             ),
           );
         }
-        if (model.cost !== undefined) {
-          add(
-            state(
-              `${accountId}.models.${modelId}.costToday`,
-              tName("nameModelCosts", model.model),
-              "number",
-              "value",
-              model.cost,
-              snapshot.costs?.currency ?? "USD",
-            ),
-          );
-        }
       }
     }
   }
 
   if (snapshot.available !== undefined) {
-    add(state(`${accountId}.available`, tName("nameAvailable"), "boolean", "indicator", snapshot.available));
+    // Under `credits`, where it belongs: "is there enough balance to make calls"
+    // is a statement about the balance, not about the account. It sat at the
+    // account root next to `warning` and `limitReached`, which read as a third
+    // account-wide alarm.
+    if (!credits) {
+      channel(`${accountId}.credits`, tName("nameCredits"));
+    }
+    add(state(`${accountId}.credits.available`, tName("nameAvailable"), "boolean", "indicator", snapshot.available));
   }
 
   return { objects, writes };
@@ -291,13 +364,13 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
  * @param snapshot the snapshot
  * @returns percent plus the label that produced it, or undefined when nothing applies
  */
-export function limitingWindow(snapshot: UsageSnapshot): { percent: number; label: string } | undefined {
+export function limitingWindow(snapshot: UsageSnapshot): LimitDriver | undefined {
   const limits = snapshot.limits ?? [];
   const planWide = limits.filter(limit => !limit.scoped);
-  let best: { percent: number; label: string } | undefined;
+  let best: LimitDriver | undefined;
   for (const limit of planWide.length > 0 ? planWide : limits) {
     if (!best || limit.percent > best.percent) {
-      best = { percent: limit.percent, label: limit.label };
+      best = { percent: limit.percent, label: limit.label, window: limit };
     }
   }
   const credits = snapshot.credits?.percent;
@@ -305,6 +378,23 @@ export function limitingWindow(snapshot: UsageSnapshot): { percent: number; labe
     best = { percent: credits, label: "Credits" };
   }
   return best;
+}
+
+/**
+ * Every plan-wide window the provider has CLOSED, with its reason.
+ *
+ * A closed window is the provider stating that this account cannot go on — the
+ * fact `limitReached` is supposed to carry, which the adapter otherwise infers
+ * from `percent >= 100`. Model-scoped windows are left out for the same reason
+ * they never raise the warning.
+ *
+ * @param snapshot the snapshot
+ * @returns label and reason per locked window
+ */
+export function lockedWindows(snapshot: UsageSnapshot): { label: string; reason: string }[] {
+  return (snapshot.limits ?? [])
+    .filter(limit => !limit.scoped && limit.lockedReason)
+    .map(limit => ({ label: limit.label, reason: limit.lockedReason as string }));
 }
 
 /**

@@ -1,5 +1,12 @@
 import type { UsageSnapshot } from "./provider";
-import { limitingWindow, mapSnapshot, maxLimitPercent, orphanObjectIds } from "./snapshot-tree";
+import {
+  limitingWindow,
+  lockedWindows,
+  mapSnapshot,
+  maxLimitPercent,
+  orphanObjectIds,
+  windowEnd,
+} from "./snapshot-tree";
 
 describe("mapSnapshot", () => {
   test("a subscription snapshot yields device, limit channels and percent/reset states", () => {
@@ -70,7 +77,7 @@ describe("mapSnapshot", () => {
       tokens: {
         inputToday: 210000,
         outputToday: 48000,
-        perModel: [{ model: "gpt-5-mini", tokens: 150000, cost: 0.5 }],
+        perModel: [{ model: "gpt-5-mini", tokens: 150000 }],
       },
     });
     const ids = objects.map(o => o.id);
@@ -80,9 +87,11 @@ describe("mapSnapshot", () => {
         "oai.models",
         "oai.models.gpt-5-mini",
         "oai.models.gpt-5-mini.tokensToday",
-        "oai.models.gpt-5-mini.costToday",
       ]),
     );
+    // The per-model cost datapoint is gone with the field that never had a
+    // producer — the OpenAI cost report groups by line item, not by model.
+    expect(ids).not.toContain("oai.models.gpt-5-mini.costToday");
     expect(writes).toContainEqual({ id: "oai.costs.projectedMonth", value: 22 });
   });
 
@@ -112,7 +121,11 @@ describe("mapSnapshot", () => {
       credits: { remaining: 12.5, currency: "USD" },
       available: true,
     });
-    const available = objects.find(o => o.id === "ds.available");
+    // Under `credits`, not at the account root: it is a statement about the
+    // balance, and at the root it read as a third account-wide alarm next to
+    // `warning` and `limitReached`.
+    expect(objects.find(o => o.id === "ds.available")).toBeUndefined();
+    const available = objects.find(o => o.id === "ds.credits.available");
     expect(available?.common).toMatchObject({ type: "boolean", role: "indicator", write: false });
   });
 });
@@ -189,7 +202,7 @@ describe("maxLimitPercent", () => {
       ],
     };
     expect(maxLimitPercent(snapshot)).toBe(72);
-    expect(limitingWindow(snapshot)).toEqual({ percent: 72, label: "Session (5 h)" });
+    expect(limitingWindow(snapshot)).toMatchObject({ percent: 72, label: "Session (5 h)" });
   });
 
   test("a model window stays out as long as a plan-wide one exists", () => {
@@ -213,7 +226,7 @@ describe("maxLimitPercent", () => {
           { name: "flash", label: "gemini-2.5-flash", labelKey: "nameWindowSession", percent: 80, scoped: true },
         ],
       }),
-    ).toEqual({ percent: 80, label: "gemini-2.5-flash" });
+    ).toMatchObject({ percent: 80, label: "gemini-2.5-flash" });
   });
 
   test("the label of the deciding window comes back for the warning message", () => {
@@ -224,6 +237,138 @@ describe("maxLimitPercent", () => {
           { name: "week", label: "Week (all models)", labelKey: "nameWindowSession", percent: 91 },
         ],
       }),
-    ).toEqual({ percent: 91, label: "Week (all models)" });
+    ).toMatchObject({ percent: 91, label: "Week (all models)" });
+  });
+});
+
+describe("which window is in force", () => {
+  test("the provider's own mark wins where there is one", () => {
+    // Claude states it per window: with Fable at 97 % the model window is active
+    // while session at 8 % and week at 54 % are not (measured 2026-09-06).
+    const { writes } = mapSnapshot("claude", {
+      limits: [
+        { name: "session", label: "Session", labelKey: "nameWindowSession", percent: 8, active: false },
+        { name: "week", label: "Week", labelKey: "nameWindowWeek", percent: 54, active: false },
+        {
+          name: "weekly_scoped-Fable",
+          label: "weekly scoped Fable",
+          labelKey: "nameWindowModelWeek",
+          percent: 97,
+          scoped: true,
+          active: true,
+        },
+      ],
+    });
+    expect(writes).toContainEqual({ id: "claude.limits.session.active", value: false });
+    expect(writes).toContainEqual({ id: "claude.limits.week.active", value: false });
+    expect(writes).toContainEqual({ id: "claude.limits.weekly_scoped-Fable.active", value: true });
+  });
+
+  test("without a mark the window that speaks for the account is the one in force", () => {
+    // ChatGPT and Google send no such flag — the datapoint has to mean the same
+    // thing there, so it falls back to the window the warning uses.
+    const { writes } = mapSnapshot("chatgpt", {
+      limits: [
+        { name: "session", label: "Session", labelKey: "nameWindowSession", percent: 12 },
+        { name: "week", label: "Week", labelKey: "nameWindowWeekShort", percent: 61 },
+      ],
+    });
+    expect(writes).toContainEqual({ id: "chatgpt.limits.session.active", value: false });
+    expect(writes).toContainEqual({ id: "chatgpt.limits.week.active", value: true });
+  });
+
+  test("a model window is never in force while a plan-wide one exists", () => {
+    const { writes } = mapSnapshot("gemini", {
+      limits: [
+        { name: "week", label: "Week", labelKey: "nameWindowWeek", percent: 30 },
+        { name: "pro", label: "pro", labelKey: "nameWindowQuota", percent: 100, scoped: true },
+      ],
+    });
+    expect(writes).toContainEqual({ id: "gemini.limits.pro.active", value: false });
+    expect(writes).toContainEqual({ id: "gemini.limits.week.active", value: true });
+  });
+
+  test("the flag is a read-only indicator", () => {
+    const { objects } = mapSnapshot("a", {
+      limits: [{ name: "w", label: "W", labelKey: "nameWindowSession", percent: 1 }],
+    });
+    expect(objects.find(o => o.id === "a.limits.w.active")?.common).toMatchObject({
+      type: "boolean",
+      role: "indicator",
+      write: false,
+    });
+  });
+});
+
+describe("windowEnd", () => {
+  test("rounds to the minute, which is what stops the history flooding", () => {
+    // Anthropic recomputes the timestamp per request: the same window end arrives
+    // as ...59.898Z, ...00.364Z, ...59.539Z. Unrounded, every poll counted as a
+    // change — 952 history entries in five days for seventeen real windows.
+    expect(windowEnd("2026-09-06T14:09:59.898660+00:00")).toBe("2026-09-06T14:10:00Z");
+    expect(windowEnd("2026-09-06T14:10:00.364729+00:00")).toBe("2026-09-06T14:10:00Z");
+    expect(windowEnd("2026-09-06T14:09:59.539015+00:00")).toBe("2026-09-06T14:10:00Z");
+  });
+
+  test("no window, no date — and nothing invented from rubbish", () => {
+    expect(windowEnd(undefined)).toBe("");
+    expect(windowEnd("")).toBe("");
+    expect(windowEnd("whenever")).toBe("");
+  });
+
+  test("the window's reset datapoint carries the rounded value", () => {
+    const { writes } = mapSnapshot("a", {
+      limits: [
+        {
+          name: "w",
+          label: "W",
+          labelKey: "nameWindowSession",
+          percent: 1,
+          resetAt: "2026-09-06T14:09:59.898660+00:00",
+        },
+      ],
+    });
+    expect(writes).toContainEqual({ id: "a.limits.w.resetAt", value: "2026-09-06T14:10:00Z" });
+  });
+});
+
+describe("lockedWindows", () => {
+  test("a plan-wide window the provider closed is reported with its reason", () => {
+    expect(
+      lockedWindows({
+        limits: [
+          {
+            name: "week",
+            label: "Week (all models)",
+            labelKey: "nameWindowWeek",
+            percent: 100,
+            lockedReason: "usage_limit_reached",
+          },
+        ],
+      }),
+    ).toEqual([{ label: "Week (all models)", reason: "usage_limit_reached" }]);
+  });
+
+  test("a locked MODEL window is not the account's problem", () => {
+    // Same rule as the warning: Fable at its cap is the Fable limit, not the
+    // account limit (krobi 2026-09-06).
+    expect(
+      lockedWindows({
+        limits: [
+          {
+            name: "fable",
+            label: "Fable",
+            labelKey: "nameWindowModelWeek",
+            percent: 100,
+            scoped: true,
+            lockedReason: "usage_limit_reached",
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  test("nothing locked, nothing reported", () => {
+    expect(lockedWindows({ limits: [{ name: "w", label: "W", labelKey: "nameWindowWeek", percent: 99 }] })).toEqual([]);
   });
 });

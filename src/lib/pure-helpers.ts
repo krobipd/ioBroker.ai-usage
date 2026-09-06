@@ -1,12 +1,14 @@
+import { PROVIDERS, type ProviderKind } from "./provider";
+
 /** One configured AI account, validated from the admin table (API boundary). */
 export interface AccountConfig {
   /** Display name from the table. */
   name: string;
-  /** Id-safe object id derived from the name. */
+  /** The account's fixed object id. */
   id: string;
-  /** Provider kind. */
-  provider: string;
-  /** Central credential id (system.credentials.*); empty for claude-sub. */
+  /** Provider kind — validated against the catalogue, so no `default` branch can be reached. */
+  provider: ProviderKind;
+  /** Central credential id (system.credentials.*); empty for the subscriptions. */
   credentialId: string;
   /** Warn threshold in percent. */
   warnThreshold: number;
@@ -26,23 +28,13 @@ export function sanitizeId(name: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-/** The provider kinds the adapter knows. */
-export const PROVIDER_KINDS = [
-  "claude-sub",
-  "chatgpt-sub",
-  "gemini-sub",
-  "openrouter",
-  "deepseek",
-  "openai",
-  "anthropic-api",
-];
+/** The provider kinds the adapter knows — derived from the catalogue in `provider.ts`. */
+export const PROVIDER_KINDS: readonly string[] = PROVIDERS.map(entry => entry.kind);
 
 /** Fixed object id per subscription — adapter-owned, never derived from a display name. */
-export const SUBSCRIPTION_IDS: Record<string, string> = {
-  "claude-sub": "claude",
-  "chatgpt-sub": "chatgpt",
-  "gemini-sub": "gemini",
-};
+export const SUBSCRIPTION_IDS: Record<string, string> = Object.fromEntries(
+  PROVIDERS.filter(entry => entry.accountId !== undefined).map(entry => [entry.kind, entry.accountId as string]),
+);
 
 /** Top-level object roots the adapter owns — no account may use them as id. */
 export const RESERVED_ROOT_IDS = ["info", "total"];
@@ -105,7 +97,7 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
     accounts.push({
       name,
       id,
-      provider,
+      provider: provider as ProviderKind,
       credentialId,
       warnThreshold: Number.isFinite(threshold) && threshold >= 10 && threshold <= 100 ? threshold : 80,
     });

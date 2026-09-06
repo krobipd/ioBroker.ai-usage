@@ -1,7 +1,7 @@
 {
   "settingsHeader": "Ustawienia",
   "label_pollInterval": "Interwał odpytywania (s)",
-  "help_pollInterval": "Jak często odpytywane jest każde konto. Poniżej 300 s grozi ograniczenie przez dostawcę — Claude odrzuca wtedy zapytania przez długi czas.",
+  "help_pollInterval": "Jak często odpytywane jest każde konto. Dolna granica 60 s chroni przed ograniczaniem przez dostawców; 300 s wystarcza dla okien zmieniających się godzinami.",
   "label_notifications": "Powiadomienia",
   "help_notifications": "Jedno powiadomienie, gdy konto przekroczy próg ostrzegawczy lub dane dostępowe przestaną działać.",
   "supportHeader": "Wesprzyj rozwój",
@@ -30,6 +30,7 @@
   "nameLimits": "Okna limitów",
   "nameWindowPercent": "%s wykorzystane",
   "nameWindowResetAt": "%s zeruje się",
+  "nameWindowActive": "%s to obowiązujący limit",
   "nameCredits": "Środki",
   "nameCreditsUsed": "Wykorzystane środki",
   "nameCreditsLimit": "Limit środków",
@@ -48,6 +49,7 @@
   "nameTokensInput": "Tokeny wejściowe dzisiaj",
   "nameTokensOutput": "Tokeny wyjściowe dzisiaj",
   "nameModels": "Zużycie na model",
+  "nameModel": "Model %s",
   "nameModelTokens": "%s tokenów dzisiaj",
   "nameModelCosts": "%s koszty dzisiaj",
   "nameAvailable": "Środki wystarczają na zapytania",
@@ -56,5 +58,14 @@
   "nameWindowWeekShort": "Tydzień",
   "nameWindowModelWeek": "Tydzień (%s)",
   "nameWindowQuota": "Limit %s",
-  "nameWindowOther": "Limit: %s"
+  "nameWindowOther": "Limit: %s",
+  "descUnreach": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+  "descLastError": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+  "descWarning": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+  "descLimitReached": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+  "descWindowActive": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+  "descWindowResetAt": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+  "descResetCredits": "Kupowane bony resetujące pełne okno limitu. Liczone z listy dostawcy, wygasłe pomijane.",
+  "descCostsProjected": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy.",
+  "descTotalMaxPercent": "Najbardziej zapełnione konto: jego okno planu albo pozostały budżet — co jest wyższe."
 }

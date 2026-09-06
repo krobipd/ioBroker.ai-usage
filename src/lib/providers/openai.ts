@@ -1,6 +1,6 @@
 import { getJson, type JsonFetch } from "../http";
 import type { UsageProvider, UsageSnapshot } from "../provider";
-import { round2 } from "../pure-helpers";
+import { finiteNumber, round2 } from "../pure-helpers";
 import { fetchAllPages, isToday, monthStartUnix, projectMonth } from "./report-utils";
 
 /**
@@ -33,8 +33,8 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
     let sum = 0;
     for (const result of entry.results) {
       const amount = (result as { amount?: { value?: unknown; currency?: unknown } })?.amount;
-      const value = Number(amount?.value);
-      if (Number.isFinite(value)) {
+      const value = finiteNumber(amount?.value);
+      if (value !== undefined) {
         sum += value;
       }
       if (typeof amount?.currency === "string" && amount.currency) {
@@ -59,16 +59,16 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
     sawUsageToday = true;
     for (const result of entry.results) {
       const data = result as { input_tokens?: unknown; output_tokens?: unknown; model?: unknown };
-      const input = Number(data.input_tokens);
-      const output = Number(data.output_tokens);
-      if (Number.isFinite(input)) {
+      const input = finiteNumber(data.input_tokens);
+      const output = finiteNumber(data.output_tokens);
+      if (input !== undefined) {
         inputToday += input;
       }
-      if (Number.isFinite(output)) {
+      if (output !== undefined) {
         outputToday += output;
       }
       if (typeof data.model === "string" && data.model) {
-        const tokens = (Number.isFinite(input) ? input : 0) + (Number.isFinite(output) ? output : 0);
+        const tokens = (input ?? 0) + (output ?? 0);
         const existing = perModel.get(data.model) ?? { tokens: 0 };
         existing.tokens += tokens;
         perModel.set(data.model, existing);

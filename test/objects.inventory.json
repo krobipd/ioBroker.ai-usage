@@ -1,0 +1,3758 @@
+{
+  "ai-usage.0.chatgpt": {
+    "type": "device",
+    "common": {
+      "name": "ChatGPT (ChatGPT)",
+      "statusStates": {
+        "offlineId": "info.unreach"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt"
+  },
+  "ai-usage.0.chatgpt.credits": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Guthaben",
+        "en": "Credits",
+        "es": "Créditos",
+        "fr": "Crédits",
+        "it": "Crediti",
+        "nl": "Tegoed",
+        "pl": "Środki",
+        "pt": "Créditos",
+        "ru": "Кредиты",
+        "uk": "Кредити",
+        "zh-cn": "额度"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.credits"
+  },
+  "ai-usage.0.chatgpt.credits.remaining": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben übrig",
+        "en": "Credits remaining",
+        "es": "Créditos restantes",
+        "fr": "Crédits restants",
+        "it": "Crediti rimanenti",
+        "nl": "Tegoed resterend",
+        "pl": "Pozostałe środki",
+        "pt": "Créditos restantes",
+        "ru": "Осталось кредитов",
+        "uk": "Залишок кредитів",
+        "zh-cn": "剩余额度"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.credits.remaining"
+  },
+  "ai-usage.0.chatgpt.credits.resetCredits": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Verfügbare Limit-Reset-Gutscheine",
+        "en": "Available limit-reset credits",
+        "es": "Vales de reinicio de límite disponibles",
+        "fr": "Bons de réinitialisation de limite disponibles",
+        "it": "Buoni di azzeramento limite disponibili",
+        "nl": "Beschikbare limiet-resetbonnen",
+        "pl": "Dostępne kupony resetu limitu",
+        "pt": "Vales de reposição de limite disponíveis",
+        "ru": "Доступные ваучеры сброса лимита",
+        "uk": "Доступні ваучери скидання ліміту",
+        "zh-cn": "可用的限额重置券"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Käufliche Gutscheine, die ein volles Limit-Fenster zurücksetzen. Aus der Liste des Anbieters gezählt, abgelaufene bleiben draußen.",
+        "en": "Purchasable vouchers that clear a full limit window. Counted from the provider's list, expired ones left out.",
+        "es": "Vales comprables que reinician una ventana de límite llena. Contados desde la lista del proveedor, los caducados quedan fuera.",
+        "fr": "Bons achetables qui réinitialisent une fenêtre de limite pleine. Comptés depuis la liste du fournisseur, les expirés exclus.",
+        "it": "Buoni acquistabili che azzerano una finestra di limite piena. Contati dall'elenco del provider, quelli scaduti esclusi.",
+        "nl": "Koopbare vouchers die een vol limietvenster resetten. Geteld uit de lijst van de aanbieder, verlopen exemplaren tellen niet mee.",
+        "pl": "Kupowane bony resetujące pełne okno limitu. Liczone z listy dostawcy, wygasłe pomijane.",
+        "pt": "Vales compráveis que repõem uma janela de limite cheia. Contados a partir da lista do fornecedor, os expirados ficam de fora.",
+        "ru": "Покупаемые ваучеры, сбрасывающие полное окно лимита. Подсчитаны по списку провайдера, просроченные исключены.",
+        "uk": "Ваучери, які можна купити, щоб скинути повне вікно ліміту. Пораховані зі списку провайдера, прострочені не враховано.",
+        "zh-cn": "可购买的额度券，用于重置已用满的限额窗口。按供应商列表统计，已过期的不计入。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.credits.resetCredits"
+  },
+  "ai-usage.0.chatgpt.credits.resetCreditsNextExpiry": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Nächster Reset-Gutschein verfällt am",
+        "en": "Next reset credit expires at",
+        "es": "El próximo vale de reinicio caduca el",
+        "fr": "Le prochain bon de réinitialisation expire le",
+        "it": "Il prossimo buono di azzeramento scade il",
+        "nl": "Volgende resetbon verloopt op",
+        "pl": "Następny kupon resetu wygasa",
+        "pt": "O próximo vale de reposição expira em",
+        "ru": "Ближайший ваучер сброса истекает",
+        "uk": "Наступний ваучер скидання спливає",
+        "zh-cn": "下一张重置券到期时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.credits.resetCreditsNextExpiry"
+  },
+  "ai-usage.0.chatgpt.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Informations",
+        "it": "Informazioni",
+        "nl": "Info",
+        "pl": "Informacje",
+        "pt": "Informações",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.info"
+  },
+  "ai-usage.0.chatgpt.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Fehler",
+        "en": "Last error",
+        "es": "Último error",
+        "fr": "Dernière erreur",
+        "it": "Ultimo errore",
+        "nl": "Laatste fout",
+        "pl": "Ostatni błąd",
+        "pt": "Último erro",
+        "ru": "Последняя ошибка",
+        "uk": "Остання помилка",
+        "zh-cn": "最近一次错误"
+      },
+      "desc": {
+        "de": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+        "en": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+        "es": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+        "fr": "Pourquoi ce compte ne fournit rien. Vide tant que tout va bien ; « Unknown » tant que l'adaptateur n'a rien à signaler.",
+        "it": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+        "nl": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+        "pl": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+        "pt": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+        "ru": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
+        "uk": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",
+        "zh-cn": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.info.error"
+  },
+  "ai-usage.0.chatgpt.info.lastUpdate": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzte erfolgreiche Aktualisierung",
+        "en": "Last successful update",
+        "es": "Última actualización correcta",
+        "fr": "Dernière mise à jour réussie",
+        "it": "Ultimo aggiornamento riuscito",
+        "nl": "Laatste geslaagde update",
+        "pl": "Ostatnia udana aktualizacja",
+        "pt": "Última atualização bem-sucedida",
+        "ru": "Последнее успешное обновление",
+        "uk": "Останнє успішне оновлення",
+        "zh-cn": "最近一次成功更新"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.info.lastUpdate"
+  },
+  "ai-usage.0.chatgpt.info.unreach": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "KI-Dienst nicht erreichbar",
+        "en": "AI service not reachable",
+        "es": "Servicio de IA inaccesible",
+        "fr": "Service IA injoignable",
+        "it": "Servizio IA non raggiungibile",
+        "nl": "AI-dienst niet bereikbaar",
+        "pl": "Usługa AI nieosiągalna",
+        "pt": "Serviço de IA inacessível",
+        "ru": "Сервис ИИ недоступен",
+        "uk": "Сервіс ШІ недоступний",
+        "zh-cn": "AI 服务不可访问"
+      },
+      "desc": {
+        "de": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+        "en": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+        "es": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+        "fr": "Vrai tant que ce compte ne fournit pas de données. Une limitation conserve les dernières valeurs et le laisse faux.",
+        "it": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+        "nl": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+        "pl": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+        "pt": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+        "ru": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
+        "uk": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
+        "zh-cn": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。"
+      },
+      "type": "boolean",
+      "role": "indicator.maintenance.unreach",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.info.unreach"
+  },
+  "ai-usage.0.chatgpt.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Bei 100 % (Limit-Fenster oder Budget)",
+        "en": "At 100 % (limit window or budget)",
+        "es": "Al 100 % (ventana de límite o saldo)",
+        "fr": "À 100 % (fenêtre de limite ou budget)",
+        "it": "Al 100 % (finestra di limite o budget)",
+        "nl": "Op 100 % (limietvenster of budget)",
+        "pl": "Na 100 % (okno limitu lub budżet)",
+        "pt": "Em 100 % (janela de limite ou saldo)",
+        "ru": "На 100 % (окно лимита или бюджет)",
+        "uk": "На 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limitReached"
+  },
+  "ai-usage.0.chatgpt.limits": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Limit-Fenster",
+        "en": "Limit windows",
+        "es": "Ventanas de límite",
+        "fr": "Fenêtres de limite",
+        "it": "Finestre di limite",
+        "nl": "Limietvensters",
+        "pl": "Okna limitów",
+        "pt": "Janelas de limite",
+        "ru": "Окна лимитов",
+        "uk": "Вікна лімітів",
+        "zh-cn": "限额窗口"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits"
+  },
+  "ai-usage.0.chatgpt.limits.GPT-5_Pro": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Limit: GPT-5 Pro",
+        "en": "Limit: GPT-5 Pro",
+        "es": "Límite: GPT-5 Pro",
+        "fr": "Limite : GPT-5 Pro",
+        "it": "Limite: GPT-5 Pro",
+        "nl": "Limiet: GPT-5 Pro",
+        "pl": "Limit: GPT-5 Pro",
+        "pt": "Limite: GPT-5 Pro",
+        "ru": "Лимит: GPT-5 Pro",
+        "uk": "Ліміт: GPT-5 Pro",
+        "zh-cn": "限额：GPT-5 Pro"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro"
+  },
+  "ai-usage.0.chatgpt.limits.GPT-5_Pro.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Limit: GPT-5 Pro ist gerade das gültige Limit",
+        "en": "Limit: GPT-5 Pro is the limit in force",
+        "es": "Límite: GPT-5 Pro es el límite vigente",
+        "fr": "Limite : GPT-5 Pro est la limite en vigueur",
+        "it": "Limite: GPT-5 Pro è il limite in vigore",
+        "nl": "Limiet: GPT-5 Pro is de geldende limiet",
+        "pl": "Limit: GPT-5 Pro to obowiązujący limit",
+        "pt": "Limite: GPT-5 Pro é o limite em vigor",
+        "ru": "Лимит: GPT-5 Pro — действующий лимит",
+        "uk": "Ліміт: GPT-5 Pro — чинний ліміт",
+        "zh-cn": "限额：GPT-5 Pro 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro.active"
+  },
+  "ai-usage.0.chatgpt.limits.GPT-5_Pro.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Limit: GPT-5 Pro verbraucht",
+        "en": "Limit: GPT-5 Pro used",
+        "es": "Límite: GPT-5 Pro utilizado",
+        "fr": "Limite : GPT-5 Pro utilisé",
+        "it": "Limite: GPT-5 Pro utilizzato",
+        "nl": "Limiet: GPT-5 Pro verbruikt",
+        "pl": "Limit: GPT-5 Pro wykorzystane",
+        "pt": "Limite: GPT-5 Pro utilizado",
+        "ru": "Лимит: GPT-5 Pro использовано",
+        "uk": "Ліміт: GPT-5 Pro використано",
+        "zh-cn": "限额：GPT-5 Pro 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro.percent"
+  },
+  "ai-usage.0.chatgpt.limits.GPT-5_Pro.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Limit: GPT-5 Pro wird zurückgesetzt am",
+        "en": "Limit: GPT-5 Pro resets at",
+        "es": "Límite: GPT-5 Pro se reinicia el",
+        "fr": "Limite : GPT-5 Pro est réinitialisé le",
+        "it": "Limite: GPT-5 Pro si azzera il",
+        "nl": "Limiet: GPT-5 Pro wordt gereset op",
+        "pl": "Limit: GPT-5 Pro zeruje się",
+        "pt": "Limite: GPT-5 Pro é reiniciado em",
+        "ru": "Лимит: GPT-5 Pro сбрасывается",
+        "uk": "Ліміт: GPT-5 Pro скидається",
+        "zh-cn": "限额：GPT-5 Pro 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro.resetAt"
+  },
+  "ai-usage.0.chatgpt.limits.session": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.)",
+        "en": "Session (5 h)",
+        "es": "Sesión (5 h)",
+        "fr": "Session (5 h)",
+        "it": "Sessione (5 h)",
+        "nl": "Sessie (5 u)",
+        "pl": "Sesja (5 godz.)",
+        "pt": "Sessão (5 h)",
+        "ru": "Сессия (5 ч)",
+        "uk": "Сесія (5 год)",
+        "zh-cn": "会话（5 小时）"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.session"
+  },
+  "ai-usage.0.chatgpt.limits.session.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.) ist gerade das gültige Limit",
+        "en": "Session (5 h) is the limit in force",
+        "es": "Sesión (5 h) es el límite vigente",
+        "fr": "Session (5 h) est la limite en vigueur",
+        "it": "Sessione (5 h) è il limite in vigore",
+        "nl": "Sessie (5 u) is de geldende limiet",
+        "pl": "Sesja (5 godz.) to obowiązujący limit",
+        "pt": "Sessão (5 h) é o limite em vigor",
+        "ru": "Сессия (5 ч) — действующий лимит",
+        "uk": "Сесія (5 год) — чинний ліміт",
+        "zh-cn": "会话（5 小时） 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.session.active"
+  },
+  "ai-usage.0.chatgpt.limits.session.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.) verbraucht",
+        "en": "Session (5 h) used",
+        "es": "Sesión (5 h) utilizado",
+        "fr": "Session (5 h) utilisé",
+        "it": "Sessione (5 h) utilizzato",
+        "nl": "Sessie (5 u) verbruikt",
+        "pl": "Sesja (5 godz.) wykorzystane",
+        "pt": "Sessão (5 h) utilizado",
+        "ru": "Сессия (5 ч) использовано",
+        "uk": "Сесія (5 год) використано",
+        "zh-cn": "会话（5 小时） 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.session.percent"
+  },
+  "ai-usage.0.chatgpt.limits.session.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.) wird zurückgesetzt am",
+        "en": "Session (5 h) resets at",
+        "es": "Sesión (5 h) se reinicia el",
+        "fr": "Session (5 h) est réinitialisé le",
+        "it": "Sessione (5 h) si azzera il",
+        "nl": "Sessie (5 u) wordt gereset op",
+        "pl": "Sesja (5 godz.) zeruje się",
+        "pt": "Sessão (5 h) é reiniciado em",
+        "ru": "Сессия (5 ч) сбрасывается",
+        "uk": "Сесія (5 год) скидається",
+        "zh-cn": "会话（5 小时） 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.session.resetAt"
+  },
+  "ai-usage.0.chatgpt.limits.week": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Woche",
+        "en": "Week",
+        "es": "Semana",
+        "fr": "Semaine",
+        "it": "Settimana",
+        "nl": "Week",
+        "pl": "Tydzień",
+        "pt": "Semana",
+        "ru": "Неделя",
+        "uk": "Тиждень",
+        "zh-cn": "一周"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.week"
+  },
+  "ai-usage.0.chatgpt.limits.week.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche ist gerade das gültige Limit",
+        "en": "Week is the limit in force",
+        "es": "Semana es el límite vigente",
+        "fr": "Semaine est la limite en vigueur",
+        "it": "Settimana è il limite in vigore",
+        "nl": "Week is de geldende limiet",
+        "pl": "Tydzień to obowiązujący limit",
+        "pt": "Semana é o limite em vigor",
+        "ru": "Неделя — действующий лимит",
+        "uk": "Тиждень — чинний ліміт",
+        "zh-cn": "一周 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.week.active"
+  },
+  "ai-usage.0.chatgpt.limits.week.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche verbraucht",
+        "en": "Week used",
+        "es": "Semana utilizado",
+        "fr": "Semaine utilisé",
+        "it": "Settimana utilizzato",
+        "nl": "Week verbruikt",
+        "pl": "Tydzień wykorzystane",
+        "pt": "Semana utilizado",
+        "ru": "Неделя использовано",
+        "uk": "Тиждень використано",
+        "zh-cn": "一周 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.week.percent"
+  },
+  "ai-usage.0.chatgpt.limits.week.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche wird zurückgesetzt am",
+        "en": "Week resets at",
+        "es": "Semana se reinicia el",
+        "fr": "Semaine est réinitialisé le",
+        "it": "Settimana si azzera il",
+        "nl": "Week wordt gereset op",
+        "pl": "Tydzień zeruje się",
+        "pt": "Semana é reiniciado em",
+        "ru": "Неделя сбрасывается",
+        "uk": "Тиждень скидається",
+        "zh-cn": "一周 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.week.resetAt"
+  },
+  "ai-usage.0.chatgpt.warning": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Über der Warnschwelle",
+        "en": "Above warn threshold",
+        "es": "Por encima del umbral de aviso",
+        "fr": "Au-dessus du seuil d'alerte",
+        "it": "Sopra la soglia di avviso",
+        "nl": "Boven de waarschuwingsdrempel",
+        "pl": "Powyżej progu ostrzegawczego",
+        "pt": "Acima do limite de aviso",
+        "ru": "Выше порога предупреждения",
+        "uk": "Вище порога попередження",
+        "zh-cn": "超过警告阈值"
+      },
+      "desc": {
+        "de": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+        "en": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+        "es": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+        "fr": "Vrai tant qu'une fenêtre du forfait dépasse le seuil d'alerte de ce compte. La fenêtre d'un seul modèle ne le déclenche jamais.",
+        "it": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+        "nl": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+        "pl": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+        "pt": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+        "ru": "Истина, пока общее для тарифа окно выше порога предупреждения этого аккаунта. Окно отдельной модели его не вызывает.",
+        "uk": "Істина, поки вікно всього тарифу перевищує поріг попередження цього акаунта. Вікно окремої моделі його не вмикає.",
+        "zh-cn": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.warning"
+  },
+  "ai-usage.0.claude": {
+    "type": "device",
+    "common": {
+      "name": "Claude (Claude)",
+      "statusStates": {
+        "offlineId": "info.unreach"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude"
+  },
+  "ai-usage.0.claude.costs": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Kosten",
+        "en": "Costs",
+        "es": "Costes",
+        "fr": "Coûts",
+        "it": "Costi",
+        "nl": "Kosten",
+        "pl": "Koszty",
+        "pt": "Custos",
+        "ru": "Расходы",
+        "uk": "Витрати",
+        "zh-cn": "费用"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.costs"
+  },
+  "ai-usage.0.claude.costs.month": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten diesen Monat",
+        "en": "Costs this month",
+        "es": "Costes de este mes",
+        "fr": "Coûts ce mois-ci",
+        "it": "Costi di questo mese",
+        "nl": "Kosten deze maand",
+        "pl": "Koszty w tym miesiącu",
+        "pt": "Custos deste mês",
+        "ru": "Расходы за месяц",
+        "uk": "Витрати цього місяця",
+        "zh-cn": "本月费用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.costs.month"
+  },
+  "ai-usage.0.claude.credits": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Guthaben",
+        "en": "Credits",
+        "es": "Créditos",
+        "fr": "Crédits",
+        "it": "Crediti",
+        "nl": "Tegoed",
+        "pl": "Środki",
+        "pt": "Créditos",
+        "ru": "Кредиты",
+        "uk": "Кредити",
+        "zh-cn": "额度"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.credits"
+  },
+  "ai-usage.0.claude.credits.limit": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben-Grenze",
+        "en": "Credits limit",
+        "es": "Límite de créditos",
+        "fr": "Limite de crédits",
+        "it": "Limite di crediti",
+        "nl": "Tegoedlimiet",
+        "pl": "Limit środków",
+        "pt": "Limite de créditos",
+        "ru": "Лимит кредитов",
+        "uk": "Ліміт кредитів",
+        "zh-cn": "额度上限"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.credits.limit"
+  },
+  "ai-usage.0.claude.credits.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben verbraucht (Prozent)",
+        "en": "Credits used (percent)",
+        "es": "Créditos utilizados (porcentaje)",
+        "fr": "Crédits utilisés (pourcentage)",
+        "it": "Crediti utilizzati (percentuale)",
+        "nl": "Tegoed verbruikt (procent)",
+        "pl": "Wykorzystane środki (procent)",
+        "pt": "Créditos utilizados (percentagem)",
+        "ru": "Кредитов использовано (проценты)",
+        "uk": "Використано кредитів (відсоток)",
+        "zh-cn": "已用额度（百分比）"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.credits.percent"
+  },
+  "ai-usage.0.claude.credits.used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben verbraucht",
+        "en": "Credits used",
+        "es": "Créditos utilizados",
+        "fr": "Crédits utilisés",
+        "it": "Crediti utilizzati",
+        "nl": "Tegoed verbruikt",
+        "pl": "Wykorzystane środki",
+        "pt": "Créditos utilizados",
+        "ru": "Кредитов использовано",
+        "uk": "Використано кредитів",
+        "zh-cn": "已用额度"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.credits.used"
+  },
+  "ai-usage.0.claude.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Informations",
+        "it": "Informazioni",
+        "nl": "Info",
+        "pl": "Informacje",
+        "pt": "Informações",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.info"
+  },
+  "ai-usage.0.claude.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Fehler",
+        "en": "Last error",
+        "es": "Último error",
+        "fr": "Dernière erreur",
+        "it": "Ultimo errore",
+        "nl": "Laatste fout",
+        "pl": "Ostatni błąd",
+        "pt": "Último erro",
+        "ru": "Последняя ошибка",
+        "uk": "Остання помилка",
+        "zh-cn": "最近一次错误"
+      },
+      "desc": {
+        "de": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+        "en": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+        "es": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+        "fr": "Pourquoi ce compte ne fournit rien. Vide tant que tout va bien ; « Unknown » tant que l'adaptateur n'a rien à signaler.",
+        "it": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+        "nl": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+        "pl": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+        "pt": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+        "ru": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
+        "uk": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",
+        "zh-cn": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.info.error"
+  },
+  "ai-usage.0.claude.info.lastUpdate": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzte erfolgreiche Aktualisierung",
+        "en": "Last successful update",
+        "es": "Última actualización correcta",
+        "fr": "Dernière mise à jour réussie",
+        "it": "Ultimo aggiornamento riuscito",
+        "nl": "Laatste geslaagde update",
+        "pl": "Ostatnia udana aktualizacja",
+        "pt": "Última atualização bem-sucedida",
+        "ru": "Последнее успешное обновление",
+        "uk": "Останнє успішне оновлення",
+        "zh-cn": "最近一次成功更新"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.info.lastUpdate"
+  },
+  "ai-usage.0.claude.info.unreach": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "KI-Dienst nicht erreichbar",
+        "en": "AI service not reachable",
+        "es": "Servicio de IA inaccesible",
+        "fr": "Service IA injoignable",
+        "it": "Servizio IA non raggiungibile",
+        "nl": "AI-dienst niet bereikbaar",
+        "pl": "Usługa AI nieosiągalna",
+        "pt": "Serviço de IA inacessível",
+        "ru": "Сервис ИИ недоступен",
+        "uk": "Сервіс ШІ недоступний",
+        "zh-cn": "AI 服务不可访问"
+      },
+      "desc": {
+        "de": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+        "en": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+        "es": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+        "fr": "Vrai tant que ce compte ne fournit pas de données. Une limitation conserve les dernières valeurs et le laisse faux.",
+        "it": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+        "nl": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+        "pl": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+        "pt": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+        "ru": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
+        "uk": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
+        "zh-cn": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。"
+      },
+      "type": "boolean",
+      "role": "indicator.maintenance.unreach",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.info.unreach"
+  },
+  "ai-usage.0.claude.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Bei 100 % (Limit-Fenster oder Budget)",
+        "en": "At 100 % (limit window or budget)",
+        "es": "Al 100 % (ventana de límite o saldo)",
+        "fr": "À 100 % (fenêtre de limite ou budget)",
+        "it": "Al 100 % (finestra di limite o budget)",
+        "nl": "Op 100 % (limietvenster of budget)",
+        "pl": "Na 100 % (okno limitu lub budżet)",
+        "pt": "Em 100 % (janela de limite ou saldo)",
+        "ru": "На 100 % (окно лимита или бюджет)",
+        "uk": "На 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limitReached"
+  },
+  "ai-usage.0.claude.limits": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Limit-Fenster",
+        "en": "Limit windows",
+        "es": "Ventanas de límite",
+        "fr": "Fenêtres de limite",
+        "it": "Finestre di limite",
+        "nl": "Limietvensters",
+        "pl": "Okna limitów",
+        "pt": "Janelas de limite",
+        "ru": "Окна лимитов",
+        "uk": "Вікна лімітів",
+        "zh-cn": "限额窗口"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits"
+  },
+  "ai-usage.0.claude.limits.session": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.)",
+        "en": "Session (5 h)",
+        "es": "Sesión (5 h)",
+        "fr": "Session (5 h)",
+        "it": "Sessione (5 h)",
+        "nl": "Sessie (5 u)",
+        "pl": "Sesja (5 godz.)",
+        "pt": "Sessão (5 h)",
+        "ru": "Сессия (5 ч)",
+        "uk": "Сесія (5 год)",
+        "zh-cn": "会话（5 小时）"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.session"
+  },
+  "ai-usage.0.claude.limits.session.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.) ist gerade das gültige Limit",
+        "en": "Session (5 h) is the limit in force",
+        "es": "Sesión (5 h) es el límite vigente",
+        "fr": "Session (5 h) est la limite en vigueur",
+        "it": "Sessione (5 h) è il limite in vigore",
+        "nl": "Sessie (5 u) is de geldende limiet",
+        "pl": "Sesja (5 godz.) to obowiązujący limit",
+        "pt": "Sessão (5 h) é o limite em vigor",
+        "ru": "Сессия (5 ч) — действующий лимит",
+        "uk": "Сесія (5 год) — чинний ліміт",
+        "zh-cn": "会话（5 小时） 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.session.active"
+  },
+  "ai-usage.0.claude.limits.session.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.) verbraucht",
+        "en": "Session (5 h) used",
+        "es": "Sesión (5 h) utilizado",
+        "fr": "Session (5 h) utilisé",
+        "it": "Sessione (5 h) utilizzato",
+        "nl": "Sessie (5 u) verbruikt",
+        "pl": "Sesja (5 godz.) wykorzystane",
+        "pt": "Sessão (5 h) utilizado",
+        "ru": "Сессия (5 ч) использовано",
+        "uk": "Сесія (5 год) використано",
+        "zh-cn": "会话（5 小时） 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.session.percent"
+  },
+  "ai-usage.0.claude.limits.session.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Sitzung (5 Std.) wird zurückgesetzt am",
+        "en": "Session (5 h) resets at",
+        "es": "Sesión (5 h) se reinicia el",
+        "fr": "Session (5 h) est réinitialisé le",
+        "it": "Sessione (5 h) si azzera il",
+        "nl": "Sessie (5 u) wordt gereset op",
+        "pl": "Sesja (5 godz.) zeruje się",
+        "pt": "Sessão (5 h) é reiniciado em",
+        "ru": "Сессия (5 ч) сбрасывается",
+        "uk": "Сесія (5 год) скидається",
+        "zh-cn": "会话（5 小时） 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.session.resetAt"
+  },
+  "ai-usage.0.claude.limits.week": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Woche (alle Modelle)",
+        "en": "Week (all models)",
+        "es": "Semana (todos los modelos)",
+        "fr": "Semaine (tous les modèles)",
+        "it": "Settimana (tutti i modelli)",
+        "nl": "Week (alle modellen)",
+        "pl": "Tydzień (wszystkie modele)",
+        "pt": "Semana (todos os modelos)",
+        "ru": "Неделя (все модели)",
+        "uk": "Тиждень (усі моделі)",
+        "zh-cn": "一周（所有模型）"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.week"
+  },
+  "ai-usage.0.claude.limits.week.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (alle Modelle) ist gerade das gültige Limit",
+        "en": "Week (all models) is the limit in force",
+        "es": "Semana (todos los modelos) es el límite vigente",
+        "fr": "Semaine (tous les modèles) est la limite en vigueur",
+        "it": "Settimana (tutti i modelli) è il limite in vigore",
+        "nl": "Week (alle modellen) is de geldende limiet",
+        "pl": "Tydzień (wszystkie modele) to obowiązujący limit",
+        "pt": "Semana (todos os modelos) é o limite em vigor",
+        "ru": "Неделя (все модели) — действующий лимит",
+        "uk": "Тиждень (усі моделі) — чинний ліміт",
+        "zh-cn": "一周（所有模型） 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.week.active"
+  },
+  "ai-usage.0.claude.limits.week.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (alle Modelle) verbraucht",
+        "en": "Week (all models) used",
+        "es": "Semana (todos los modelos) utilizado",
+        "fr": "Semaine (tous les modèles) utilisé",
+        "it": "Settimana (tutti i modelli) utilizzato",
+        "nl": "Week (alle modellen) verbruikt",
+        "pl": "Tydzień (wszystkie modele) wykorzystane",
+        "pt": "Semana (todos os modelos) utilizado",
+        "ru": "Неделя (все модели) использовано",
+        "uk": "Тиждень (усі моделі) використано",
+        "zh-cn": "一周（所有模型） 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.week.percent"
+  },
+  "ai-usage.0.claude.limits.week.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (alle Modelle) wird zurückgesetzt am",
+        "en": "Week (all models) resets at",
+        "es": "Semana (todos los modelos) se reinicia el",
+        "fr": "Semaine (tous les modèles) est réinitialisé le",
+        "it": "Settimana (tutti i modelli) si azzera il",
+        "nl": "Week (alle modellen) wordt gereset op",
+        "pl": "Tydzień (wszystkie modele) zeruje się",
+        "pt": "Semana (todos os modelos) é reiniciado em",
+        "ru": "Неделя (все модели) сбрасывается",
+        "uk": "Тиждень (усі моделі) скидається",
+        "zh-cn": "一周（所有模型） 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.week.resetAt"
+  },
+  "ai-usage.0.claude.limits.weekly_scoped-Fable": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Woche (Fable)",
+        "en": "Week (Fable)",
+        "es": "Semana (Fable)",
+        "fr": "Semaine (Fable)",
+        "it": "Settimana (Fable)",
+        "nl": "Week (Fable)",
+        "pl": "Tydzień (Fable)",
+        "pt": "Semana (Fable)",
+        "ru": "Неделя (Fable)",
+        "uk": "Тиждень (Fable)",
+        "zh-cn": "一周（Fable）"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.weekly_scoped-Fable"
+  },
+  "ai-usage.0.claude.limits.weekly_scoped-Fable.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (Fable) ist gerade das gültige Limit",
+        "en": "Week (Fable) is the limit in force",
+        "es": "Semana (Fable) es el límite vigente",
+        "fr": "Semaine (Fable) est la limite en vigueur",
+        "it": "Settimana (Fable) è il limite in vigore",
+        "nl": "Week (Fable) is de geldende limiet",
+        "pl": "Tydzień (Fable) to obowiązujący limit",
+        "pt": "Semana (Fable) é o limite em vigor",
+        "ru": "Неделя (Fable) — действующий лимит",
+        "uk": "Тиждень (Fable) — чинний ліміт",
+        "zh-cn": "一周（Fable） 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.weekly_scoped-Fable.active"
+  },
+  "ai-usage.0.claude.limits.weekly_scoped-Fable.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (Fable) verbraucht",
+        "en": "Week (Fable) used",
+        "es": "Semana (Fable) utilizado",
+        "fr": "Semaine (Fable) utilisé",
+        "it": "Settimana (Fable) utilizzato",
+        "nl": "Week (Fable) verbruikt",
+        "pl": "Tydzień (Fable) wykorzystane",
+        "pt": "Semana (Fable) utilizado",
+        "ru": "Неделя (Fable) использовано",
+        "uk": "Тиждень (Fable) використано",
+        "zh-cn": "一周（Fable） 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.weekly_scoped-Fable.percent"
+  },
+  "ai-usage.0.claude.limits.weekly_scoped-Fable.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (Fable) wird zurückgesetzt am",
+        "en": "Week (Fable) resets at",
+        "es": "Semana (Fable) se reinicia el",
+        "fr": "Semaine (Fable) est réinitialisé le",
+        "it": "Settimana (Fable) si azzera il",
+        "nl": "Week (Fable) wordt gereset op",
+        "pl": "Tydzień (Fable) zeruje się",
+        "pt": "Semana (Fable) é reiniciado em",
+        "ru": "Неделя (Fable) сбрасывается",
+        "uk": "Тиждень (Fable) скидається",
+        "zh-cn": "一周（Fable） 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.limits.weekly_scoped-Fable.resetAt"
+  },
+  "ai-usage.0.claude.warning": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Über der Warnschwelle",
+        "en": "Above warn threshold",
+        "es": "Por encima del umbral de aviso",
+        "fr": "Au-dessus du seuil d'alerte",
+        "it": "Sopra la soglia di avviso",
+        "nl": "Boven de waarschuwingsdrempel",
+        "pl": "Powyżej progu ostrzegawczego",
+        "pt": "Acima do limite de aviso",
+        "ru": "Выше порога предупреждения",
+        "uk": "Вище порога попередження",
+        "zh-cn": "超过警告阈值"
+      },
+      "desc": {
+        "de": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+        "en": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+        "es": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+        "fr": "Vrai tant qu'une fenêtre du forfait dépasse le seuil d'alerte de ce compte. La fenêtre d'un seul modèle ne le déclenche jamais.",
+        "it": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+        "nl": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+        "pl": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+        "pt": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+        "ru": "Истина, пока общее для тарифа окно выше порога предупреждения этого аккаунта. Окно отдельной модели его не вызывает.",
+        "uk": "Істина, поки вікно всього тарифу перевищує поріг попередження цього акаунта. Вікно окремої моделі його не вмикає.",
+        "zh-cn": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.claude.warning"
+  },
+  "ai-usage.0.fixture-anthropic-api": {
+    "type": "device",
+    "common": {
+      "name": "Anthropic (Anthropic)",
+      "statusStates": {
+        "offlineId": "info.unreach"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api"
+  },
+  "ai-usage.0.fixture-anthropic-api.costs": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Kosten",
+        "en": "Costs",
+        "es": "Costes",
+        "fr": "Coûts",
+        "it": "Costi",
+        "nl": "Kosten",
+        "pl": "Koszty",
+        "pt": "Custos",
+        "ru": "Расходы",
+        "uk": "Витрати",
+        "zh-cn": "费用"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.costs"
+  },
+  "ai-usage.0.fixture-anthropic-api.costs.month": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten diesen Monat",
+        "en": "Costs this month",
+        "es": "Costes de este mes",
+        "fr": "Coûts ce mois-ci",
+        "it": "Costi di questo mese",
+        "nl": "Kosten deze maand",
+        "pl": "Koszty w tym miesiącu",
+        "pt": "Custos deste mês",
+        "ru": "Расходы за месяц",
+        "uk": "Витрати цього місяця",
+        "zh-cn": "本月费用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.costs.month"
+  },
+  "ai-usage.0.fixture-anthropic-api.costs.projectedMonth": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kostenprognose zum Monatsende (berechnet)",
+        "en": "Costs projected month-end (computed)",
+        "es": "Costes previstos a fin de mes (calculado)",
+        "fr": "Coûts prévus en fin de mois (calculé)",
+        "it": "Costi previsti a fine mese (calcolato)",
+        "nl": "Verwachte kosten einde maand (berekend)",
+        "pl": "Prognoza kosztów na koniec miesiąca (obliczona)",
+        "pt": "Custos previstos para o fim do mês (calculado)",
+        "ru": "Прогноз расходов на конец месяца (расчёт)",
+        "uk": "Прогноз витрат на кінець місяця (розрахунок)",
+        "zh-cn": "月末费用预测（推算）"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD",
+      "desc": {
+        "de": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters.",
+        "en": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports.",
+        "es": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor.",
+        "fr": "Dépense projetée en fin de mois, calculée à partir du montant déjà dépensé — ce n'est pas un chiffre du fournisseur.",
+        "it": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider.",
+        "nl": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder.",
+        "pl": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy.",
+        "pt": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor.",
+        "ru": "Прогноз расходов на конец месяца, рассчитанный из уже потраченного — это не данные провайдера.",
+        "uk": "Прогноз витрат на кінець місяця, розрахований із уже витраченого — це не число від провайдера.",
+        "zh-cn": "按目前支出推算的月末花费——不是供应商给出的数字。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.costs.projectedMonth"
+  },
+  "ai-usage.0.fixture-anthropic-api.costs.today": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten heute",
+        "en": "Costs today",
+        "es": "Costes de hoy",
+        "fr": "Coûts aujourd'hui",
+        "it": "Costi di oggi",
+        "nl": "Kosten vandaag",
+        "pl": "Koszty dzisiaj",
+        "pt": "Custos hoje",
+        "ru": "Расходы сегодня",
+        "uk": "Витрати сьогодні",
+        "zh-cn": "今日费用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.costs.today"
+  },
+  "ai-usage.0.fixture-anthropic-api.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Informations",
+        "it": "Informazioni",
+        "nl": "Info",
+        "pl": "Informacje",
+        "pt": "Informações",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.info"
+  },
+  "ai-usage.0.fixture-anthropic-api.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Fehler",
+        "en": "Last error",
+        "es": "Último error",
+        "fr": "Dernière erreur",
+        "it": "Ultimo errore",
+        "nl": "Laatste fout",
+        "pl": "Ostatni błąd",
+        "pt": "Último erro",
+        "ru": "Последняя ошибка",
+        "uk": "Остання помилка",
+        "zh-cn": "最近一次错误"
+      },
+      "desc": {
+        "de": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+        "en": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+        "es": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+        "fr": "Pourquoi ce compte ne fournit rien. Vide tant que tout va bien ; « Unknown » tant que l'adaptateur n'a rien à signaler.",
+        "it": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+        "nl": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+        "pl": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+        "pt": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+        "ru": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
+        "uk": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",
+        "zh-cn": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.info.error"
+  },
+  "ai-usage.0.fixture-anthropic-api.info.lastUpdate": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzte erfolgreiche Aktualisierung",
+        "en": "Last successful update",
+        "es": "Última actualización correcta",
+        "fr": "Dernière mise à jour réussie",
+        "it": "Ultimo aggiornamento riuscito",
+        "nl": "Laatste geslaagde update",
+        "pl": "Ostatnia udana aktualizacja",
+        "pt": "Última atualização bem-sucedida",
+        "ru": "Последнее успешное обновление",
+        "uk": "Останнє успішне оновлення",
+        "zh-cn": "最近一次成功更新"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.info.lastUpdate"
+  },
+  "ai-usage.0.fixture-anthropic-api.info.unreach": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "KI-Dienst nicht erreichbar",
+        "en": "AI service not reachable",
+        "es": "Servicio de IA inaccesible",
+        "fr": "Service IA injoignable",
+        "it": "Servizio IA non raggiungibile",
+        "nl": "AI-dienst niet bereikbaar",
+        "pl": "Usługa AI nieosiągalna",
+        "pt": "Serviço de IA inacessível",
+        "ru": "Сервис ИИ недоступен",
+        "uk": "Сервіс ШІ недоступний",
+        "zh-cn": "AI 服务不可访问"
+      },
+      "desc": {
+        "de": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+        "en": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+        "es": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+        "fr": "Vrai tant que ce compte ne fournit pas de données. Une limitation conserve les dernières valeurs et le laisse faux.",
+        "it": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+        "nl": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+        "pl": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+        "pt": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+        "ru": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
+        "uk": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
+        "zh-cn": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。"
+      },
+      "type": "boolean",
+      "role": "indicator.maintenance.unreach",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.info.unreach"
+  },
+  "ai-usage.0.fixture-anthropic-api.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Bei 100 % (Limit-Fenster oder Budget)",
+        "en": "At 100 % (limit window or budget)",
+        "es": "Al 100 % (ventana de límite o saldo)",
+        "fr": "À 100 % (fenêtre de limite ou budget)",
+        "it": "Al 100 % (finestra di limite o budget)",
+        "nl": "Op 100 % (limietvenster of budget)",
+        "pl": "Na 100 % (okno limitu lub budżet)",
+        "pt": "Em 100 % (janela de limite ou saldo)",
+        "ru": "На 100 % (окно лимита или бюджет)",
+        "uk": "На 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.limitReached"
+  },
+  "ai-usage.0.fixture-anthropic-api.tokens": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Token",
+        "en": "Tokens",
+        "es": "Tokens",
+        "fr": "Jetons",
+        "it": "Token",
+        "nl": "Tokens",
+        "pl": "Tokeny",
+        "pt": "Tokens",
+        "ru": "Токены",
+        "uk": "Токени",
+        "zh-cn": "Token"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.tokens"
+  },
+  "ai-usage.0.fixture-anthropic-api.tokens.inputToday": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Eingabe-Token heute",
+        "en": "Input tokens today",
+        "es": "Tokens de entrada de hoy",
+        "fr": "Jetons d'entrée aujourd'hui",
+        "it": "Token di input di oggi",
+        "nl": "Invoertokens vandaag",
+        "pl": "Tokeny wejściowe dzisiaj",
+        "pt": "Tokens de entrada hoje",
+        "ru": "Входные токены сегодня",
+        "uk": "Вхідні токени сьогодні",
+        "zh-cn": "今日输入 Token"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.tokens.inputToday"
+  },
+  "ai-usage.0.fixture-anthropic-api.tokens.outputToday": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Ausgabe-Token heute",
+        "en": "Output tokens today",
+        "es": "Tokens de salida de hoy",
+        "fr": "Jetons de sortie aujourd'hui",
+        "it": "Token di output di oggi",
+        "nl": "Uitvoertokens vandaag",
+        "pl": "Tokeny wyjściowe dzisiaj",
+        "pt": "Tokens de saída hoje",
+        "ru": "Выходные токены сегодня",
+        "uk": "Вихідні токени сьогодні",
+        "zh-cn": "今日输出 Token"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.tokens.outputToday"
+  },
+  "ai-usage.0.fixture-anthropic-api.warning": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Über der Warnschwelle",
+        "en": "Above warn threshold",
+        "es": "Por encima del umbral de aviso",
+        "fr": "Au-dessus du seuil d'alerte",
+        "it": "Sopra la soglia di avviso",
+        "nl": "Boven de waarschuwingsdrempel",
+        "pl": "Powyżej progu ostrzegawczego",
+        "pt": "Acima do limite de aviso",
+        "ru": "Выше порога предупреждения",
+        "uk": "Вище порога попередження",
+        "zh-cn": "超过警告阈值"
+      },
+      "desc": {
+        "de": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+        "en": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+        "es": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+        "fr": "Vrai tant qu'une fenêtre du forfait dépasse le seuil d'alerte de ce compte. La fenêtre d'un seul modèle ne le déclenche jamais.",
+        "it": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+        "nl": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+        "pl": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+        "pt": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+        "ru": "Истина, пока общее для тарифа окно выше порога предупреждения этого аккаунта. Окно отдельной модели его не вызывает.",
+        "uk": "Істина, поки вікно всього тарифу перевищує поріг попередження цього акаунта. Вікно окремої моделі його не вмикає.",
+        "zh-cn": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-anthropic-api.warning"
+  },
+  "ai-usage.0.fixture-deepseek-api": {
+    "type": "device",
+    "common": {
+      "name": "DeepSeek (DeepSeek)",
+      "statusStates": {
+        "offlineId": "info.unreach"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api"
+  },
+  "ai-usage.0.fixture-deepseek-api.credits": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Guthaben",
+        "en": "Credits",
+        "es": "Créditos",
+        "fr": "Crédits",
+        "it": "Crediti",
+        "nl": "Tegoed",
+        "pl": "Środki",
+        "pt": "Créditos",
+        "ru": "Кредиты",
+        "uk": "Кредити",
+        "zh-cn": "额度"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.credits"
+  },
+  "ai-usage.0.fixture-deepseek-api.credits.available": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben reicht für Anfragen",
+        "en": "Balance sufficient for calls",
+        "es": "Saldo suficiente para las llamadas",
+        "fr": "Solde suffisant pour les appels",
+        "it": "Saldo sufficiente per le chiamate",
+        "nl": "Tegoed voldoende voor aanvragen",
+        "pl": "Środki wystarczają na zapytania",
+        "pt": "Saldo suficiente para chamadas",
+        "ru": "Баланса хватает для запросов",
+        "uk": "Балансу достатньо для запитів",
+        "zh-cn": "余额足以发起调用"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.credits.available"
+  },
+  "ai-usage.0.fixture-deepseek-api.credits.granted": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Gewährtes Guthaben",
+        "en": "Granted balance",
+        "es": "Saldo concedido",
+        "fr": "Solde offert",
+        "it": "Saldo concesso",
+        "nl": "Toegekend tegoed",
+        "pl": "Przyznane środki",
+        "pt": "Saldo concedido",
+        "ru": "Предоставленный баланс",
+        "uk": "Наданий баланс",
+        "zh-cn": "赠送余额"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.credits.granted"
+  },
+  "ai-usage.0.fixture-deepseek-api.credits.remaining": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben übrig",
+        "en": "Credits remaining",
+        "es": "Créditos restantes",
+        "fr": "Crédits restants",
+        "it": "Crediti rimanenti",
+        "nl": "Tegoed resterend",
+        "pl": "Pozostałe środki",
+        "pt": "Créditos restantes",
+        "ru": "Осталось кредитов",
+        "uk": "Залишок кредитів",
+        "zh-cn": "剩余额度"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.credits.remaining"
+  },
+  "ai-usage.0.fixture-deepseek-api.credits.toppedUp": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Aufgeladenes Guthaben",
+        "en": "Topped-up balance",
+        "es": "Saldo recargado",
+        "fr": "Solde rechargé",
+        "it": "Saldo ricaricato",
+        "nl": "Opgewaardeerd tegoed",
+        "pl": "Doładowane środki",
+        "pt": "Saldo carregado",
+        "ru": "Пополненный баланс",
+        "uk": "Поповнений баланс",
+        "zh-cn": "充值余额"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.credits.toppedUp"
+  },
+  "ai-usage.0.fixture-deepseek-api.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Informations",
+        "it": "Informazioni",
+        "nl": "Info",
+        "pl": "Informacje",
+        "pt": "Informações",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.info"
+  },
+  "ai-usage.0.fixture-deepseek-api.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Fehler",
+        "en": "Last error",
+        "es": "Último error",
+        "fr": "Dernière erreur",
+        "it": "Ultimo errore",
+        "nl": "Laatste fout",
+        "pl": "Ostatni błąd",
+        "pt": "Último erro",
+        "ru": "Последняя ошибка",
+        "uk": "Остання помилка",
+        "zh-cn": "最近一次错误"
+      },
+      "desc": {
+        "de": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+        "en": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+        "es": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+        "fr": "Pourquoi ce compte ne fournit rien. Vide tant que tout va bien ; « Unknown » tant que l'adaptateur n'a rien à signaler.",
+        "it": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+        "nl": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+        "pl": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+        "pt": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+        "ru": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
+        "uk": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",
+        "zh-cn": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.info.error"
+  },
+  "ai-usage.0.fixture-deepseek-api.info.lastUpdate": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzte erfolgreiche Aktualisierung",
+        "en": "Last successful update",
+        "es": "Última actualización correcta",
+        "fr": "Dernière mise à jour réussie",
+        "it": "Ultimo aggiornamento riuscito",
+        "nl": "Laatste geslaagde update",
+        "pl": "Ostatnia udana aktualizacja",
+        "pt": "Última atualização bem-sucedida",
+        "ru": "Последнее успешное обновление",
+        "uk": "Останнє успішне оновлення",
+        "zh-cn": "最近一次成功更新"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.info.lastUpdate"
+  },
+  "ai-usage.0.fixture-deepseek-api.info.unreach": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "KI-Dienst nicht erreichbar",
+        "en": "AI service not reachable",
+        "es": "Servicio de IA inaccesible",
+        "fr": "Service IA injoignable",
+        "it": "Servizio IA non raggiungibile",
+        "nl": "AI-dienst niet bereikbaar",
+        "pl": "Usługa AI nieosiągalna",
+        "pt": "Serviço de IA inacessível",
+        "ru": "Сервис ИИ недоступен",
+        "uk": "Сервіс ШІ недоступний",
+        "zh-cn": "AI 服务不可访问"
+      },
+      "desc": {
+        "de": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+        "en": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+        "es": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+        "fr": "Vrai tant que ce compte ne fournit pas de données. Une limitation conserve les dernières valeurs et le laisse faux.",
+        "it": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+        "nl": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+        "pl": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+        "pt": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+        "ru": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
+        "uk": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
+        "zh-cn": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。"
+      },
+      "type": "boolean",
+      "role": "indicator.maintenance.unreach",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.info.unreach"
+  },
+  "ai-usage.0.fixture-deepseek-api.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Bei 100 % (Limit-Fenster oder Budget)",
+        "en": "At 100 % (limit window or budget)",
+        "es": "Al 100 % (ventana de límite o saldo)",
+        "fr": "À 100 % (fenêtre de limite ou budget)",
+        "it": "Al 100 % (finestra di limite o budget)",
+        "nl": "Op 100 % (limietvenster of budget)",
+        "pl": "Na 100 % (okno limitu lub budżet)",
+        "pt": "Em 100 % (janela de limite ou saldo)",
+        "ru": "На 100 % (окно лимита или бюджет)",
+        "uk": "На 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.limitReached"
+  },
+  "ai-usage.0.fixture-deepseek-api.warning": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Über der Warnschwelle",
+        "en": "Above warn threshold",
+        "es": "Por encima del umbral de aviso",
+        "fr": "Au-dessus du seuil d'alerte",
+        "it": "Sopra la soglia di avviso",
+        "nl": "Boven de waarschuwingsdrempel",
+        "pl": "Powyżej progu ostrzegawczego",
+        "pt": "Acima do limite de aviso",
+        "ru": "Выше порога предупреждения",
+        "uk": "Вище порога попередження",
+        "zh-cn": "超过警告阈值"
+      },
+      "desc": {
+        "de": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+        "en": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+        "es": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+        "fr": "Vrai tant qu'une fenêtre du forfait dépasse le seuil d'alerte de ce compte. La fenêtre d'un seul modèle ne le déclenche jamais.",
+        "it": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+        "nl": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+        "pl": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+        "pt": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+        "ru": "Истина, пока общее для тарифа окно выше порога предупреждения этого аккаунта. Окно отдельной модели его не вызывает.",
+        "uk": "Істина, поки вікно всього тарифу перевищує поріг попередження цього акаунта. Вікно окремої моделі його не вмикає.",
+        "zh-cn": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-deepseek-api.warning"
+  },
+  "ai-usage.0.fixture-openai-api": {
+    "type": "device",
+    "common": {
+      "name": "OpenAI (OpenAI)",
+      "statusStates": {
+        "offlineId": "info.unreach"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api"
+  },
+  "ai-usage.0.fixture-openai-api.costs": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Kosten",
+        "en": "Costs",
+        "es": "Costes",
+        "fr": "Coûts",
+        "it": "Costi",
+        "nl": "Kosten",
+        "pl": "Koszty",
+        "pt": "Custos",
+        "ru": "Расходы",
+        "uk": "Витрати",
+        "zh-cn": "费用"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.costs"
+  },
+  "ai-usage.0.fixture-openai-api.costs.month": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten diesen Monat",
+        "en": "Costs this month",
+        "es": "Costes de este mes",
+        "fr": "Coûts ce mois-ci",
+        "it": "Costi di questo mese",
+        "nl": "Kosten deze maand",
+        "pl": "Koszty w tym miesiącu",
+        "pt": "Custos deste mês",
+        "ru": "Расходы за месяц",
+        "uk": "Витрати цього місяця",
+        "zh-cn": "本月费用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.costs.month"
+  },
+  "ai-usage.0.fixture-openai-api.costs.projectedMonth": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kostenprognose zum Monatsende (berechnet)",
+        "en": "Costs projected month-end (computed)",
+        "es": "Costes previstos a fin de mes (calculado)",
+        "fr": "Coûts prévus en fin de mois (calculé)",
+        "it": "Costi previsti a fine mese (calcolato)",
+        "nl": "Verwachte kosten einde maand (berekend)",
+        "pl": "Prognoza kosztów na koniec miesiąca (obliczona)",
+        "pt": "Custos previstos para o fim do mês (calculado)",
+        "ru": "Прогноз расходов на конец месяца (расчёт)",
+        "uk": "Прогноз витрат на кінець місяця (розрахунок)",
+        "zh-cn": "月末费用预测（推算）"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD",
+      "desc": {
+        "de": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters.",
+        "en": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports.",
+        "es": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor.",
+        "fr": "Dépense projetée en fin de mois, calculée à partir du montant déjà dépensé — ce n'est pas un chiffre du fournisseur.",
+        "it": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider.",
+        "nl": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder.",
+        "pl": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy.",
+        "pt": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor.",
+        "ru": "Прогноз расходов на конец месяца, рассчитанный из уже потраченного — это не данные провайдера.",
+        "uk": "Прогноз витрат на кінець місяця, розрахований із уже витраченого — це не число від провайдера.",
+        "zh-cn": "按目前支出推算的月末花费——不是供应商给出的数字。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.costs.projectedMonth"
+  },
+  "ai-usage.0.fixture-openai-api.costs.today": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten heute",
+        "en": "Costs today",
+        "es": "Costes de hoy",
+        "fr": "Coûts aujourd'hui",
+        "it": "Costi di oggi",
+        "nl": "Kosten vandaag",
+        "pl": "Koszty dzisiaj",
+        "pt": "Custos hoje",
+        "ru": "Расходы сегодня",
+        "uk": "Витрати сьогодні",
+        "zh-cn": "今日费用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.costs.today"
+  },
+  "ai-usage.0.fixture-openai-api.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Informations",
+        "it": "Informazioni",
+        "nl": "Info",
+        "pl": "Informacje",
+        "pt": "Informações",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.info"
+  },
+  "ai-usage.0.fixture-openai-api.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Fehler",
+        "en": "Last error",
+        "es": "Último error",
+        "fr": "Dernière erreur",
+        "it": "Ultimo errore",
+        "nl": "Laatste fout",
+        "pl": "Ostatni błąd",
+        "pt": "Último erro",
+        "ru": "Последняя ошибка",
+        "uk": "Остання помилка",
+        "zh-cn": "最近一次错误"
+      },
+      "desc": {
+        "de": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+        "en": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+        "es": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+        "fr": "Pourquoi ce compte ne fournit rien. Vide tant que tout va bien ; « Unknown » tant que l'adaptateur n'a rien à signaler.",
+        "it": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+        "nl": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+        "pl": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+        "pt": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+        "ru": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
+        "uk": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",
+        "zh-cn": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.info.error"
+  },
+  "ai-usage.0.fixture-openai-api.info.lastUpdate": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzte erfolgreiche Aktualisierung",
+        "en": "Last successful update",
+        "es": "Última actualización correcta",
+        "fr": "Dernière mise à jour réussie",
+        "it": "Ultimo aggiornamento riuscito",
+        "nl": "Laatste geslaagde update",
+        "pl": "Ostatnia udana aktualizacja",
+        "pt": "Última atualização bem-sucedida",
+        "ru": "Последнее успешное обновление",
+        "uk": "Останнє успішне оновлення",
+        "zh-cn": "最近一次成功更新"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.info.lastUpdate"
+  },
+  "ai-usage.0.fixture-openai-api.info.unreach": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "KI-Dienst nicht erreichbar",
+        "en": "AI service not reachable",
+        "es": "Servicio de IA inaccesible",
+        "fr": "Service IA injoignable",
+        "it": "Servizio IA non raggiungibile",
+        "nl": "AI-dienst niet bereikbaar",
+        "pl": "Usługa AI nieosiągalna",
+        "pt": "Serviço de IA inacessível",
+        "ru": "Сервис ИИ недоступен",
+        "uk": "Сервіс ШІ недоступний",
+        "zh-cn": "AI 服务不可访问"
+      },
+      "desc": {
+        "de": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+        "en": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+        "es": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+        "fr": "Vrai tant que ce compte ne fournit pas de données. Une limitation conserve les dernières valeurs et le laisse faux.",
+        "it": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+        "nl": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+        "pl": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+        "pt": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+        "ru": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
+        "uk": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
+        "zh-cn": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。"
+      },
+      "type": "boolean",
+      "role": "indicator.maintenance.unreach",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.info.unreach"
+  },
+  "ai-usage.0.fixture-openai-api.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Bei 100 % (Limit-Fenster oder Budget)",
+        "en": "At 100 % (limit window or budget)",
+        "es": "Al 100 % (ventana de límite o saldo)",
+        "fr": "À 100 % (fenêtre de limite ou budget)",
+        "it": "Al 100 % (finestra di limite o budget)",
+        "nl": "Op 100 % (limietvenster of budget)",
+        "pl": "Na 100 % (okno limitu lub budżet)",
+        "pt": "Em 100 % (janela de limite ou saldo)",
+        "ru": "На 100 % (окно лимита или бюджет)",
+        "uk": "На 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.limitReached"
+  },
+  "ai-usage.0.fixture-openai-api.models": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Verbrauch je Modell",
+        "en": "Per-model usage",
+        "es": "Uso por modelo",
+        "fr": "Utilisation par modèle",
+        "it": "Utilizzo per modello",
+        "nl": "Verbruik per model",
+        "pl": "Zużycie na model",
+        "pt": "Utilização por modelo",
+        "ru": "Использование по моделям",
+        "uk": "Використання за моделями",
+        "zh-cn": "各模型用量"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.models"
+  },
+  "ai-usage.0.fixture-openai-api.models.gpt-5": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Modell gpt-5",
+        "en": "Model gpt-5",
+        "es": "Modelo gpt-5",
+        "fr": "Modèle gpt-5",
+        "it": "Modello gpt-5",
+        "nl": "Model gpt-5",
+        "pl": "Model gpt-5",
+        "pt": "Modelo gpt-5",
+        "ru": "Модель gpt-5",
+        "uk": "Модель gpt-5",
+        "zh-cn": "模型 gpt-5"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.models.gpt-5"
+  },
+  "ai-usage.0.fixture-openai-api.models.gpt-5-mini": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Modell gpt-5-mini",
+        "en": "Model gpt-5-mini",
+        "es": "Modelo gpt-5-mini",
+        "fr": "Modèle gpt-5-mini",
+        "it": "Modello gpt-5-mini",
+        "nl": "Model gpt-5-mini",
+        "pl": "Model gpt-5-mini",
+        "pt": "Modelo gpt-5-mini",
+        "ru": "Модель gpt-5-mini",
+        "uk": "Модель gpt-5-mini",
+        "zh-cn": "模型 gpt-5-mini"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.models.gpt-5-mini"
+  },
+  "ai-usage.0.fixture-openai-api.models.gpt-5-mini.tokensToday": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "gpt-5-mini Token heute",
+        "en": "gpt-5-mini tokens today",
+        "es": "gpt-5-mini tokens de hoy",
+        "fr": "gpt-5-mini jetons aujourd'hui",
+        "it": "gpt-5-mini token di oggi",
+        "nl": "gpt-5-mini tokens vandaag",
+        "pl": "gpt-5-mini tokenów dzisiaj",
+        "pt": "gpt-5-mini tokens hoje",
+        "ru": "gpt-5-mini токенов сегодня",
+        "uk": "gpt-5-mini токенів сьогодні",
+        "zh-cn": "gpt-5-mini 今日 Token"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.models.gpt-5-mini.tokensToday"
+  },
+  "ai-usage.0.fixture-openai-api.models.gpt-5.tokensToday": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "gpt-5 Token heute",
+        "en": "gpt-5 tokens today",
+        "es": "gpt-5 tokens de hoy",
+        "fr": "gpt-5 jetons aujourd'hui",
+        "it": "gpt-5 token di oggi",
+        "nl": "gpt-5 tokens vandaag",
+        "pl": "gpt-5 tokenów dzisiaj",
+        "pt": "gpt-5 tokens hoje",
+        "ru": "gpt-5 токенов сегодня",
+        "uk": "gpt-5 токенів сьогодні",
+        "zh-cn": "gpt-5 今日 Token"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.models.gpt-5.tokensToday"
+  },
+  "ai-usage.0.fixture-openai-api.tokens": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Token",
+        "en": "Tokens",
+        "es": "Tokens",
+        "fr": "Jetons",
+        "it": "Token",
+        "nl": "Tokens",
+        "pl": "Tokeny",
+        "pt": "Tokens",
+        "ru": "Токены",
+        "uk": "Токени",
+        "zh-cn": "Token"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.tokens"
+  },
+  "ai-usage.0.fixture-openai-api.tokens.inputToday": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Eingabe-Token heute",
+        "en": "Input tokens today",
+        "es": "Tokens de entrada de hoy",
+        "fr": "Jetons d'entrée aujourd'hui",
+        "it": "Token di input di oggi",
+        "nl": "Invoertokens vandaag",
+        "pl": "Tokeny wejściowe dzisiaj",
+        "pt": "Tokens de entrada hoje",
+        "ru": "Входные токены сегодня",
+        "uk": "Вхідні токени сьогодні",
+        "zh-cn": "今日输入 Token"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.tokens.inputToday"
+  },
+  "ai-usage.0.fixture-openai-api.tokens.outputToday": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Ausgabe-Token heute",
+        "en": "Output tokens today",
+        "es": "Tokens de salida de hoy",
+        "fr": "Jetons de sortie aujourd'hui",
+        "it": "Token di output di oggi",
+        "nl": "Uitvoertokens vandaag",
+        "pl": "Tokeny wyjściowe dzisiaj",
+        "pt": "Tokens de saída hoje",
+        "ru": "Выходные токены сегодня",
+        "uk": "Вихідні токени сьогодні",
+        "zh-cn": "今日输出 Token"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.tokens.outputToday"
+  },
+  "ai-usage.0.fixture-openai-api.warning": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Über der Warnschwelle",
+        "en": "Above warn threshold",
+        "es": "Por encima del umbral de aviso",
+        "fr": "Au-dessus du seuil d'alerte",
+        "it": "Sopra la soglia di avviso",
+        "nl": "Boven de waarschuwingsdrempel",
+        "pl": "Powyżej progu ostrzegawczego",
+        "pt": "Acima do limite de aviso",
+        "ru": "Выше порога предупреждения",
+        "uk": "Вище порога попередження",
+        "zh-cn": "超过警告阈值"
+      },
+      "desc": {
+        "de": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+        "en": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+        "es": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+        "fr": "Vrai tant qu'une fenêtre du forfait dépasse le seuil d'alerte de ce compte. La fenêtre d'un seul modèle ne le déclenche jamais.",
+        "it": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+        "nl": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+        "pl": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+        "pt": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+        "ru": "Истина, пока общее для тарифа окно выше порога предупреждения этого аккаунта. Окно отдельной модели его не вызывает.",
+        "uk": "Істина, поки вікно всього тарифу перевищує поріг попередження цього акаунта. Вікно окремої моделі його не вмикає.",
+        "zh-cn": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openai-api.warning"
+  },
+  "ai-usage.0.fixture-openrouter-api": {
+    "type": "device",
+    "common": {
+      "name": "OpenRouter (OpenRouter)",
+      "statusStates": {
+        "offlineId": "info.unreach"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api"
+  },
+  "ai-usage.0.fixture-openrouter-api.costs": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Kosten",
+        "en": "Costs",
+        "es": "Costes",
+        "fr": "Coûts",
+        "it": "Costi",
+        "nl": "Kosten",
+        "pl": "Koszty",
+        "pt": "Custos",
+        "ru": "Расходы",
+        "uk": "Витрати",
+        "zh-cn": "费用"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.costs"
+  },
+  "ai-usage.0.fixture-openrouter-api.costs.total": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten gesamt (seit Beginn)",
+        "en": "Costs total (lifetime)",
+        "es": "Costes totales (desde el inicio)",
+        "fr": "Coûts totaux (depuis le début)",
+        "it": "Costi totali (dall'inizio)",
+        "nl": "Kosten totaal (sinds begin)",
+        "pl": "Koszty łącznie (od początku)",
+        "pt": "Custos totais (desde o início)",
+        "ru": "Расходы всего (за всё время)",
+        "uk": "Витрати загалом (за весь час)",
+        "zh-cn": "累计费用（历史总计）"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.costs.total"
+  },
+  "ai-usage.0.fixture-openrouter-api.credits": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Guthaben",
+        "en": "Credits",
+        "es": "Créditos",
+        "fr": "Crédits",
+        "it": "Crediti",
+        "nl": "Tegoed",
+        "pl": "Środki",
+        "pt": "Créditos",
+        "ru": "Кредиты",
+        "uk": "Кредити",
+        "zh-cn": "额度"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.credits"
+  },
+  "ai-usage.0.fixture-openrouter-api.credits.limit": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben-Grenze",
+        "en": "Credits limit",
+        "es": "Límite de créditos",
+        "fr": "Limite de crédits",
+        "it": "Limite di crediti",
+        "nl": "Tegoedlimiet",
+        "pl": "Limit środków",
+        "pt": "Limite de créditos",
+        "ru": "Лимит кредитов",
+        "uk": "Ліміт кредитів",
+        "zh-cn": "额度上限"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.credits.limit"
+  },
+  "ai-usage.0.fixture-openrouter-api.credits.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben verbraucht (Prozent)",
+        "en": "Credits used (percent)",
+        "es": "Créditos utilizados (porcentaje)",
+        "fr": "Crédits utilisés (pourcentage)",
+        "it": "Crediti utilizzati (percentuale)",
+        "nl": "Tegoed verbruikt (procent)",
+        "pl": "Wykorzystane środki (procent)",
+        "pt": "Créditos utilizados (percentagem)",
+        "ru": "Кредитов использовано (проценты)",
+        "uk": "Використано кредитів (відсоток)",
+        "zh-cn": "已用额度（百分比）"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.credits.percent"
+  },
+  "ai-usage.0.fixture-openrouter-api.credits.remaining": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben übrig",
+        "en": "Credits remaining",
+        "es": "Créditos restantes",
+        "fr": "Crédits restants",
+        "it": "Crediti rimanenti",
+        "nl": "Tegoed resterend",
+        "pl": "Pozostałe środki",
+        "pt": "Créditos restantes",
+        "ru": "Осталось кредитов",
+        "uk": "Залишок кредитів",
+        "zh-cn": "剩余额度"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.credits.remaining"
+  },
+  "ai-usage.0.fixture-openrouter-api.credits.used": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Guthaben verbraucht",
+        "en": "Credits used",
+        "es": "Créditos utilizados",
+        "fr": "Crédits utilisés",
+        "it": "Crediti utilizzati",
+        "nl": "Tegoed verbruikt",
+        "pl": "Wykorzystane środki",
+        "pt": "Créditos utilizados",
+        "ru": "Кредитов использовано",
+        "uk": "Використано кредитів",
+        "zh-cn": "已用额度"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.credits.used"
+  },
+  "ai-usage.0.fixture-openrouter-api.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Informations",
+        "it": "Informazioni",
+        "nl": "Info",
+        "pl": "Informacje",
+        "pt": "Informações",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.info"
+  },
+  "ai-usage.0.fixture-openrouter-api.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Fehler",
+        "en": "Last error",
+        "es": "Último error",
+        "fr": "Dernière erreur",
+        "it": "Ultimo errore",
+        "nl": "Laatste fout",
+        "pl": "Ostatni błąd",
+        "pt": "Último erro",
+        "ru": "Последняя ошибка",
+        "uk": "Остання помилка",
+        "zh-cn": "最近一次错误"
+      },
+      "desc": {
+        "de": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+        "en": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+        "es": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+        "fr": "Pourquoi ce compte ne fournit rien. Vide tant que tout va bien ; « Unknown » tant que l'adaptateur n'a rien à signaler.",
+        "it": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+        "nl": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+        "pl": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+        "pt": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+        "ru": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
+        "uk": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",
+        "zh-cn": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.info.error"
+  },
+  "ai-usage.0.fixture-openrouter-api.info.lastUpdate": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzte erfolgreiche Aktualisierung",
+        "en": "Last successful update",
+        "es": "Última actualización correcta",
+        "fr": "Dernière mise à jour réussie",
+        "it": "Ultimo aggiornamento riuscito",
+        "nl": "Laatste geslaagde update",
+        "pl": "Ostatnia udana aktualizacja",
+        "pt": "Última atualização bem-sucedida",
+        "ru": "Последнее успешное обновление",
+        "uk": "Останнє успішне оновлення",
+        "zh-cn": "最近一次成功更新"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.info.lastUpdate"
+  },
+  "ai-usage.0.fixture-openrouter-api.info.unreach": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "KI-Dienst nicht erreichbar",
+        "en": "AI service not reachable",
+        "es": "Servicio de IA inaccesible",
+        "fr": "Service IA injoignable",
+        "it": "Servizio IA non raggiungibile",
+        "nl": "AI-dienst niet bereikbaar",
+        "pl": "Usługa AI nieosiągalna",
+        "pt": "Serviço de IA inacessível",
+        "ru": "Сервис ИИ недоступен",
+        "uk": "Сервіс ШІ недоступний",
+        "zh-cn": "AI 服务不可访问"
+      },
+      "desc": {
+        "de": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+        "en": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+        "es": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+        "fr": "Vrai tant que ce compte ne fournit pas de données. Une limitation conserve les dernières valeurs et le laisse faux.",
+        "it": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+        "nl": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+        "pl": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+        "pt": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+        "ru": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
+        "uk": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
+        "zh-cn": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。"
+      },
+      "type": "boolean",
+      "role": "indicator.maintenance.unreach",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.info.unreach"
+  },
+  "ai-usage.0.fixture-openrouter-api.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Bei 100 % (Limit-Fenster oder Budget)",
+        "en": "At 100 % (limit window or budget)",
+        "es": "Al 100 % (ventana de límite o saldo)",
+        "fr": "À 100 % (fenêtre de limite ou budget)",
+        "it": "Al 100 % (finestra di limite o budget)",
+        "nl": "Op 100 % (limietvenster of budget)",
+        "pl": "Na 100 % (okno limitu lub budżet)",
+        "pt": "Em 100 % (janela de limite ou saldo)",
+        "ru": "На 100 % (окно лимита или бюджет)",
+        "uk": "На 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.limitReached"
+  },
+  "ai-usage.0.fixture-openrouter-api.warning": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Über der Warnschwelle",
+        "en": "Above warn threshold",
+        "es": "Por encima del umbral de aviso",
+        "fr": "Au-dessus du seuil d'alerte",
+        "it": "Sopra la soglia di avviso",
+        "nl": "Boven de waarschuwingsdrempel",
+        "pl": "Powyżej progu ostrzegawczego",
+        "pt": "Acima do limite de aviso",
+        "ru": "Выше порога предупреждения",
+        "uk": "Вище порога попередження",
+        "zh-cn": "超过警告阈值"
+      },
+      "desc": {
+        "de": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+        "en": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+        "es": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+        "fr": "Vrai tant qu'une fenêtre du forfait dépasse le seuil d'alerte de ce compte. La fenêtre d'un seul modèle ne le déclenche jamais.",
+        "it": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+        "nl": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+        "pl": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+        "pt": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+        "ru": "Истина, пока общее для тарифа окно выше порога предупреждения этого аккаунта. Окно отдельной модели его не вызывает.",
+        "uk": "Істина, поки вікно всього тарифу перевищує поріг попередження цього акаунта. Вікно окремої моделі його не вмикає.",
+        "zh-cn": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.fixture-openrouter-api.warning"
+  },
+  "ai-usage.0.gemini": {
+    "type": "device",
+    "common": {
+      "name": "Gemini (Gemini)",
+      "statusStates": {
+        "offlineId": "info.unreach"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini"
+  },
+  "ai-usage.0.gemini.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Info",
+        "en": "Info",
+        "es": "Información",
+        "fr": "Informations",
+        "it": "Informazioni",
+        "nl": "Info",
+        "pl": "Informacje",
+        "pt": "Informações",
+        "ru": "Информация",
+        "uk": "Інформація",
+        "zh-cn": "信息"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.info"
+  },
+  "ai-usage.0.gemini.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Fehler",
+        "en": "Last error",
+        "es": "Último error",
+        "fr": "Dernière erreur",
+        "it": "Ultimo errore",
+        "nl": "Laatste fout",
+        "pl": "Ostatni błąd",
+        "pt": "Último erro",
+        "ru": "Последняя ошибка",
+        "uk": "Остання помилка",
+        "zh-cn": "最近一次错误"
+      },
+      "desc": {
+        "de": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",
+        "en": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",
+        "es": "Por qué esta cuenta no entrega nada. Vacío mientras todo va bien; \"Unknown\" mientras el adaptador no tiene nada que informar.",
+        "fr": "Pourquoi ce compte ne fournit rien. Vide tant que tout va bien ; « Unknown » tant que l'adaptateur n'a rien à signaler.",
+        "it": "Perché questo account non fornisce nulla. Vuoto finché tutto funziona; \"Unknown\" finché l'adapter non ha nulla da segnalare.",
+        "nl": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",
+        "pl": "Dlaczego to konto nic nie dostarcza. Puste, gdy wszystko działa; „Unknown\", gdy adapter nie ma nic do zgłoszenia.",
+        "pt": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",
+        "ru": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
+        "uk": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",
+        "zh-cn": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.info.error"
+  },
+  "ai-usage.0.gemini.info.lastUpdate": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzte erfolgreiche Aktualisierung",
+        "en": "Last successful update",
+        "es": "Última actualización correcta",
+        "fr": "Dernière mise à jour réussie",
+        "it": "Ultimo aggiornamento riuscito",
+        "nl": "Laatste geslaagde update",
+        "pl": "Ostatnia udana aktualizacja",
+        "pt": "Última atualização bem-sucedida",
+        "ru": "Последнее успешное обновление",
+        "uk": "Останнє успішне оновлення",
+        "zh-cn": "最近一次成功更新"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.info.lastUpdate"
+  },
+  "ai-usage.0.gemini.info.unreach": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "KI-Dienst nicht erreichbar",
+        "en": "AI service not reachable",
+        "es": "Servicio de IA inaccesible",
+        "fr": "Service IA injoignable",
+        "it": "Servizio IA non raggiungibile",
+        "nl": "AI-dienst niet bereikbaar",
+        "pl": "Usługa AI nieosiągalna",
+        "pt": "Serviço de IA inacessível",
+        "ru": "Сервис ИИ недоступен",
+        "uk": "Сервіс ШІ недоступний",
+        "zh-cn": "AI 服务不可访问"
+      },
+      "desc": {
+        "de": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
+        "en": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
+        "es": "Verdadero mientras esta cuenta no entrega datos. Una limitación mantiene los últimos valores y lo deja falso.",
+        "fr": "Vrai tant que ce compte ne fournit pas de données. Une limitation conserve les dernières valeurs et le laisse faux.",
+        "it": "Vero finché questo account non fornisce dati. Una limitazione mantiene gli ultimi valori e lo lascia falso.",
+        "nl": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
+        "pl": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",
+        "pt": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
+        "ru": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
+        "uk": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
+        "zh-cn": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。"
+      },
+      "type": "boolean",
+      "role": "indicator.maintenance.unreach",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.info.unreach"
+  },
+  "ai-usage.0.gemini.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Bei 100 % (Limit-Fenster oder Budget)",
+        "en": "At 100 % (limit window or budget)",
+        "es": "Al 100 % (ventana de límite o saldo)",
+        "fr": "À 100 % (fenêtre de limite ou budget)",
+        "it": "Al 100 % (finestra di limite o budget)",
+        "nl": "Op 100 % (limietvenster of budget)",
+        "pl": "Na 100 % (okno limitu lub budżet)",
+        "pt": "Em 100 % (janela de limite ou saldo)",
+        "ru": "На 100 % (окно лимита или бюджет)",
+        "uk": "На 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limitReached"
+  },
+  "ai-usage.0.gemini.limits": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Limit-Fenster",
+        "en": "Limit windows",
+        "es": "Ventanas de límite",
+        "fr": "Fenêtres de limite",
+        "it": "Finestre di limite",
+        "nl": "Limietvensters",
+        "pl": "Okna limitów",
+        "pt": "Janelas de limite",
+        "ru": "Окна лимитов",
+        "uk": "Вікна лімітів",
+        "zh-cn": "限额窗口"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-flash": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-flash",
+        "en": "gemini-3-flash quota",
+        "es": "Cuota de gemini-3-flash",
+        "fr": "Quota gemini-3-flash",
+        "it": "Quota gemini-3-flash",
+        "nl": "Quotum gemini-3-flash",
+        "pl": "Limit gemini-3-flash",
+        "pt": "Quota de gemini-3-flash",
+        "ru": "Квота gemini-3-flash",
+        "uk": "Квота gemini-3-flash",
+        "zh-cn": "gemini-3-flash 配额"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-flash"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-flash.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-flash ist gerade das gültige Limit",
+        "en": "gemini-3-flash quota is the limit in force",
+        "es": "Cuota de gemini-3-flash es el límite vigente",
+        "fr": "Quota gemini-3-flash est la limite en vigueur",
+        "it": "Quota gemini-3-flash è il limite in vigore",
+        "nl": "Quotum gemini-3-flash is de geldende limiet",
+        "pl": "Limit gemini-3-flash to obowiązujący limit",
+        "pt": "Quota de gemini-3-flash é o limite em vigor",
+        "ru": "Квота gemini-3-flash — действующий лимит",
+        "uk": "Квота gemini-3-flash — чинний ліміт",
+        "zh-cn": "gemini-3-flash 配额 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-flash.active"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-flash.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-flash verbraucht",
+        "en": "gemini-3-flash quota used",
+        "es": "Cuota de gemini-3-flash utilizado",
+        "fr": "Quota gemini-3-flash utilisé",
+        "it": "Quota gemini-3-flash utilizzato",
+        "nl": "Quotum gemini-3-flash verbruikt",
+        "pl": "Limit gemini-3-flash wykorzystane",
+        "pt": "Quota de gemini-3-flash utilizado",
+        "ru": "Квота gemini-3-flash использовано",
+        "uk": "Квота gemini-3-flash використано",
+        "zh-cn": "gemini-3-flash 配额 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-flash.percent"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-flash.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-flash wird zurückgesetzt am",
+        "en": "gemini-3-flash quota resets at",
+        "es": "Cuota de gemini-3-flash se reinicia el",
+        "fr": "Quota gemini-3-flash est réinitialisé le",
+        "it": "Quota gemini-3-flash si azzera il",
+        "nl": "Quotum gemini-3-flash wordt gereset op",
+        "pl": "Limit gemini-3-flash zeruje się",
+        "pt": "Quota de gemini-3-flash é reiniciado em",
+        "ru": "Квота gemini-3-flash сбрасывается",
+        "uk": "Квота gemini-3-flash скидається",
+        "zh-cn": "gemini-3-flash 配额 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-flash.resetAt"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-pro": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-pro",
+        "en": "gemini-3-pro quota",
+        "es": "Cuota de gemini-3-pro",
+        "fr": "Quota gemini-3-pro",
+        "it": "Quota gemini-3-pro",
+        "nl": "Quotum gemini-3-pro",
+        "pl": "Limit gemini-3-pro",
+        "pt": "Quota de gemini-3-pro",
+        "ru": "Квота gemini-3-pro",
+        "uk": "Квота gemini-3-pro",
+        "zh-cn": "gemini-3-pro 配额"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-pro"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-pro.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-pro ist gerade das gültige Limit",
+        "en": "gemini-3-pro quota is the limit in force",
+        "es": "Cuota de gemini-3-pro es el límite vigente",
+        "fr": "Quota gemini-3-pro est la limite en vigueur",
+        "it": "Quota gemini-3-pro è il limite in vigore",
+        "nl": "Quotum gemini-3-pro is de geldende limiet",
+        "pl": "Limit gemini-3-pro to obowiązujący limit",
+        "pt": "Quota de gemini-3-pro é o limite em vigor",
+        "ru": "Квота gemini-3-pro — действующий лимит",
+        "uk": "Квота gemini-3-pro — чинний ліміт",
+        "zh-cn": "gemini-3-pro 配额 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-pro.active"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-pro.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-pro verbraucht",
+        "en": "gemini-3-pro quota used",
+        "es": "Cuota de gemini-3-pro utilizado",
+        "fr": "Quota gemini-3-pro utilisé",
+        "it": "Quota gemini-3-pro utilizzato",
+        "nl": "Quotum gemini-3-pro verbruikt",
+        "pl": "Limit gemini-3-pro wykorzystane",
+        "pt": "Quota de gemini-3-pro utilizado",
+        "ru": "Квота gemini-3-pro использовано",
+        "uk": "Квота gemini-3-pro використано",
+        "zh-cn": "gemini-3-pro 配额 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-pro.percent"
+  },
+  "ai-usage.0.gemini.limits.gemini-3-pro.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kontingent gemini-3-pro wird zurückgesetzt am",
+        "en": "gemini-3-pro quota resets at",
+        "es": "Cuota de gemini-3-pro se reinicia el",
+        "fr": "Quota gemini-3-pro est réinitialisé le",
+        "it": "Quota gemini-3-pro si azzera il",
+        "nl": "Quotum gemini-3-pro wordt gereset op",
+        "pl": "Limit gemini-3-pro zeruje się",
+        "pt": "Quota de gemini-3-pro é reiniciado em",
+        "ru": "Квота gemini-3-pro сбрасывается",
+        "uk": "Квота gemini-3-pro скидається",
+        "zh-cn": "gemini-3-pro 配额 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.gemini-3-pro.resetAt"
+  },
+  "ai-usage.0.gemini.warning": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Über der Warnschwelle",
+        "en": "Above warn threshold",
+        "es": "Por encima del umbral de aviso",
+        "fr": "Au-dessus du seuil d'alerte",
+        "it": "Sopra la soglia di avviso",
+        "nl": "Boven de waarschuwingsdrempel",
+        "pl": "Powyżej progu ostrzegawczego",
+        "pt": "Acima do limite de aviso",
+        "ru": "Выше порога предупреждения",
+        "uk": "Вище порога попередження",
+        "zh-cn": "超过警告阈值"
+      },
+      "desc": {
+        "de": "Wahr, solange ein plan-weites Fenster über der Warnschwelle dieses Kontos liegt. Das Fenster eines einzelnen Modells löst es nie aus.",
+        "en": "True while a plan-wide window is above the warn threshold of this account. A single model's window never raises it.",
+        "es": "Verdadero mientras una ventana del plan supere el umbral de aviso de esta cuenta. La ventana de un solo modelo nunca lo activa.",
+        "fr": "Vrai tant qu'une fenêtre du forfait dépasse le seuil d'alerte de ce compte. La fenêtre d'un seul modèle ne le déclenche jamais.",
+        "it": "Vero finché una finestra dell'intero piano supera la soglia di avviso di questo account. La finestra di un singolo modello non lo attiva mai.",
+        "nl": "Waar zolang een planbreed venster boven de waarschuwingsdrempel van dit account ligt. Het venster van één model activeert het nooit.",
+        "pl": "Prawda, dopóki okno obejmujące cały plan przekracza próg ostrzegawczy tego konta. Okno pojedynczego modelu nigdy go nie wyzwala.",
+        "pt": "Verdadeiro enquanto uma janela do plano estiver acima do limite de aviso desta conta. A janela de um único modelo nunca a aciona.",
+        "ru": "Истина, пока общее для тарифа окно выше порога предупреждения этого аккаунта. Окно отдельной модели его не вызывает.",
+        "uk": "Істина, поки вікно всього тарифу перевищує поріг попередження цього акаунта. Вікно окремої моделі його не вмикає.",
+        "zh-cn": "当覆盖整个套餐的窗口超过该账户的警告阈值时为真。单个模型的窗口从不触发它。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.warning"
+  },
+  "ai-usage.0.info": {
+    "_id": "ai-usage.0.info",
+    "type": "channel",
+    "common": {
+      "name": {
+        "en": "Adapter Information",
+        "de": "Adapter-Informationen",
+        "ru": "Информация об адаптере",
+        "pt": "Informações do adaptador",
+        "nl": "Adapterinformatie",
+        "fr": "Informations sur l'adaptateur",
+        "it": "Informazioni sull'adattatore",
+        "es": "Información del adaptador",
+        "pl": "Informacje o adapterze",
+        "uk": "Інформація про адаптер",
+        "zh-cn": "适配器信息"
+      }
+    },
+    "native": {}
+  },
+  "ai-usage.0.info.connection": {
+    "_id": "ai-usage.0.info.connection",
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "At least one account reachable",
+        "de": "Mindestens ein Konto erreichbar",
+        "ru": "Хотя бы один аккаунт доступен",
+        "pt": "Pelo menos uma conta acessível",
+        "nl": "Ten minste één account bereikbaar",
+        "fr": "Au moins un compte joignable",
+        "it": "Almeno un account raggiungibile",
+        "es": "Al menos una cuenta accesible",
+        "pl": "Co najmniej jedno konto osiągalne",
+        "uk": "Щонайменше один акаунт доступний",
+        "zh-cn": "至少一个账户可访问"
+      },
+      "type": "boolean",
+      "role": "indicator.connected",
+      "read": true,
+      "write": false,
+      "def": false,
+      "desc": {
+        "en": "True as soon as at least one AI account is delivering data.",
+        "de": "Wahr, sobald mindestens ein KI-Konto Daten liefert.",
+        "ru": "Истина, как только хотя бы один аккаунт ИИ передаёт данные.",
+        "pt": "Verdadeiro assim que pelo menos uma conta de IA fornece dados.",
+        "nl": "Waar zodra ten minste één AI-account gegevens levert.",
+        "fr": "Vrai dès qu'au moins un compte IA fournit des données.",
+        "it": "Vero non appena almeno un account IA fornisce dati.",
+        "es": "Verdadero en cuanto al menos una cuenta de IA entrega datos.",
+        "pl": "Prawda, gdy co najmniej jedno konto AI dostarcza dane.",
+        "uk": "Істина, щойно принаймні один акаунт ШІ надає дані.",
+        "zh-cn": "只要至少一个 AI 账户正在提供数据即为真。"
+      }
+    },
+    "native": {}
+  },
+  "ai-usage.0.total": {
+    "_id": "ai-usage.0.total",
+    "type": "folder",
+    "common": {
+      "name": {
+        "en": "Totals across all accounts",
+        "de": "Gesamtwerte über alle Konten",
+        "ru": "Итоги по всем аккаунтам",
+        "pt": "Totais de todas as contas",
+        "nl": "Totalen over alle accounts",
+        "fr": "Totaux de tous les comptes",
+        "it": "Totali di tutti gli account",
+        "es": "Totales de todas las cuentas",
+        "pl": "Sumy dla wszystkich kont",
+        "uk": "Підсумки за всіма акаунтами",
+        "zh-cn": "所有账户的总计"
+      }
+    },
+    "native": {}
+  },
+  "ai-usage.0.total.accounts": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Konfigurierte Konten",
+        "en": "Configured accounts",
+        "es": "Cuentas configuradas",
+        "fr": "Comptes configurés",
+        "it": "Account configurati",
+        "nl": "Geconfigureerde accounts",
+        "pl": "Skonfigurowane konta",
+        "pt": "Contas configuradas",
+        "ru": "Настроенные аккаунты",
+        "uk": "Налаштовані акаунти",
+        "zh-cn": "已配置的账户数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.accounts"
+  },
+  "ai-usage.0.total.accountsReachable": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Erreichbare Konten",
+        "en": "Reachable accounts",
+        "es": "Cuentas accesibles",
+        "fr": "Comptes joignables",
+        "it": "Account raggiungibili",
+        "nl": "Bereikbare accounts",
+        "pl": "Osiągalne konta",
+        "pt": "Contas acessíveis",
+        "ru": "Доступные аккаунты",
+        "uk": "Доступні акаунти",
+        "zh-cn": "可访问的账户数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.accountsReachable"
+  },
+  "ai-usage.0.total.costs": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Kosten (USD-Konten)",
+        "en": "Costs (USD accounts)",
+        "es": "Costes (cuentas en USD)",
+        "fr": "Coûts (comptes en USD)",
+        "it": "Costi (account in USD)",
+        "nl": "Kosten (USD-accounts)",
+        "pl": "Koszty (konta w USD)",
+        "pt": "Custos (contas em USD)",
+        "ru": "Расходы (аккаунты в USD)",
+        "uk": "Витрати (акаунти в USD)",
+        "zh-cn": "费用（美元账户）"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.costs"
+  },
+  "ai-usage.0.total.costs.month": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten diesen Monat (alle Konten)",
+        "en": "Costs this month (all accounts)",
+        "es": "Costes de este mes (todas las cuentas)",
+        "fr": "Coûts ce mois-ci (tous les comptes)",
+        "it": "Costi di questo mese (tutti gli account)",
+        "nl": "Kosten deze maand (alle accounts)",
+        "pl": "Koszty w tym miesiącu (wszystkie konta)",
+        "pt": "Custos deste mês (todas as contas)",
+        "ru": "Расходы за месяц (все аккаунты)",
+        "uk": "Витрати цього місяця (усі акаунти)",
+        "zh-cn": "本月费用（所有账户）"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.costs.month"
+  },
+  "ai-usage.0.total.costs.projectedMonth": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kostenprognose zum Monatsende (berechnet)",
+        "en": "Costs projected month-end (computed)",
+        "es": "Costes previstos a fin de mes (calculado)",
+        "fr": "Coûts prévus en fin de mois (calculé)",
+        "it": "Costi previsti a fine mese (calcolato)",
+        "nl": "Verwachte kosten einde maand (berekend)",
+        "pl": "Prognoza kosztów na koniec miesiąca (obliczona)",
+        "pt": "Custos previstos para o fim do mês (calculado)",
+        "ru": "Прогноз расходов на конец месяца (расчёт)",
+        "uk": "Прогноз витрат на кінець місяця (розрахунок)",
+        "zh-cn": "月末费用预测（推算）"
+      },
+      "desc": {
+        "de": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters.",
+        "en": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports.",
+        "es": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor.",
+        "fr": "Dépense projetée en fin de mois, calculée à partir du montant déjà dépensé — ce n'est pas un chiffre du fournisseur.",
+        "it": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider.",
+        "nl": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder.",
+        "pl": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy.",
+        "pt": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor.",
+        "ru": "Прогноз расходов на конец месяца, рассчитанный из уже потраченного — это не данные провайдера.",
+        "uk": "Прогноз витрат на кінець місяця, розрахований із уже витраченого — це не число від провайдера.",
+        "zh-cn": "按目前支出推算的月末花费——不是供应商给出的数字。"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.costs.projectedMonth"
+  },
+  "ai-usage.0.total.costs.today": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Kosten heute (alle Konten)",
+        "en": "Costs today (all accounts)",
+        "es": "Costes de hoy (todas las cuentas)",
+        "fr": "Coûts aujourd'hui (tous les comptes)",
+        "it": "Costi di oggi (tutti gli account)",
+        "nl": "Kosten vandaag (alle accounts)",
+        "pl": "Koszty dzisiaj (wszystkie konta)",
+        "pt": "Custos hoje (todas as contas)",
+        "ru": "Расходы сегодня (все аккаунты)",
+        "uk": "Витрати сьогодні (усі акаунти)",
+        "zh-cn": "今日费用（所有账户）"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "USD"
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.costs.today"
+  },
+  "ai-usage.0.total.limitReached": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Ein Konto steht bei 100 % (Limit-Fenster oder Budget)",
+        "en": "An account is at 100 % (limit window or budget)",
+        "es": "Una cuenta está al 100 % (ventana de límite o saldo)",
+        "fr": "Un compte est à 100 % (fenêtre de limite ou budget)",
+        "it": "Un account è al 100 % (finestra di limite o budget)",
+        "nl": "Een account staat op 100 % (limietvenster of budget)",
+        "pl": "Konto jest na 100 % (okno limitu lub budżet)",
+        "pt": "Uma conta está em 100 % (janela de limite ou saldo)",
+        "ru": "Аккаунт достиг 100 % (окно лимита или бюджет)",
+        "uk": "Акаунт на 100 % (вікно ліміту або бюджет)",
+        "zh-cn": "有账户已达 100 %（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Wahr, wenn ein plan-weites Fenster bei 100 % steht oder der Anbieter es als gesperrt meldet. Ein einzelnes Modell am Anschlag zählt nicht.",
+        "en": "True when a plan-wide window is at 100 % or the provider reports it as locked. A single model at its cap does not count.",
+        "es": "Verdadero cuando una ventana del plan está al 100 % o el proveedor la declara bloqueada. Un solo modelo en su tope no cuenta.",
+        "fr": "Vrai lorsqu'une fenêtre du forfait atteint 100 % ou que le fournisseur la déclare bloquée. Un seul modèle à sa limite ne compte pas.",
+        "it": "Vero quando una finestra dell'intero piano è al 100 % o il provider la segnala bloccata. Un singolo modello al limite non conta.",
+        "nl": "Waar wanneer een planbreed venster op 100 % staat of de aanbieder het als geblokkeerd meldt. Eén model op zijn limiet telt niet.",
+        "pl": "Prawda, gdy okno całego planu osiąga 100 % lub dostawca zgłasza je jako zablokowane. Pojedynczy model na granicy się nie liczy.",
+        "pt": "Verdadeiro quando uma janela do plano está a 100 % ou o fornecedor a indica bloqueada. Um único modelo no limite não conta.",
+        "ru": "Истина, когда общее для тарифа окно на 100 % или провайдер сообщает о блокировке. Отдельная модель на пределе не считается.",
+        "uk": "Істина, коли вікно всього тарифу на 100 % або провайдер повідомляє про блокування. Окрема модель на межі не рахується.",
+        "zh-cn": "当覆盖整个套餐的窗口达到 100 %，或供应商报告其已锁定时为真。单个模型触顶不计入。"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.limitReached"
+  },
+  "ai-usage.0.total.maxLimitPercent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Höchste Konto-Auslastung (Limit-Fenster oder Budget)",
+        "en": "Highest account utilisation (limit window or budget)",
+        "es": "Mayor utilización de una cuenta (ventana de límite o saldo)",
+        "fr": "Utilisation la plus élevée d'un compte (fenêtre de limite ou budget)",
+        "it": "Utilizzo più alto di un account (finestra di limite o budget)",
+        "nl": "Hoogste accountbenutting (limietvenster of budget)",
+        "pl": "Najwyższe wykorzystanie konta (okno limitu lub budżet)",
+        "pt": "Maior utilização de uma conta (janela de limite ou saldo)",
+        "ru": "Наибольшая загрузка аккаунта (окно лимита или бюджет)",
+        "uk": "Найвище використання акаунта (вікно ліміту або бюджет)",
+        "zh-cn": "账户最高使用率（限额窗口或额度）"
+      },
+      "desc": {
+        "de": "Das vollste Konto: sein plan-weites Fenster oder sein Restguthaben, je nachdem, was höher liegt.",
+        "en": "The fullest account: its plan-wide window or its remaining budget, whichever is higher.",
+        "es": "La cuenta más llena: su ventana del plan o su presupuesto restante, lo que sea mayor.",
+        "fr": "Le compte le plus rempli : sa fenêtre de forfait ou son budget restant, selon ce qui est le plus élevé.",
+        "it": "L'account più pieno: la sua finestra di piano o il budget residuo, a seconda di quale sia maggiore.",
+        "nl": "Het volste account: zijn planbrede venster of zijn resterende budget, wat hoger is.",
+        "pl": "Najbardziej zapełnione konto: jego okno planu albo pozostały budżet — co jest wyższe.",
+        "pt": "A conta mais cheia: a sua janela do plano ou o orçamento restante, o que for maior.",
+        "ru": "Самый заполненный аккаунт: его общее окно тарифа или остаток бюджета — что выше.",
+        "uk": "Найзаповненіший акаунт: його вікно тарифу або залишок бюджету — що більше.",
+        "zh-cn": "最满的账户：其套餐窗口或剩余额度，取较高者。"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.maxLimitPercent"
+  },
+  "ai-usage.0.total.warningsActive": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Konten über ihrer Warnschwelle",
+        "en": "Accounts above their warn threshold",
+        "es": "Cuentas por encima de su umbral de aviso",
+        "fr": "Comptes au-dessus de leur seuil d'alerte",
+        "it": "Account sopra la loro soglia di avviso",
+        "nl": "Accounts boven hun waarschuwingsdrempel",
+        "pl": "Konta powyżej swojego progu ostrzegawczego",
+        "pt": "Contas acima do seu limite de aviso",
+        "ru": "Аккаунты выше своего порога предупреждения",
+        "uk": "Акаунти вище свого порога попередження",
+        "zh-cn": "超过各自警告阈值的账户数"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "ai-usage.0.total.warningsActive"
+  }
+}

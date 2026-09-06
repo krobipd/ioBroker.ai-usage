@@ -3,17 +3,19 @@
 declare global {
   namespace ioBroker {
     interface AdapterConfig {
-      /** Configured AI accounts (admin table). */
+      /** Configured AI accounts — one row per switched-on account. */
       accounts: {
-        /** Display name; becomes the object id (sanitized). */
+        /** Display name, shown in the settings and in the account's node name. */
         name: string;
-        /** Provider kind (claude-sub, openrouter, deepseek, openai, anthropic-api). */
+        /**
+         * Provider kind: claude-sub, chatgpt-sub, gemini-sub, openrouter, deepseek,
+         * openai or anthropic-api. The catalogue in `lib/provider.ts` is the source.
+         */
         provider: string;
-        /** Id of the central credential (system.credentials.*); empty for claude-sub. */
+        /** Id of the central credential (system.credentials.*); empty for the subscriptions. */
         credentialId: string;
         /** Warn threshold in percent (default 80). */
         warnThreshold: number;
-        /** Whether this account is polled. */
       }[];
       /** Poll interval in seconds (min 60, default 300). */
       pollInterval: number;
