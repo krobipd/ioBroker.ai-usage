@@ -2,6 +2,8 @@ import { vi } from "vitest";
 
 /** The in-memory file system the token-store tests run against. */
 const files = new Map<string, string>();
+/** The options each write was made with — the file MODE is a rule, not a detail. */
+const writeOptions = new Map<string, unknown>();
 /** Paths whose read fails with something other than "not there". */
 const unreadable = new Set<string>();
 
@@ -21,7 +23,11 @@ vi.mock("node:fs/promises", () => ({
     }
     return Promise.resolve(content);
   }),
-  writeFile: vi.fn((path: string, content: string) => Promise.resolve(void files.set(path, content))),
+  writeFile: vi.fn((path: string, content: string, options?: unknown) => {
+    files.set(path, content);
+    writeOptions.set(path, options);
+    return Promise.resolve();
+  }),
   unlink: vi.fn((path: string) => {
     if (!files.delete(path)) {
       return Promise.reject(new Error("ENOENT"));
@@ -100,6 +106,7 @@ const tokens: TokenSet = { accessToken: "at", refreshToken: "rt", expiresAt: 9_9
 
 function makeAdapter(): AiUsageAdapter {
   files.clear();
+  writeOptions.clear();
   unreadable.clear();
   return new AiUsageAdapter();
 }
@@ -116,6 +123,30 @@ describe("token store", () => {
     expect(await store.load()).toEqual(tokens);
     await store.clear();
     expect(await store.load()).toBeNull();
+  });
+
+  test("what reaches the disk is ciphertext, never the token itself", async () => {
+    // A save() followed by load() proves nothing here: save also fills the in-memory
+    // cache, so the reader never touches the file. Only the FILE says whether the
+    // encryption actually happened — and it is the whole protection for a refresh
+    // token that would otherwise let anyone with read access use the account.
+    // (Mutation A9, 2026-09-07: dropping `this.encrypt(...)` survived the entire suite.)
+    const adapter = makeAdapter();
+    await internals(adapter).tokenStore("claude-sub").save(tokens);
+    const written = files.get(CLAUDE_FILE);
+    expect(written).toBe(`enc:${JSON.stringify(tokens)}`);
+    // …and explicitly NOT the plain payload. (A substring check would be useless
+    // here: the fixture's "at" also occurs inside the key name "accessToken".)
+    expect(written).not.toBe(JSON.stringify(tokens));
+  });
+
+  test("the token file is owner-only", async () => {
+    // Encryption and file mode are two independent guards; the adapter key sits on
+    // the same machine, so a world-readable ciphertext is not a rest state we want.
+    // (Mutation A8, 2026-09-07: 0o600 → 0o644 survived the entire suite.)
+    const adapter = makeAdapter();
+    await internals(adapter).tokenStore("claude-sub").save(tokens);
+    expect(writeOptions.get(CLAUDE_FILE)).toMatchObject({ mode: 0o600 });
   });
 
   test("clearing drops the tokens even after they were read", async () => {
