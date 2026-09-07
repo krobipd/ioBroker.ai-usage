@@ -151,10 +151,10 @@ so instead of pretending to be connected; signing in again is all it takes.
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 0.12.1 (2026-09-07)
 
 - Fixed: The last-update stamp of an account no longer moves forward while the provider is only throttling — it dates the values standing next to it, so you can see how old they really are
-- Improved: Twenty-five more datapoints explain themselves in the object tree — among them what "today" means (the provider counts it in UTC), why the cost totals can be lower than the accounts show, and what the two parts of a balance are
+- Improved: Twenty-five more datapoints explain themselves in the object tree — what "today" means (the provider counts it in UTC), and why the cost totals can be lower than the accounts show
 
 ### 0.12.0 (2026-09-06)
 
@@ -199,10 +199,6 @@ so instead of pretending to be connected; signing in again is all it takes.
 ### 0.9.3 (2026-08-27)
 
 - Fixed: The first start after updating no longer leaves a warning in the log
-
-### 0.9.2 (2026-08-27)
-
-- Fixed: Stopping the instance now marks the accounts as offline on installations that were updated too, not only on fresh ones — the previous version left them showing as online
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

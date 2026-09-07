@@ -6,13 +6,13 @@ export default [
     languageOptions: {
       parserOptions: {
         projectService: {
-          // test/standards is ours and is linted; it lives outside the root
-          // tsconfig include (which stays at the fleet master), so the parser
-          // needs it named here.
+          // Only files NO tsconfig covers may stand here — a file that is also in
+          // the project service makes the parser refuse the whole run. Since the
+          // root tsconfig includes `test/**/*.ts` (fleet master, 2026-09-07), the
+          // repo-standards suite is covered there and must NOT be listed.
           allowDefaultProject: [
             "*.mjs",
             "*.mts",
-            "test/standards/*.test.ts",
             // The inventory fixtures: plain CommonJS the adapter process preloads,
             // outside every tsconfig include but ours to keep clean.
             "test/fixtures/inventory/*.cjs",

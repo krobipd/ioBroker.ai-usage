@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.12.0",
+    "version": "0.12.1",
     "news": {
+      "0.12.1": {
+        "en": "The last-update stamp no longer moves forward while the provider is only throttling, and twenty-five more datapoints explain themselves in the object tree.",
+        "de": "Der Stempel der letzten Aktualisierung rückt nicht mehr vor, solange der Anbieter nur drosselt, und fünfundzwanzig weitere Datenpunkte erklären sich im Objektbaum selbst.",
+        "ru": "Метка последнего обновления больше не сдвигается, пока провайдер лишь ограничивает запросы, а ещё двадцать пять точек данных объясняют себя в дереве объектов.",
+        "pt": "A marca da última atualização deixa de avançar enquanto o fornecedor apenas limita os pedidos, e mais vinte e cinco pontos de dados explicam-se na árvore de objetos.",
+        "nl": "Het stempel van de laatste update loopt niet meer door zolang de aanbieder alleen beperkt, en vijfentwintig extra datapunten leggen zichzelf uit in de objectboom.",
+        "fr": "L'horodatage de la dernière mise à jour n'avance plus tant que le fournisseur ne fait que limiter, et vingt-cinq points de donnée de plus s'expliquent dans l'arbre d'objets.",
+        "it": "Il timestamp dell'ultimo aggiornamento non avanza più finché il provider si limita a rallentare, e altri venticinque datapoint si spiegano da soli nell'albero degli oggetti.",
+        "es": "La marca de la última actualización ya no avanza mientras el proveedor solo limita las peticiones, y veinticinco puntos de datos más se explican en el árbol de objetos.",
+        "pl": "Znacznik ostatniej aktualizacji nie przesuwa się już, gdy dostawca jedynie ogranicza zapytania, a kolejne dwadzieścia pięć punktów danych objaśnia się w drzewie obiektów.",
+        "uk": "Позначка останнього оновлення більше не зсувається, поки провайдер лише обмежує запити, а ще двадцять п'ять точок даних пояснюють себе в дереві об'єктів.",
+        "zh-cn": "在供应商仅限流期间，最近一次更新的时间戳不再向前推进；另有二十五个数据点会在对象树中自行说明其含义。"
+      },
       "0.12.0": {
         "en": "An account that is not signed in yet no longer reports a rejected sign-in, every limit window shows whether it is the one in force, and reset times stop flooding a recording.",
         "de": "Ein noch nicht angemeldetes Konto meldet keine abgelehnte Anmeldung mehr, jedes Limit-Fenster zeigt, ob es gerade das gültige ist, und Reset-Zeiten fluten keine Aufzeichnung mehr.",
@@ -80,19 +93,6 @@
         "pl": "Dopóki konto nie ma nic do zgłoszenia — adapter wyłączony lub uruchomiony i jeszcze nieodpytany — jako powód widnieje teraz „Unknown\" zamiast zdania o adapterze",
         "uk": "Поки обліковий запис не має про що повідомити — адаптер вимкнено або запущено й ще не опитано — як причина тепер стоїть «Unknown» замість фрази про адаптер",
         "zh-cn": "当某个账户暂无可报告的内容时——适配器已停止，或刚启动尚未查询——原因显示为“Unkn”，而不再是一句关于适配器的说明"
-      },
-      "0.9.0": {
-        "en": "Stopping the instance now really marks every account as offline, and an account no longer keeps claiming to deliver data after a crash",
-        "de": "Das Stoppen der Instanz kennzeichnet jetzt wirklich jedes Konto als offline, und nach einem Absturz behauptet kein Konto mehr, es liefere Daten",
-        "ru": "Остановка экземпляра теперь действительно помечает все аккаунты как офлайн, и после сбоя ни один аккаунт больше не утверждает, что передаёт данные",
-        "pt": "Parar a instância passa a marcar realmente todas as contas como offline, e após uma falha nenhuma conta continua a afirmar que fornece dados",
-        "nl": "Het stoppen van de instantie markeert nu echt elk account als offline, en na een crash beweert geen account meer dat het gegevens levert",
-        "fr": "L'arrêt de l'instance marque désormais réellement chaque compte hors ligne, et après un plantage aucun compte ne prétend plus fournir des données",
-        "it": "L'arresto dell'istanza contrassegna davvero ogni account come offline e dopo un crash nessun account continua a sostenere di fornire dati",
-        "es": "Detener la instancia ahora marca realmente todas las cuentas como sin conexión, y tras un fallo ninguna cuenta sigue afirmando que entrega datos",
-        "pl": "Zatrzymanie instancji naprawdę oznacza teraz każde konto jako offline, a po awarii żadne konto nie twierdzi już, że dostarcza dane",
-        "uk": "Зупинка екземпляра тепер справді позначає кожен обліковий запис як офлайн, а після збою жоден із них більше не стверджує, що передає дані",
-        "zh-cn": "停止实例现在会真正把每个账户标记为离线，崩溃之后账户也不再声称自己仍在提供数据"
       }
     },
     "plugins": {
