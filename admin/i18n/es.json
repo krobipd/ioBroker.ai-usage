@@ -67,5 +67,17 @@
   "descWindowResetAt": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
   "descResetCredits": "Vales comprables que reinician una ventana de límite llena. Contados desde la lista del proveedor, los caducados quedan fuera.",
   "descCostsProjected": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor.",
-  "descTotalMaxPercent": "La cuenta más llena: su ventana del plan o su presupuesto restante, lo que sea mayor."
+  "descTotalMaxPercent": "La cuenta más llena: su ventana del plan o su presupuesto restante, lo que sea mayor.",
+  "descLastUpdate": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+  "descCostsToday": "El importe facturado por el uso de hoy, del informe diario del proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+  "descCostsMonth": "Lo que ha costado el uso en sí este mes. El precio de una suscripción nunca forma parte de ello — solo lo que se factura además del plan.",
+  "descTokensToday": "Contado desde el informe diario de uso del propio proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+  "descModelTokens": "Los tokens de entrada y de salida de este modelo sumados — los contadores bajo «Tokens» los mantienen separados.",
+  "descCreditsGranted": "La parte del saldo que el proveedor regaló. «Créditos restantes» es el saldo completo; lo ingresado figura en «Saldo recargado».",
+  "descCreditsToppedUp": "La parte del saldo que se ingresó. «Créditos restantes» es el saldo completo; lo que el proveedor regaló figura en «Saldo concedido».",
+  "descResetCreditsExpiry": "Cuándo caduca el vale que expira primero. Vacío mientras no se posee ningún vale — el dato permanece, solo se vacía su valor.",
+  "descTotalCosts": "Sumado solo sobre las cuentas que facturan en USD. Otras monedas y contadores por unidades (créditos de solicitudes, vales de reinicio) quedan fuera, así que puede ser menor que lo que muestran las cuentas.",
+  "descTotalCostsProjected": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor. Sumado solo sobre las cuentas que facturan en USD.",
+  "descTotalAccounts": "Todas las cuentas activadas en la configuración, incluidas aquellas que el adaptador no puede consultar por faltarle sus credenciales.",
+  "descTotalReachable": "Cuántas cuentas cuentan como entregando datos. Una cuenta limitada sigue contando — conserva sus últimos valores, y su última actualización correcta dice cuán antiguos son."
 }

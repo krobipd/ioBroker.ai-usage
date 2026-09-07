@@ -1,0 +1,10 @@
+{
+  "*.limits.*.percent": "The window's own name plus the % unit is the whole statement; what a full window means for the account is carried by warning, limitReached and limits.*.active.",
+  "*.credits.used": "Name plus the currency unit is the whole statement — how much of the granted budget has gone.",
+  "*.credits.limit": "Name plus the currency unit is the whole statement — the ceiling the provider granted.",
+  "*.credits.remaining": "Money still available to spend, in the currency the unit names — the same plain statement at every provider.",
+  "*.credits.percent": "Used measured against the limit; the name says percent and the unit repeats it.",
+  "*.credits.available": "The provider's own yes/no on whether the balance still covers calls — the name is that sentence.",
+  "*.costs.total": "The name carries the only thing that could surprise: this counter runs over the account's lifetime, not over a period.",
+  "total.warningsActive": "Counts the accounts whose own warning datapoint is true, and that one carries the explanation."
+}

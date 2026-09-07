@@ -67,5 +67,17 @@
   "descWindowResetAt": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
   "descResetCredits": "Bons achetables qui réinitialisent une fenêtre de limite pleine. Comptés depuis la liste du fournisseur, les expirés exclus.",
   "descCostsProjected": "Dépense projetée en fin de mois, calculée à partir du montant déjà dépensé — ce n'est pas un chiffre du fournisseur.",
-  "descTotalMaxPercent": "Le compte le plus rempli : sa fenêtre de forfait ou son budget restant, selon ce qui est le plus élevé."
+  "descTotalMaxPercent": "Le compte le plus rempli : sa fenêtre de forfait ou son budget restant, selon ce qui est le plus élevé.",
+  "descLastUpdate": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+  "descCostsToday": "Le montant facturé pour l'usage du jour, d'après le rapport quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+  "descCostsMonth": "Ce que l'usage lui-même a coûté ce mois-ci. Le prix d'un abonnement n'y figure jamais — uniquement ce qui est facturé en plus du forfait.",
+  "descTokensToday": "Compté à partir du rapport d'usage quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+  "descModelTokens": "Les jetons d'entrée et de sortie de ce modèle additionnés — les compteurs sous « Jetons » les gardent séparés.",
+  "descCreditsGranted": "La part du solde offerte par le fournisseur. « Crédits restants » est le solde entier ; ce qui a été versé figure sous « Solde rechargé ».",
+  "descCreditsToppedUp": "La part du solde qui a été versée. « Crédits restants » est le solde entier ; ce que le fournisseur a offert figure sous « Solde offert ».",
+  "descResetCreditsExpiry": "Quand expire le bon qui arrive à échéance en premier. Vide tant qu'aucun bon n'est détenu — le point de donnée reste, seule sa valeur se vide.",
+  "descTotalCosts": "Additionné uniquement sur les comptes facturés en USD. Les autres devises et les compteurs à l'unité (crédits de requêtes, bons de réinitialisation) restent dehors : le total peut donc être inférieur à ce qu'affichent les comptes.",
+  "descTotalCostsProjected": "Dépense projetée en fin de mois, calculée à partir du montant déjà dépensé — ce n'est pas un chiffre du fournisseur. Additionné uniquement sur les comptes facturés en USD.",
+  "descTotalAccounts": "Tous les comptes activés dans les réglages, y compris ceux que l'adaptateur ne peut pas interroger faute d'identifiants.",
+  "descTotalReachable": "Combien de comptes sont considérés comme fournissant des données. Un compte limité reste compté : il conserve ses dernières valeurs, et sa dernière mise à jour réussie en donne l'âge."
 }

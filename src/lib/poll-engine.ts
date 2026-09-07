@@ -565,12 +565,19 @@ export class PollEngine {
   /**
    * Write one account's info states (offline marker, error text, last update).
    *
+   * The stamp only moves when a poll actually brought a snapshot. It used to hang
+   * on `reachable`, and that includes `rate-limited` by design — so every throttled
+   * poll re-dated values it had not fetched: after a day of throttling the stamp
+   * read "an hour ago" next to day-old numbers, which is the one thing a datapoint
+   * called "last successful update" must never do (measured 2026-09-07 while
+   * writing its description).
+   *
    * @param runtime the account's runtime
    */
   private writeAccountInfo(runtime: AccountRuntime): void {
     const { config } = runtime;
     void this.writeAccountStatus(runtime);
-    if (runtime.status.reachable) {
+    if (runtime.state === "ok") {
       this.deps.setState(`${config.id}.info.lastUpdate`, new Date(this.deps.now()).toISOString());
     }
   }
@@ -681,7 +688,14 @@ export class PollEngine {
       {
         id: `${config.id}.info.lastUpdate`,
         type: "state",
-        common: { name: tName("nameLastUpdate"), type: "string", role: "date", read: true, write: false },
+        common: {
+          name: tName("nameLastUpdate"),
+          desc: tName("descLastUpdate"),
+          type: "string",
+          role: "date",
+          read: true,
+          write: false,
+        },
       },
       {
         id: `${config.id}.warning`,
@@ -741,6 +755,7 @@ export class PollEngine {
         type: "state",
         common: {
           name: tName("nameTotalCostsToday"),
+          desc: tName("descTotalCosts"),
           type: "number",
           role: "value",
           read: true,
@@ -753,6 +768,7 @@ export class PollEngine {
         type: "state",
         common: {
           name: tName("nameTotalCostsMonth"),
+          desc: tName("descTotalCosts"),
           type: "number",
           role: "value",
           read: true,
@@ -765,7 +781,7 @@ export class PollEngine {
         type: "state",
         common: {
           name: tName("nameTotalCostsProjected"),
-          desc: tName("descCostsProjected"),
+          desc: tName("descTotalCostsProjected"),
           type: "number",
           role: "value",
           read: true,
@@ -816,12 +832,26 @@ export class PollEngine {
       {
         id: "total.accountsReachable",
         type: "state",
-        common: { name: tName("nameTotalReachable"), type: "number", role: "value", read: true, write: false },
+        common: {
+          name: tName("nameTotalReachable"),
+          desc: tName("descTotalReachable"),
+          type: "number",
+          role: "value",
+          read: true,
+          write: false,
+        },
       },
       {
         id: "total.accounts",
         type: "state",
-        common: { name: tName("nameTotalAccounts"), type: "number", role: "value", read: true, write: false },
+        common: {
+          name: tName("nameTotalAccounts"),
+          desc: tName("descTotalAccounts"),
+          type: "number",
+          role: "value",
+          read: true,
+          write: false,
+        },
       },
     ];
     for (const def of defs) {

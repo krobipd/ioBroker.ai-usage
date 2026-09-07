@@ -67,5 +67,17 @@
   "descWindowResetAt": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
   "descResetCredits": "Buoni acquistabili che azzerano una finestra di limite piena. Contati dall'elenco del provider, quelli scaduti esclusi.",
   "descCostsProjected": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider.",
-  "descTotalMaxPercent": "L'account più pieno: la sua finestra di piano o il budget residuo, a seconda di quale sia maggiore."
+  "descTotalMaxPercent": "L'account più pieno: la sua finestra di piano o il budget residuo, a seconda di quale sia maggiore.",
+  "descLastUpdate": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+  "descCostsToday": "L'importo fatturato per l'uso di oggi, dal rapporto giornaliero del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+  "descCostsMonth": "Quanto è costato l'uso stesso in questo mese. Il prezzo di un abbonamento non ne fa mai parte — solo ciò che viene fatturato oltre il piano.",
+  "descTokensToday": "Contato dal rapporto giornaliero di utilizzo del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+  "descModelTokens": "I token di input e di output di questo modello sommati — i contatori sotto «Token» li tengono separati.",
+  "descCreditsGranted": "La parte del saldo regalata dal provider. «Crediti rimanenti» è il saldo intero; quanto è stato versato sta sotto «Saldo ricaricato».",
+  "descCreditsToppedUp": "La parte del saldo che è stata versata. «Crediti rimanenti» è il saldo intero; quanto il provider ha regalato sta sotto «Saldo concesso».",
+  "descResetCreditsExpiry": "Quando scade il buono che termina per primo. Vuoto finché non si possiede alcun buono — il datapoint resta, si svuota solo il suo valore.",
+  "descTotalCosts": "Sommato solo sugli account che fatturano in USD. Altre valute e contatori a pezzi (crediti di richieste, buoni di azzeramento) restano fuori, quindi il valore può essere inferiore a quello degli account.",
+  "descTotalCostsProjected": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider. Sommato solo sugli account che fatturano in USD.",
+  "descTotalAccounts": "Ogni account attivato nelle impostazioni, comprese quelle che l'adapter non può interrogare perché mancano le credenziali.",
+  "descTotalReachable": "Quanti account risultano attivi nel fornire dati. Un account limitato resta nel conteggio — conserva gli ultimi valori, e il suo ultimo aggiornamento riuscito ne dice l'età."
 }

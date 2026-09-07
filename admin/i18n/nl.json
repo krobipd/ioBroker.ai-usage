@@ -67,5 +67,17 @@
   "descWindowResetAt": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
   "descResetCredits": "Koopbare vouchers die een vol limietvenster resetten. Geteld uit de lijst van de aanbieder, verlopen exemplaren tellen niet mee.",
   "descCostsProjected": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder.",
-  "descTotalMaxPercent": "Het volste account: zijn planbrede venster of zijn resterende budget, wat hoger is."
+  "descTotalMaxPercent": "Het volste account: zijn planbrede venster of zijn resterende budget, wat hoger is.",
+  "descLastUpdate": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+  "descCostsToday": "Het bedrag dat voor het gebruik van vandaag in rekening is gebracht, uit het dagrapport van de aanbieder. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+  "descCostsMonth": "Wat het gebruik zelf deze maand heeft gekost. De prijs van een abonnement zit er nooit in — alleen wat bovenop het plan wordt gefactureerd.",
+  "descTokensToday": "Geteld uit het dagelijkse gebruiksrapport van de aanbieder zelf. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+  "descModelTokens": "De invoer- en uitvoertokens van dit model bij elkaar opgeteld — de tellers onder 'Tokens' houden ze uit elkaar.",
+  "descCreditsGranted": "Het deel van het tegoed dat de aanbieder gratis gaf. 'Resterend tegoed' is het hele saldo; het gestorte deel staat onder 'Opgewaardeerd tegoed'.",
+  "descCreditsToppedUp": "Het deel van het tegoed dat is gestort. 'Resterend tegoed' is het hele saldo; wat de aanbieder gratis gaf staat onder 'Toegekend tegoed'.",
+  "descResetCreditsExpiry": "Wanneer de bon die het eerst afloopt verstrijkt. Leeg zolang er geen bon is — het datapunt blijft, alleen de waarde wordt leeg.",
+  "descTotalCosts": "Alleen opgeteld over de accounts die in USD afrekenen. Andere valuta's en stuktellers (verzoektegoeden, resetbonnen) blijven erbuiten, dus dit kan lager zijn dan de accounts tonen.",
+  "descTotalCostsProjected": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder. Alleen opgeteld over de accounts die in USD afrekenen.",
+  "descTotalAccounts": "Elk account dat in de instellingen is ingeschakeld, ook die welke de adapter niet kan opvragen omdat de inloggegevens ontbreken.",
+  "descTotalReachable": "Hoeveel accounts als leverend gelden. Een beperkt account blijft meetellen — het behoudt zijn laatste waarden, en de laatste geslaagde update zegt hoe oud die zijn."
 }

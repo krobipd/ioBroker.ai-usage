@@ -111,7 +111,20 @@
       "type": "string",
       "role": "date",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Wann der zuerst ablaufende Gutschein verfällt. Leer, solange kein Gutschein vorhanden ist — der Datenpunkt bleibt, nur sein Wert leert sich.",
+        "en": "When the voucher that runs out first expires. Empty while no voucher is held — the datapoint stays, only its value empties.",
+        "es": "Cuándo caduca el vale que expira primero. Vacío mientras no se posee ningún vale — el dato permanece, solo se vacía su valor.",
+        "fr": "Quand expire le bon qui arrive à échéance en premier. Vide tant qu'aucun bon n'est détenu — le point de donnée reste, seule sa valeur se vide.",
+        "it": "Quando scade il buono che termina per primo. Vuoto finché non si possiede alcun buono — il datapoint resta, si svuota solo il suo valore.",
+        "nl": "Wanneer de bon die het eerst afloopt verstrijkt. Leeg zolang er geen bon is — het datapunt blijft, alleen de waarde wordt leeg.",
+        "pl": "Kiedy wygasa kupon kończący się jako pierwszy. Puste, dopóki nie ma żadnego kuponu — punkt danych pozostaje, pustoszeje tylko jego wartość.",
+        "pt": "Quando expira o vale que termina primeiro. Vazio enquanto não há nenhum vale — o ponto de dados permanece, apenas o seu valor fica vazio.",
+        "ru": "Когда истекает ваучер, срок которого заканчивается первым. Пусто, пока ваучеров нет — точка данных остаётся, пустеет лишь её значение.",
+        "uk": "Коли спливає ваучер, термін якого закінчується першим. Порожньо, поки ваучерів немає — точка даних залишається, порожніє лише її значення.",
+        "zh-cn": "最先到期的额度券的到期时间。没有额度券时为空——数据点保留，仅数值清空。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.chatgpt.credits.resetCreditsNextExpiry"
@@ -188,6 +201,19 @@
         "ru": "Последнее успешное обновление",
         "uk": "Останнє успішне оновлення",
         "zh-cn": "最近一次成功更新"
+      },
+      "desc": {
+        "de": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+        "en": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+        "es": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+        "fr": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+        "it": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+        "nl": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+        "pl": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+        "pt": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+        "ru": "Когда этот аккаунт в последний раз передал данные. Троттлинг или отказ метку не двигают, поэтому её возраст — это возраст соседних значений.",
+        "uk": "Коли цей акаунт востаннє надав дані. Обмежений або відхилений запит не зсуває позначку, тож її вік — це вік сусідніх значень.",
+        "zh-cn": "此账户最近一次提供数据的时间。被限流或被拒绝的查询不会推进它，因此该时间戳的新旧即为旁边数值的新旧。"
       },
       "type": "string",
       "role": "date",
@@ -736,7 +762,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": "USD",
+      "desc": {
+        "de": "Was die Nutzung selbst diesen Monat gekostet hat. Der Preis eines Abos steckt nie darin — nur, was zusätzlich zum Tarif berechnet wird.",
+        "en": "What the use itself has cost this month. The price of a subscription is never part of it — only what is billed on top of the plan.",
+        "es": "Lo que ha costado el uso en sí este mes. El precio de una suscripción nunca forma parte de ello — solo lo que se factura además del plan.",
+        "fr": "Ce que l'usage lui-même a coûté ce mois-ci. Le prix d'un abonnement n'y figure jamais — uniquement ce qui est facturé en plus du forfait.",
+        "it": "Quanto è costato l'uso stesso in questo mese. Il prezzo di un abbonamento non ne fa mai parte — solo ciò che viene fatturato oltre il piano.",
+        "nl": "Wat het gebruik zelf deze maand heeft gekost. De prijs van een abonnement zit er nooit in — alleen wat bovenop het plan wordt gefactureerd.",
+        "pl": "Ile kosztowało samo użycie w tym miesiącu. Cena subskrypcji nigdy nie wchodzi w skład tej kwoty — tylko to, co naliczono ponad plan.",
+        "pt": "Quanto custou o uso em si este mês. O preço de uma subscrição nunca faz parte — apenas o que é faturado para além do plano.",
+        "ru": "Во сколько обошлось само использование в этом месяце. Цена подписки сюда никогда не входит — только то, что начислено сверх тарифа.",
+        "uk": "У скільки обійшлося саме використання цього місяця. Ціна підписки сюди ніколи не входить — лише те, що нараховано понад тариф.",
+        "zh-cn": "本月使用本身产生的费用。订阅费从不计入其中，只包含套餐之外另行计费的部分。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.claude.costs.month"
@@ -908,6 +947,19 @@
         "ru": "Последнее успешное обновление",
         "uk": "Останнє успішне оновлення",
         "zh-cn": "最近一次成功更新"
+      },
+      "desc": {
+        "de": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+        "en": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+        "es": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+        "fr": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+        "it": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+        "nl": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+        "pl": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+        "pt": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+        "ru": "Когда этот аккаунт в последний раз передал данные. Троттлинг или отказ метку не двигают, поэтому её возраст — это возраст соседних значений.",
+        "uk": "Коли цей акаунт востаннє надав дані. Обмежений або відхилений запит не зсуває позначку, тож її вік — це вік сусідніх значень.",
+        "zh-cn": "此账户最近一次提供数据的时间。被限流或被拒绝的查询不会推进它，因此该时间戳的新旧即为旁边数值的新旧。"
       },
       "type": "string",
       "role": "date",
@@ -1456,7 +1508,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": "USD",
+      "desc": {
+        "de": "Was die Nutzung selbst diesen Monat gekostet hat. Der Preis eines Abos steckt nie darin — nur, was zusätzlich zum Tarif berechnet wird.",
+        "en": "What the use itself has cost this month. The price of a subscription is never part of it — only what is billed on top of the plan.",
+        "es": "Lo que ha costado el uso en sí este mes. El precio de una suscripción nunca forma parte de ello — solo lo que se factura además del plan.",
+        "fr": "Ce que l'usage lui-même a coûté ce mois-ci. Le prix d'un abonnement n'y figure jamais — uniquement ce qui est facturé en plus du forfait.",
+        "it": "Quanto è costato l'uso stesso in questo mese. Il prezzo di un abbonamento non ne fa mai parte — solo ciò che viene fatturato oltre il piano.",
+        "nl": "Wat het gebruik zelf deze maand heeft gekost. De prijs van een abonnement zit er nooit in — alleen wat bovenop het plan wordt gefactureerd.",
+        "pl": "Ile kosztowało samo użycie w tym miesiącu. Cena subskrypcji nigdy nie wchodzi w skład tej kwoty — tylko to, co naliczono ponad plan.",
+        "pt": "Quanto custou o uso em si este mês. O preço de uma subscrição nunca faz parte — apenas o que é faturado para além do plano.",
+        "ru": "Во сколько обошлось само использование в этом месяце. Цена подписки сюда никогда не входит — только то, что начислено сверх тарифа.",
+        "uk": "У скільки обійшлося саме використання цього місяця. Ціна підписки сюди ніколи не входить — лише те, що нараховано понад тариф.",
+        "zh-cn": "本月使用本身产生的费用。订阅费从不计入其中，只包含套餐之外另行计费的部分。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-anthropic-api.costs.month"
@@ -1519,7 +1584,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": "USD",
+      "desc": {
+        "de": "Was die heutige Nutzung gekostet hat, aus dem Tagesbericht des Anbieters. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+        "en": "Money billed for today's use, from the provider's daily report. The day is counted in UTC, so the counter starts over before local midnight.",
+        "es": "El importe facturado por el uso de hoy, del informe diario del proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+        "fr": "Le montant facturé pour l'usage du jour, d'après le rapport quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+        "it": "L'importo fatturato per l'uso di oggi, dal rapporto giornaliero del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+        "nl": "Het bedrag dat voor het gebruik van vandaag in rekening is gebracht, uit het dagrapport van de aanbieder. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+        "pl": "Kwota naliczona za dzisiejsze użycie, z dziennego raportu dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+        "pt": "O valor faturado pelo uso de hoje, do relatório diário do fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+        "ru": "Сумма, начисленная за сегодняшнее использование, из дневного отчёта провайдера. День считается в UTC, поэтому счётчик обнуляется до местной полуночи.",
+        "uk": "Сума, нарахована за сьогоднішнє використання, зі щоденного звіту провайдера. День рахується в UTC, тож лічильник обнуляється до місцевої півночі.",
+        "zh-cn": "供应商日报表中今日用量的计费金额。日期按 UTC 计算，因此计数会在本地午夜之前归零。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-anthropic-api.costs.today"
@@ -1596,6 +1674,19 @@
         "ru": "Последнее успешное обновление",
         "uk": "Останнє успішне оновлення",
         "zh-cn": "最近一次成功更新"
+      },
+      "desc": {
+        "de": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+        "en": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+        "es": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+        "fr": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+        "it": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+        "nl": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+        "pl": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+        "pt": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+        "ru": "Когда этот аккаунт в последний раз передал данные. Троттлинг или отказ метку не двигают, поэтому её возраст — это возраст соседних значений.",
+        "uk": "Коли цей акаунт востаннє надав дані. Обмежений або відхилений запит не зсуває позначку, тож її вік — це вік сусідніх значень.",
+        "zh-cn": "此账户最近一次提供数据的时间。被限流或被拒绝的查询不会推进它，因此该时间戳的新旧即为旁边数值的新旧。"
       },
       "type": "string",
       "role": "date",
@@ -1718,7 +1809,20 @@
       "type": "number",
       "role": "value",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Aus dem Tages-Nutzungsbericht des Anbieters gezählt. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+        "en": "Counted from the provider's own daily usage report. The day is counted in UTC, so the counter starts over before local midnight.",
+        "es": "Contado desde el informe diario de uso del propio proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+        "fr": "Compté à partir du rapport d'usage quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+        "it": "Contato dal rapporto giornaliero di utilizzo del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+        "nl": "Geteld uit het dagelijkse gebruiksrapport van de aanbieder zelf. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+        "pl": "Liczone z dziennego raportu użycia samego dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+        "pt": "Contado a partir do relatório diário de uso do próprio fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+        "ru": "Подсчитано по собственному дневному отчёту провайдера. День считается в UTC, поэтому счётчик обнуляется до местной полуночи.",
+        "uk": "Пораховано за власним щоденним звітом провайдера. День рахується в UTC, тож лічильник обнуляється до місцевої півночі.",
+        "zh-cn": "取自供应商自己的每日用量报表。日期按 UTC 计算，因此计数会在本地午夜之前归零。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-anthropic-api.tokens.inputToday"
@@ -1742,7 +1846,20 @@
       "type": "number",
       "role": "value",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Aus dem Tages-Nutzungsbericht des Anbieters gezählt. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+        "en": "Counted from the provider's own daily usage report. The day is counted in UTC, so the counter starts over before local midnight.",
+        "es": "Contado desde el informe diario de uso del propio proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+        "fr": "Compté à partir du rapport d'usage quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+        "it": "Contato dal rapporto giornaliero di utilizzo del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+        "nl": "Geteld uit het dagelijkse gebruiksrapport van de aanbieder zelf. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+        "pl": "Liczone z dziennego raportu użycia samego dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+        "pt": "Contado a partir do relatório diário de uso do próprio fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+        "ru": "Подсчитано по собственному дневному отчёту провайдера. День считается в UTC, поэтому счётчик обнуляется до местной полуночи.",
+        "uk": "Пораховано за власним щоденним звітом провайдера. День рахується в UTC, тож лічильник обнуляється до місцевої півночі.",
+        "zh-cn": "取自供应商自己的每日用量报表。日期按 UTC 计算，因此计数会在本地午夜之前归零。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-anthropic-api.tokens.outputToday"
@@ -1859,7 +1976,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": "USD",
+      "desc": {
+        "de": "Der Teil des Guthabens, den der Anbieter geschenkt hat. „Verbleibendes Guthaben“ ist der ganze Stand; das Eingezahlte steht unter „Aufgeladenes Guthaben“.",
+        "en": "The part of the balance the provider gave for free. Credits remaining is the whole balance; what was paid in stands under Topped-up balance.",
+        "es": "La parte del saldo que el proveedor regaló. «Créditos restantes» es el saldo completo; lo ingresado figura en «Saldo recargado».",
+        "fr": "La part du solde offerte par le fournisseur. « Crédits restants » est le solde entier ; ce qui a été versé figure sous « Solde rechargé ».",
+        "it": "La parte del saldo regalata dal provider. «Crediti rimanenti» è il saldo intero; quanto è stato versato sta sotto «Saldo ricaricato».",
+        "nl": "Het deel van het tegoed dat de aanbieder gratis gaf. 'Resterend tegoed' is het hele saldo; het gestorte deel staat onder 'Opgewaardeerd tegoed'.",
+        "pl": "Część środków, którą dostawca przyznał za darmo. „Pozostałe środki” to całe saldo; wpłacona część figuruje jako „Doładowane środki”.",
+        "pt": "A parte do saldo que o fornecedor ofereceu. «Créditos restantes» é o saldo completo; o que foi carregado está em «Saldo carregado».",
+        "ru": "Часть баланса, которую провайдер начислил бесплатно. «Остаток кредитов» — это весь баланс; внесённая часть указана в «Пополненном балансе».",
+        "uk": "Частина балансу, яку провайдер нарахував безкоштовно. «Залишок кредитів» — це весь баланс; внесена частина вказана в «Поповненому балансі».",
+        "zh-cn": "余额中由供应商赠送的部分。“剩余额度”是全部余额；自行充值的部分见“充值余额”。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-deepseek-api.credits.granted"
@@ -1909,7 +2039,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": "USD",
+      "desc": {
+        "de": "Der Teil des Guthabens, der eingezahlt wurde. „Verbleibendes Guthaben“ ist der ganze Stand; das Geschenkte steht unter „Gewährtes Guthaben“.",
+        "en": "The part of the balance that was paid in. Credits remaining is the whole balance; what the provider gave for free stands under Granted balance.",
+        "es": "La parte del saldo que se ingresó. «Créditos restantes» es el saldo completo; lo que el proveedor regaló figura en «Saldo concedido».",
+        "fr": "La part du solde qui a été versée. « Crédits restants » est le solde entier ; ce que le fournisseur a offert figure sous « Solde offert ».",
+        "it": "La parte del saldo che è stata versata. «Crediti rimanenti» è il saldo intero; quanto il provider ha regalato sta sotto «Saldo concesso».",
+        "nl": "Het deel van het tegoed dat is gestort. 'Resterend tegoed' is het hele saldo; wat de aanbieder gratis gaf staat onder 'Toegekend tegoed'.",
+        "pl": "Część środków, która została wpłacona. „Pozostałe środki” to całe saldo; to, co dostawca przyznał za darmo, figuruje jako „Przyznane środki”.",
+        "pt": "A parte do saldo que foi carregada. «Créditos restantes» é o saldo completo; o que o fornecedor ofereceu está em «Saldo concedido».",
+        "ru": "Часть баланса, которая была внесена. «Остаток кредитов» — это весь баланс; начисленное бесплатно указано в «Предоставленном балансе».",
+        "uk": "Частина балансу, яку було внесено. «Залишок кредитів» — це весь баланс; нараховане безкоштовно вказано в «Наданому балансі».",
+        "zh-cn": "余额中自行充值的部分。“剩余额度”是全部余额；由供应商赠送的部分见“赠送余额”。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-deepseek-api.credits.toppedUp"
@@ -1986,6 +2129,19 @@
         "ru": "Последнее успешное обновление",
         "uk": "Останнє успішне оновлення",
         "zh-cn": "最近一次成功更新"
+      },
+      "desc": {
+        "de": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+        "en": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+        "es": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+        "fr": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+        "it": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+        "nl": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+        "pl": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+        "pt": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+        "ru": "Когда этот аккаунт в последний раз передал данные. Троттлинг или отказ метку не двигают, поэтому её возраст — это возраст соседних значений.",
+        "uk": "Коли цей акаунт востаннє надав дані. Обмежений або відхилений запит не зсуває позначку, тож її вік — це вік сусідніх значень.",
+        "zh-cn": "此账户最近一次提供数据的时间。被限流或被拒绝的查询不会推进它，因此该时间戳的新旧即为旁边数值的新旧。"
       },
       "type": "string",
       "role": "date",
@@ -2157,7 +2313,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": "USD",
+      "desc": {
+        "de": "Was die Nutzung selbst diesen Monat gekostet hat. Der Preis eines Abos steckt nie darin — nur, was zusätzlich zum Tarif berechnet wird.",
+        "en": "What the use itself has cost this month. The price of a subscription is never part of it — only what is billed on top of the plan.",
+        "es": "Lo que ha costado el uso en sí este mes. El precio de una suscripción nunca forma parte de ello — solo lo que se factura además del plan.",
+        "fr": "Ce que l'usage lui-même a coûté ce mois-ci. Le prix d'un abonnement n'y figure jamais — uniquement ce qui est facturé en plus du forfait.",
+        "it": "Quanto è costato l'uso stesso in questo mese. Il prezzo di un abbonamento non ne fa mai parte — solo ciò che viene fatturato oltre il piano.",
+        "nl": "Wat het gebruik zelf deze maand heeft gekost. De prijs van een abonnement zit er nooit in — alleen wat bovenop het plan wordt gefactureerd.",
+        "pl": "Ile kosztowało samo użycie w tym miesiącu. Cena subskrypcji nigdy nie wchodzi w skład tej kwoty — tylko to, co naliczono ponad plan.",
+        "pt": "Quanto custou o uso em si este mês. O preço de uma subscrição nunca faz parte — apenas o que é faturado para além do plano.",
+        "ru": "Во сколько обошлось само использование в этом месяце. Цена подписки сюда никогда не входит — только то, что начислено сверх тарифа.",
+        "uk": "У скільки обійшлося саме використання цього місяця. Ціна підписки сюди ніколи не входить — лише те, що нараховано понад тариф.",
+        "zh-cn": "本月使用本身产生的费用。订阅费从不计入其中，只包含套餐之外另行计费的部分。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-openai-api.costs.month"
@@ -2220,7 +2389,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": "USD",
+      "desc": {
+        "de": "Was die heutige Nutzung gekostet hat, aus dem Tagesbericht des Anbieters. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+        "en": "Money billed for today's use, from the provider's daily report. The day is counted in UTC, so the counter starts over before local midnight.",
+        "es": "El importe facturado por el uso de hoy, del informe diario del proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+        "fr": "Le montant facturé pour l'usage du jour, d'après le rapport quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+        "it": "L'importo fatturato per l'uso di oggi, dal rapporto giornaliero del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+        "nl": "Het bedrag dat voor het gebruik van vandaag in rekening is gebracht, uit het dagrapport van de aanbieder. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+        "pl": "Kwota naliczona za dzisiejsze użycie, z dziennego raportu dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+        "pt": "O valor faturado pelo uso de hoje, do relatório diário do fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+        "ru": "Сумма, начисленная за сегодняшнее использование, из дневного отчёта провайдера. День считается в UTC, поэтому счётчик обнуляется до местной полуночи.",
+        "uk": "Сума, нарахована за сьогоднішнє використання, зі щоденного звіту провайдера. День рахується в UTC, тож лічильник обнуляється до місцевої півночі.",
+        "zh-cn": "供应商日报表中今日用量的计费金额。日期按 UTC 计算，因此计数会在本地午夜之前归零。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-openai-api.costs.today"
@@ -2297,6 +2479,19 @@
         "ru": "Последнее успешное обновление",
         "uk": "Останнє успішне оновлення",
         "zh-cn": "最近一次成功更新"
+      },
+      "desc": {
+        "de": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+        "en": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+        "es": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+        "fr": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+        "it": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+        "nl": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+        "pl": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+        "pt": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+        "ru": "Когда этот аккаунт в последний раз передал данные. Троттлинг или отказ метку не двигают, поэтому её возраст — это возраст соседних значений.",
+        "uk": "Коли цей акаунт востаннє надав дані. Обмежений або відхилений запит не зсуває позначку, тож її вік — це вік сусідніх значень.",
+        "zh-cn": "此账户最近一次提供数据的时间。被限流或被拒绝的查询不会推进它，因此该时间戳的新旧即为旁边数值的新旧。"
       },
       "type": "string",
       "role": "date",
@@ -2459,7 +2654,20 @@
       "type": "number",
       "role": "value",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Eingabe- und Ausgabe-Token dieses Modells zusammengezählt — die Zähler unter „Tokens“ halten beide auseinander.",
+        "en": "Input and output tokens of this model added together — the counters under Tokens keep the two apart.",
+        "es": "Los tokens de entrada y de salida de este modelo sumados — los contadores bajo «Tokens» los mantienen separados.",
+        "fr": "Les jetons d'entrée et de sortie de ce modèle additionnés — les compteurs sous « Jetons » les gardent séparés.",
+        "it": "I token di input e di output di questo modello sommati — i contatori sotto «Token» li tengono separati.",
+        "nl": "De invoer- en uitvoertokens van dit model bij elkaar opgeteld — de tellers onder 'Tokens' houden ze uit elkaar.",
+        "pl": "Tokeny wejściowe i wyjściowe tego modelu zsumowane — liczniki w sekcji „Tokeny” trzymają je osobno.",
+        "pt": "Os tokens de entrada e de saída deste modelo somados — os contadores em «Tokens» mantêm-nos separados.",
+        "ru": "Входные и выходные токены этой модели вместе — счётчики в разделе «Токены» держат их раздельно.",
+        "uk": "Вхідні та вихідні токени цієї моделі разом — лічильники в розділі «Токени» тримають їх окремо.",
+        "zh-cn": "该模型的输入与输出 Token 之和——“Token”下的计数器则将两者分开统计。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-openai-api.models.gpt-5-mini.tokensToday"
@@ -2483,7 +2691,20 @@
       "type": "number",
       "role": "value",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Eingabe- und Ausgabe-Token dieses Modells zusammengezählt — die Zähler unter „Tokens“ halten beide auseinander.",
+        "en": "Input and output tokens of this model added together — the counters under Tokens keep the two apart.",
+        "es": "Los tokens de entrada y de salida de este modelo sumados — los contadores bajo «Tokens» los mantienen separados.",
+        "fr": "Les jetons d'entrée et de sortie de ce modèle additionnés — les compteurs sous « Jetons » les gardent séparés.",
+        "it": "I token di input e di output di questo modello sommati — i contatori sotto «Token» li tengono separati.",
+        "nl": "De invoer- en uitvoertokens van dit model bij elkaar opgeteld — de tellers onder 'Tokens' houden ze uit elkaar.",
+        "pl": "Tokeny wejściowe i wyjściowe tego modelu zsumowane — liczniki w sekcji „Tokeny” trzymają je osobno.",
+        "pt": "Os tokens de entrada e de saída deste modelo somados — os contadores em «Tokens» mantêm-nos separados.",
+        "ru": "Входные и выходные токены этой модели вместе — счётчики в разделе «Токены» держат их раздельно.",
+        "uk": "Вхідні та вихідні токени цієї моделі разом — лічильники в розділі «Токени» тримають їх окремо.",
+        "zh-cn": "该模型的输入与输出 Token 之和——“Token”下的计数器则将两者分开统计。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-openai-api.models.gpt-5.tokensToday"
@@ -2527,7 +2748,20 @@
       "type": "number",
       "role": "value",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Aus dem Tages-Nutzungsbericht des Anbieters gezählt. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+        "en": "Counted from the provider's own daily usage report. The day is counted in UTC, so the counter starts over before local midnight.",
+        "es": "Contado desde el informe diario de uso del propio proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+        "fr": "Compté à partir du rapport d'usage quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+        "it": "Contato dal rapporto giornaliero di utilizzo del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+        "nl": "Geteld uit het dagelijkse gebruiksrapport van de aanbieder zelf. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+        "pl": "Liczone z dziennego raportu użycia samego dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+        "pt": "Contado a partir do relatório diário de uso do próprio fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+        "ru": "Подсчитано по собственному дневному отчёту провайдера. День считается в UTC, поэтому счётчик обнуляется до местной полуночи.",
+        "uk": "Пораховано за власним щоденним звітом провайдера. День рахується в UTC, тож лічильник обнуляється до місцевої півночі.",
+        "zh-cn": "取自供应商自己的每日用量报表。日期按 UTC 计算，因此计数会在本地午夜之前归零。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-openai-api.tokens.inputToday"
@@ -2551,7 +2785,20 @@
       "type": "number",
       "role": "value",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Aus dem Tages-Nutzungsbericht des Anbieters gezählt. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+        "en": "Counted from the provider's own daily usage report. The day is counted in UTC, so the counter starts over before local midnight.",
+        "es": "Contado desde el informe diario de uso del propio proveedor. El día se cuenta en UTC, así que el contador se reinicia antes de la medianoche local.",
+        "fr": "Compté à partir du rapport d'usage quotidien du fournisseur. Le jour est compté en UTC : le compteur repart avant minuit local.",
+        "it": "Contato dal rapporto giornaliero di utilizzo del provider. Il giorno è contato in UTC, quindi il contatore riparte prima della mezzanotte locale.",
+        "nl": "Geteld uit het dagelijkse gebruiksrapport van de aanbieder zelf. De dag telt in UTC, dus de teller begint voor lokale middernacht opnieuw.",
+        "pl": "Liczone z dziennego raportu użycia samego dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+        "pt": "Contado a partir do relatório diário de uso do próprio fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+        "ru": "Подсчитано по собственному дневному отчёту провайдера. День считается в UTC, поэтому счётчик обнуляется до местной полуночи.",
+        "uk": "Пораховано за власним щоденним звітом провайдера. День рахується в UTC, тож лічильник обнуляється до місцевої півночі.",
+        "zh-cn": "取自供应商自己的每日用量报表。日期按 UTC 计算，因此计数会在本地午夜之前归零。"
+      }
     },
     "native": {},
     "_id": "ai-usage.0.fixture-openai-api.tokens.outputToday"
@@ -2842,6 +3089,19 @@
         "uk": "Останнє успішне оновлення",
         "zh-cn": "最近一次成功更新"
       },
+      "desc": {
+        "de": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+        "en": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+        "es": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+        "fr": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+        "it": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+        "nl": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+        "pl": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+        "pt": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+        "ru": "Когда этот аккаунт в последний раз передал данные. Троттлинг или отказ метку не двигают, поэтому её возраст — это возраст соседних значений.",
+        "uk": "Коли цей акаунт востаннє надав дані. Обмежений або відхилений запит не зсуває позначку, тож її вік — це вік сусідніх значень.",
+        "zh-cn": "此账户最近一次提供数据的时间。被限流或被拒绝的查询不会推进它，因此该时间戳的新旧即为旁边数值的新旧。"
+      },
       "type": "string",
       "role": "date",
       "read": true,
@@ -3044,6 +3304,19 @@
         "ru": "Последнее успешное обновление",
         "uk": "Останнє успішне оновлення",
         "zh-cn": "最近一次成功更新"
+      },
+      "desc": {
+        "de": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+        "en": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+        "es": "Cuándo entregó datos esta cuenta por última vez. Una consulta limitada o rechazada no lo mueve, así que la antigüedad de esta marca es la de los valores contiguos.",
+        "fr": "Quand ce compte a fourni des données pour la dernière fois. Une requête limitée ou refusée ne la fait pas avancer : l'âge de cet horodatage est celui des valeurs voisines.",
+        "it": "Quando questo account ha fornito dati l'ultima volta. Una richiesta limitata o rifiutata non lo sposta, quindi l'età di questo timestamp è quella dei valori accanto.",
+        "nl": "Wanneer dit account voor het laatst gegevens leverde. Een beperkte of geweigerde opvraging verzet hem niet, dus de leeftijd van dit stempel is die van de waarden ernaast.",
+        "pl": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+        "pt": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+        "ru": "Когда этот аккаунт в последний раз передал данные. Троттлинг или отказ метку не двигают, поэтому её возраст — это возраст соседних значений.",
+        "uk": "Коли цей акаунт востаннє надав дані. Обмежений або відхилений запит не зсуває позначку, тож її вік — це вік сусідніх значень.",
+        "zh-cn": "此账户最近一次提供数据的时间。被限流或被拒绝的查询不会推进它，因此该时间戳的新旧即为旁边数值的新旧。"
       },
       "type": "string",
       "role": "date",
@@ -3516,6 +3789,19 @@
         "uk": "Налаштовані акаунти",
         "zh-cn": "已配置的账户数"
       },
+      "desc": {
+        "de": "Jedes in den Einstellungen eingeschaltete Konto — auch die, die der Adapter mangels Zugangsdaten gar nicht abfragen kann.",
+        "en": "Every account switched on in the settings, including the ones the adapter cannot query because their credential is missing.",
+        "es": "Todas las cuentas activadas en la configuración, incluidas aquellas que el adaptador no puede consultar por faltarle sus credenciales.",
+        "fr": "Tous les comptes activés dans les réglages, y compris ceux que l'adaptateur ne peut pas interroger faute d'identifiants.",
+        "it": "Ogni account attivato nelle impostazioni, comprese quelle che l'adapter non può interrogare perché mancano le credenziali.",
+        "nl": "Elk account dat in de instellingen is ingeschakeld, ook die welke de adapter niet kan opvragen omdat de inloggegevens ontbreken.",
+        "pl": "Każde konto włączone w ustawieniach, łącznie z tymi, których adapter nie może odpytać z braku poświadczeń.",
+        "pt": "Todas as contas ativadas nas definições, incluindo aquelas que o adaptador não consegue consultar por faltarem as credenciais.",
+        "ru": "Каждый включённый в настройках аккаунт — в том числе те, которые адаптер не может опросить из-за отсутствия учётных данных.",
+        "uk": "Кожен увімкнений у налаштуваннях акаунт — зокрема ті, які адаптер не може опитати через відсутність облікових даних.",
+        "zh-cn": "在设置中启用的所有账户，包括因缺少凭据而无法查询的账户。"
+      },
       "type": "number",
       "role": "value",
       "read": true,
@@ -3539,6 +3825,19 @@
         "ru": "Доступные аккаунты",
         "uk": "Доступні акаунти",
         "zh-cn": "可访问的账户数"
+      },
+      "desc": {
+        "de": "Wie viele Konten als liefernd gelten. Ein gedrosseltes Konto bleibt mitgezählt — es behält seine letzten Werte, und seine letzte erfolgreiche Aktualisierung sagt, wie alt die sind.",
+        "en": "How many accounts count as delivering. A throttled account stays in the count — it keeps its last values, and its last successful update says how old they are.",
+        "es": "Cuántas cuentas cuentan como entregando datos. Una cuenta limitada sigue contando — conserva sus últimos valores, y su última actualización correcta dice cuán antiguos son.",
+        "fr": "Combien de comptes sont considérés comme fournissant des données. Un compte limité reste compté : il conserve ses dernières valeurs, et sa dernière mise à jour réussie en donne l'âge.",
+        "it": "Quanti account risultano attivi nel fornire dati. Un account limitato resta nel conteggio — conserva gli ultimi valori, e il suo ultimo aggiornamento riuscito ne dice l'età.",
+        "nl": "Hoeveel accounts als leverend gelden. Een beperkt account blijft meetellen — het behoudt zijn laatste waarden, en de laatste geslaagde update zegt hoe oud die zijn.",
+        "pl": "Ile kont uchodzi za dostarczające dane. Konto ograniczone nadal się liczy — zachowuje ostatnie wartości, a jego ostatnia udana aktualizacja mówi, jak stare one są.",
+        "pt": "Quantas contas contam como estando a fornecer dados. Uma conta limitada continua contada — mantém os últimos valores, e a sua última atualização bem-sucedida diz a idade deles.",
+        "ru": "Сколько аккаунтов считаются передающими данные. Аккаунт под троттлингом остаётся в счёте — он сохраняет последние значения, а его последнее успешное обновление говорит, насколько они стары.",
+        "uk": "Скільки акаунтів вважаються такими, що надають дані. Обмежений акаунт залишається в підрахунку — він зберігає останні значення, а його останнє успішне оновлення каже, наскільки вони старі.",
+        "zh-cn": "有多少账户被视为正在提供数据。被限流的账户仍计入其中——它保留最后的数值，其“最近一次成功更新”说明这些数值有多旧。"
       },
       "type": "number",
       "role": "value",
@@ -3584,6 +3883,19 @@
         "uk": "Витрати цього місяця (усі акаунти)",
         "zh-cn": "本月费用（所有账户）"
       },
+      "desc": {
+        "de": "Nur über die Konten summiert, die in USD abrechnen. Andere Währungen und Stückzähler (Anfrage-Guthaben, Reset-Gutscheine) bleiben draußen — der Wert kann also unter dem der Konten liegen.",
+        "en": "Summed over the accounts that bill in USD only. Other currencies and piece counters (request credits, reset vouchers) stay out, so this can be less than the accounts show.",
+        "es": "Sumado solo sobre las cuentas que facturan en USD. Otras monedas y contadores por unidades (créditos de solicitudes, vales de reinicio) quedan fuera, así que puede ser menor que lo que muestran las cuentas.",
+        "fr": "Additionné uniquement sur les comptes facturés en USD. Les autres devises et les compteurs à l'unité (crédits de requêtes, bons de réinitialisation) restent dehors : le total peut donc être inférieur à ce qu'affichent les comptes.",
+        "it": "Sommato solo sugli account che fatturano in USD. Altre valute e contatori a pezzi (crediti di richieste, buoni di azzeramento) restano fuori, quindi il valore può essere inferiore a quello degli account.",
+        "nl": "Alleen opgeteld over de accounts die in USD afrekenen. Andere valuta's en stuktellers (verzoektegoeden, resetbonnen) blijven erbuiten, dus dit kan lager zijn dan de accounts tonen.",
+        "pl": "Sumowane tylko po kontach rozliczanych w USD. Inne waluty i liczniki sztukowe (środki na zapytania, kupony resetu) pozostają poza sumą, więc wartość może być niższa niż na kontach.",
+        "pt": "Somado apenas sobre as contas que faturam em USD. Outras moedas e contadores por unidade (créditos de pedidos, vales de reposição) ficam de fora, pelo que o valor pode ser inferior ao das contas.",
+        "ru": "Суммируется только по аккаунтам, которые тарифицируются в USD. Другие валюты и штучные счётчики (кредиты запросов, ваучеры сброса) не входят, поэтому значение может быть меньше, чем у аккаунтов.",
+        "uk": "Сумується лише за акаунтами, які тарифікуються в USD. Інші валюти та штучні лічильники (кредити запитів, ваучери скидання) не входять, тож значення може бути меншим, ніж в акаунтах.",
+        "zh-cn": "仅对以美元计费的账户求和。其他币种与按次计数（请求额度、重置券）不计入，因此该值可能低于各账户所显示的数额。"
+      },
       "type": "number",
       "role": "value",
       "read": true,
@@ -3610,17 +3922,17 @@
         "zh-cn": "月末费用预测（推算）"
       },
       "desc": {
-        "de": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters.",
-        "en": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports.",
-        "es": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor.",
-        "fr": "Dépense projetée en fin de mois, calculée à partir du montant déjà dépensé — ce n'est pas un chiffre du fournisseur.",
-        "it": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider.",
-        "nl": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder.",
-        "pl": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy.",
-        "pt": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor.",
-        "ru": "Прогноз расходов на конец месяца, рассчитанный из уже потраченного — это не данные провайдера.",
-        "uk": "Прогноз витрат на кінець місяця, розрахований із уже витраченого — це не число від провайдера.",
-        "zh-cn": "按目前支出推算的月末花费——不是供应商给出的数字。"
+        "de": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters. Nur über die Konten summiert, die in USD abrechnen.",
+        "en": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports. Summed over the accounts that bill in USD only.",
+        "es": "Gasto proyectado a fin de mes, calculado a partir de lo ya gastado — no es una cifra del proveedor. Sumado solo sobre las cuentas que facturan en USD.",
+        "fr": "Dépense projetée en fin de mois, calculée à partir du montant déjà dépensé — ce n'est pas un chiffre du fournisseur. Additionné uniquement sur les comptes facturés en USD.",
+        "it": "Spesa prevista a fine mese, calcolata da quanto speso finora — non è un dato del provider. Sommato solo sugli account che fatturano in USD.",
+        "nl": "Verwachte uitgaven aan het einde van de maand, berekend uit wat tot nu toe is uitgegeven — geen cijfer van de aanbieder. Alleen opgeteld over de accounts die in USD afrekenen.",
+        "pl": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy. Sumowane tylko po kontach rozliczanych w USD.",
+        "pt": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor. Somado apenas sobre as contas que faturam em USD.",
+        "ru": "Прогноз расходов на конец месяца, рассчитанный из уже потраченного — это не данные провайдера. Суммируется только по аккаунтам, которые тарифицируются в USD.",
+        "uk": "Прогноз витрат на кінець місяця, розрахований із уже витраченого — це не число від провайдера. Сумується лише за акаунтами, які тарифікуються в USD.",
+        "zh-cn": "按目前支出推算的月末花费——不是供应商给出的数字。仅对以美元计费的账户求和。"
       },
       "type": "number",
       "role": "value",
@@ -3646,6 +3958,19 @@
         "ru": "Расходы сегодня (все аккаунты)",
         "uk": "Витрати сьогодні (усі акаунти)",
         "zh-cn": "今日费用（所有账户）"
+      },
+      "desc": {
+        "de": "Nur über die Konten summiert, die in USD abrechnen. Andere Währungen und Stückzähler (Anfrage-Guthaben, Reset-Gutscheine) bleiben draußen — der Wert kann also unter dem der Konten liegen.",
+        "en": "Summed over the accounts that bill in USD only. Other currencies and piece counters (request credits, reset vouchers) stay out, so this can be less than the accounts show.",
+        "es": "Sumado solo sobre las cuentas que facturan en USD. Otras monedas y contadores por unidades (créditos de solicitudes, vales de reinicio) quedan fuera, así que puede ser menor que lo que muestran las cuentas.",
+        "fr": "Additionné uniquement sur les comptes facturés en USD. Les autres devises et les compteurs à l'unité (crédits de requêtes, bons de réinitialisation) restent dehors : le total peut donc être inférieur à ce qu'affichent les comptes.",
+        "it": "Sommato solo sugli account che fatturano in USD. Altre valute e contatori a pezzi (crediti di richieste, buoni di azzeramento) restano fuori, quindi il valore può essere inferiore a quello degli account.",
+        "nl": "Alleen opgeteld over de accounts die in USD afrekenen. Andere valuta's en stuktellers (verzoektegoeden, resetbonnen) blijven erbuiten, dus dit kan lager zijn dan de accounts tonen.",
+        "pl": "Sumowane tylko po kontach rozliczanych w USD. Inne waluty i liczniki sztukowe (środki na zapytania, kupony resetu) pozostają poza sumą, więc wartość może być niższa niż na kontach.",
+        "pt": "Somado apenas sobre as contas que faturam em USD. Outras moedas e contadores por unidade (créditos de pedidos, vales de reposição) ficam de fora, pelo que o valor pode ser inferior ao das contas.",
+        "ru": "Суммируется только по аккаунтам, которые тарифицируются в USD. Другие валюты и штучные счётчики (кредиты запросов, ваучеры сброса) не входят, поэтому значение может быть меньше, чем у аккаунтов.",
+        "uk": "Сумується лише за акаунтами, які тарифікуються в USD. Інші валюти та штучні лічильники (кредити запитів, ваучери скидання) не входять, тож значення може бути меншим, ніж в акаунтах.",
+        "zh-cn": "仅对以美元计费的账户求和。其他币种与按次计数（请求额度、重置券）不计入，因此该值可能低于各账户所显示的数额。"
       },
       "type": "number",
       "role": "value",

@@ -67,5 +67,17 @@
   "descWindowResetAt": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
   "descResetCredits": "Kupowane bony resetujące pełne okno limitu. Liczone z listy dostawcy, wygasłe pomijane.",
   "descCostsProjected": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy.",
-  "descTotalMaxPercent": "Najbardziej zapełnione konto: jego okno planu albo pozostały budżet — co jest wyższe."
+  "descTotalMaxPercent": "Najbardziej zapełnione konto: jego okno planu albo pozostały budżet — co jest wyższe.",
+  "descLastUpdate": "Kiedy to konto ostatnio dostarczyło dane. Zapytanie ograniczone lub odrzucone nie przesuwa znacznika, więc jego wiek jest wiekiem sąsiednich wartości.",
+  "descCostsToday": "Kwota naliczona za dzisiejsze użycie, z dziennego raportu dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+  "descCostsMonth": "Ile kosztowało samo użycie w tym miesiącu. Cena subskrypcji nigdy nie wchodzi w skład tej kwoty — tylko to, co naliczono ponad plan.",
+  "descTokensToday": "Liczone z dziennego raportu użycia samego dostawcy. Dzień liczony jest w UTC, więc licznik zeruje się przed lokalną północą.",
+  "descModelTokens": "Tokeny wejściowe i wyjściowe tego modelu zsumowane — liczniki w sekcji „Tokeny” trzymają je osobno.",
+  "descCreditsGranted": "Część środków, którą dostawca przyznał za darmo. „Pozostałe środki” to całe saldo; wpłacona część figuruje jako „Doładowane środki”.",
+  "descCreditsToppedUp": "Część środków, która została wpłacona. „Pozostałe środki” to całe saldo; to, co dostawca przyznał za darmo, figuruje jako „Przyznane środki”.",
+  "descResetCreditsExpiry": "Kiedy wygasa kupon kończący się jako pierwszy. Puste, dopóki nie ma żadnego kuponu — punkt danych pozostaje, pustoszeje tylko jego wartość.",
+  "descTotalCosts": "Sumowane tylko po kontach rozliczanych w USD. Inne waluty i liczniki sztukowe (środki na zapytania, kupony resetu) pozostają poza sumą, więc wartość może być niższa niż na kontach.",
+  "descTotalCostsProjected": "Prognozowane wydatki na koniec miesiąca, wyliczone z dotychczasowych — to nie jest liczba od dostawcy. Sumowane tylko po kontach rozliczanych w USD.",
+  "descTotalAccounts": "Każde konto włączone w ustawieniach, łącznie z tymi, których adapter nie może odpytać z braku poświadczeń.",
+  "descTotalReachable": "Ile kont uchodzi za dostarczające dane. Konto ograniczone nadal się liczy — zachowuje ostatnie wartości, a jego ostatnia udana aktualizacja mówi, jak stare one są."
 }

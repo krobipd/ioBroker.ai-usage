@@ -67,5 +67,17 @@
   "descWindowResetAt": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
   "descResetCredits": "Purchasable vouchers that clear a full limit window. Counted from the provider's list, expired ones left out.",
   "descCostsProjected": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports.",
-  "descTotalMaxPercent": "The fullest account: its plan-wide window or its remaining budget, whichever is higher."
+  "descTotalMaxPercent": "The fullest account: its plan-wide window or its remaining budget, whichever is higher.",
+  "descLastUpdate": "When this account last delivered data. A throttled or rejected query does not move it, so the age of this stamp is the age of the values beside it.",
+  "descCostsToday": "Money billed for today's use, from the provider's daily report. The day is counted in UTC, so the counter starts over before local midnight.",
+  "descCostsMonth": "What the use itself has cost this month. The price of a subscription is never part of it — only what is billed on top of the plan.",
+  "descTokensToday": "Counted from the provider's own daily usage report. The day is counted in UTC, so the counter starts over before local midnight.",
+  "descModelTokens": "Input and output tokens of this model added together — the counters under Tokens keep the two apart.",
+  "descCreditsGranted": "The part of the balance the provider gave for free. Credits remaining is the whole balance; what was paid in stands under Topped-up balance.",
+  "descCreditsToppedUp": "The part of the balance that was paid in. Credits remaining is the whole balance; what the provider gave for free stands under Granted balance.",
+  "descResetCreditsExpiry": "When the voucher that runs out first expires. Empty while no voucher is held — the datapoint stays, only its value empties.",
+  "descTotalCosts": "Summed over the accounts that bill in USD only. Other currencies and piece counters (request credits, reset vouchers) stay out, so this can be less than the accounts show.",
+  "descTotalCostsProjected": "Projected spend at month end, computed from what was spent so far — not a figure the provider reports. Summed over the accounts that bill in USD only.",
+  "descTotalAccounts": "Every account switched on in the settings, including the ones the adapter cannot query because their credential is missing.",
+  "descTotalReachable": "How many accounts count as delivering. A throttled account stays in the count — it keeps its last values, and its last successful update says how old they are."
 }

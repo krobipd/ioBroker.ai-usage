@@ -151,6 +151,11 @@ so instead of pretending to be connected; signing in again is all it takes.
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Fixed: The last-update stamp of an account no longer moves forward while the provider is only throttling — it dates the values standing next to it, so you can see how old they really are
+- Improved: Twenty-five more datapoints explain themselves in the object tree — among them what "today" means (the provider counts it in UTC), why the cost totals can be lower than the accounts show, and what the two parts of a balance are
+
 ### 0.12.0 (2026-09-06)
 
 - Fixed: An account that has not been signed in yet no longer reports a rejected sign-in — no warning, no notification, and the settings page keeps offering the sign-in button

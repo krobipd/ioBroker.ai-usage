@@ -268,6 +268,29 @@ describe("PollEngine", () => {
     expect(provider.fetches).toBe(3);
   });
 
+  test("a throttled poll leaves the last-update stamp where it was", async () => {
+    // `reachable` stays true during a throttle by design: the last values are kept
+    // and the account still counts as delivering. The stamp must NOT follow that —
+    // it dates those values, and re-dating numbers that were never fetched is the
+    // one lie a datapoint called "last successful update" must not tell.
+    const h = makeHarness();
+    const rateLimited = (): never => {
+      throw new FetchError("rate-limit", "429");
+    };
+    const provider = scriptedProvider([{ credits: { used: 10, currency: "USD" } }, rateLimited]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick(); // success — the stamp is set
+    const stamped = h.states.get("router.info.lastUpdate");
+    expect(stamped).toBe(new Date(h.clock.now).toISOString());
+    h.clock.now += 60 * 60 * 1000;
+    await h.tick(); // 429 — no snapshot arrived
+    expect(provider.fetches).toBe(2);
+    expect(h.states.get("router.info.lastUpdate")).toBe(stamped);
+    // …while the throttle itself is still not an outage. That pair is the point.
+    expect(h.states.get("router.info.unreach")).toBe(false);
+  });
+
   test("network failures flip reachable only after three in a row", async () => {
     const h = makeHarness();
     const netFail = (): never => {

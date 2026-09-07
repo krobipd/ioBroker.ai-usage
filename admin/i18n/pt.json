@@ -67,5 +67,17 @@
   "descWindowResetAt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
   "descResetCredits": "Vales compráveis que repõem uma janela de limite cheia. Contados a partir da lista do fornecedor, os expirados ficam de fora.",
   "descCostsProjected": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor.",
-  "descTotalMaxPercent": "A conta mais cheia: a sua janela do plano ou o orçamento restante, o que for maior."
+  "descTotalMaxPercent": "A conta mais cheia: a sua janela do plano ou o orçamento restante, o que for maior.",
+  "descLastUpdate": "Quando esta conta forneceu dados pela última vez. Uma consulta limitada ou recusada não o avança, por isso a idade desta marca é a dos valores ao lado.",
+  "descCostsToday": "O valor faturado pelo uso de hoje, do relatório diário do fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+  "descCostsMonth": "Quanto custou o uso em si este mês. O preço de uma subscrição nunca faz parte — apenas o que é faturado para além do plano.",
+  "descTokensToday": "Contado a partir do relatório diário de uso do próprio fornecedor. O dia é contado em UTC, pelo que o contador recomeça antes da meia-noite local.",
+  "descModelTokens": "Os tokens de entrada e de saída deste modelo somados — os contadores em «Tokens» mantêm-nos separados.",
+  "descCreditsGranted": "A parte do saldo que o fornecedor ofereceu. «Créditos restantes» é o saldo completo; o que foi carregado está em «Saldo carregado».",
+  "descCreditsToppedUp": "A parte do saldo que foi carregada. «Créditos restantes» é o saldo completo; o que o fornecedor ofereceu está em «Saldo concedido».",
+  "descResetCreditsExpiry": "Quando expira o vale que termina primeiro. Vazio enquanto não há nenhum vale — o ponto de dados permanece, apenas o seu valor fica vazio.",
+  "descTotalCosts": "Somado apenas sobre as contas que faturam em USD. Outras moedas e contadores por unidade (créditos de pedidos, vales de reposição) ficam de fora, pelo que o valor pode ser inferior ao das contas.",
+  "descTotalCostsProjected": "Gasto projetado para o fim do mês, calculado a partir do já gasto — não é um valor do fornecedor. Somado apenas sobre as contas que faturam em USD.",
+  "descTotalAccounts": "Todas as contas ativadas nas definições, incluindo aquelas que o adaptador não consegue consultar por faltarem as credenciais.",
+  "descTotalReachable": "Quantas contas contam como estando a fornecer dados. Uma conta limitada continua contada — mantém os últimos valores, e a sua última atualização bem-sucedida diz a idade deles."
 }

@@ -229,11 +229,29 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
       add(state(`${accountId}.credits.percent`, tName("nameCreditsPercent"), "number", "value", credits.percent, "%"));
     }
     if (credits.granted !== undefined) {
-      add(state(`${accountId}.credits.granted`, tName("nameCreditsGranted"), "number", "value", credits.granted, unit));
+      add(
+        state(
+          `${accountId}.credits.granted`,
+          tName("nameCreditsGranted"),
+          "number",
+          "value",
+          credits.granted,
+          unit,
+          tName("descCreditsGranted"),
+        ),
+      );
     }
     if (credits.toppedUp !== undefined) {
       add(
-        state(`${accountId}.credits.toppedUp`, tName("nameCreditsToppedUp"), "number", "value", credits.toppedUp, unit),
+        state(
+          `${accountId}.credits.toppedUp`,
+          tName("nameCreditsToppedUp"),
+          "number",
+          "value",
+          credits.toppedUp,
+          unit,
+          tName("descCreditsToppedUp"),
+        ),
       );
     }
     if (credits.resetCredits !== undefined) {
@@ -257,6 +275,8 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
           "string",
           "date",
           windowEnd(credits.resetCreditsNextExpiry),
+          undefined,
+          tName("descResetCreditsExpiry"),
         ),
       );
     }
@@ -266,10 +286,30 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
   if (costs) {
     channel(`${accountId}.costs`, tName("nameCosts"));
     if (costs.today !== undefined) {
-      add(state(`${accountId}.costs.today`, tName("nameCostsToday"), "number", "value", costs.today, costs.currency));
+      add(
+        state(
+          `${accountId}.costs.today`,
+          tName("nameCostsToday"),
+          "number",
+          "value",
+          costs.today,
+          costs.currency,
+          tName("descCostsToday"),
+        ),
+      );
     }
     if (costs.month !== undefined) {
-      add(state(`${accountId}.costs.month`, tName("nameCostsMonth"), "number", "value", costs.month, costs.currency));
+      add(
+        state(
+          `${accountId}.costs.month`,
+          tName("nameCostsMonth"),
+          "number",
+          "value",
+          costs.month,
+          costs.currency,
+          tName("descCostsMonth"),
+        ),
+      );
     }
     if (costs.total !== undefined) {
       add(state(`${accountId}.costs.total`, tName("nameCostsTotal"), "number", "value", costs.total, costs.currency));
@@ -293,10 +333,30 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
   if (tokens) {
     channel(`${accountId}.tokens`, tName("nameTokens"));
     if (tokens.inputToday !== undefined) {
-      add(state(`${accountId}.tokens.inputToday`, tName("nameTokensInput"), "number", "value", tokens.inputToday));
+      add(
+        state(
+          `${accountId}.tokens.inputToday`,
+          tName("nameTokensInput"),
+          "number",
+          "value",
+          tokens.inputToday,
+          undefined,
+          tName("descTokensToday"),
+        ),
+      );
     }
     if (tokens.outputToday !== undefined) {
-      add(state(`${accountId}.tokens.outputToday`, tName("nameTokensOutput"), "number", "value", tokens.outputToday));
+      add(
+        state(
+          `${accountId}.tokens.outputToday`,
+          tName("nameTokensOutput"),
+          "number",
+          "value",
+          tokens.outputToday,
+          undefined,
+          tName("descTokensToday"),
+        ),
+      );
     }
     if (tokens.perModel && tokens.perModel.length > 0) {
       channel(`${accountId}.models`, tName("nameModels"));
@@ -318,6 +378,8 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
               "number",
               "value",
               model.tokens,
+              undefined,
+              tName("descModelTokens"),
             ),
           );
         }

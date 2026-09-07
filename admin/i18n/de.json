@@ -67,5 +67,17 @@
   "descWindowResetAt": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
   "descResetCredits": "Käufliche Gutscheine, die ein volles Limit-Fenster zurücksetzen. Aus der Liste des Anbieters gezählt, abgelaufene bleiben draußen.",
   "descCostsProjected": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters.",
-  "descTotalMaxPercent": "Das vollste Konto: sein plan-weites Fenster oder sein Restguthaben, je nachdem, was höher liegt."
+  "descTotalMaxPercent": "Das vollste Konto: sein plan-weites Fenster oder sein Restguthaben, je nachdem, was höher liegt.",
+  "descLastUpdate": "Wann dieses Konto zuletzt Daten geliefert hat. Eine gedrosselte oder abgelehnte Abfrage bewegt ihn nicht — das Alter dieses Stempels ist das Alter der Werte daneben.",
+  "descCostsToday": "Was die heutige Nutzung gekostet hat, aus dem Tagesbericht des Anbieters. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+  "descCostsMonth": "Was die Nutzung selbst diesen Monat gekostet hat. Der Preis eines Abos steckt nie darin — nur, was zusätzlich zum Tarif berechnet wird.",
+  "descTokensToday": "Aus dem Tages-Nutzungsbericht des Anbieters gezählt. Der Tag zählt in UTC — der Zähler beginnt vor der lokalen Mitternacht von vorn.",
+  "descModelTokens": "Eingabe- und Ausgabe-Token dieses Modells zusammengezählt — die Zähler unter „Tokens“ halten beide auseinander.",
+  "descCreditsGranted": "Der Teil des Guthabens, den der Anbieter geschenkt hat. „Verbleibendes Guthaben“ ist der ganze Stand; das Eingezahlte steht unter „Aufgeladenes Guthaben“.",
+  "descCreditsToppedUp": "Der Teil des Guthabens, der eingezahlt wurde. „Verbleibendes Guthaben“ ist der ganze Stand; das Geschenkte steht unter „Gewährtes Guthaben“.",
+  "descResetCreditsExpiry": "Wann der zuerst ablaufende Gutschein verfällt. Leer, solange kein Gutschein vorhanden ist — der Datenpunkt bleibt, nur sein Wert leert sich.",
+  "descTotalCosts": "Nur über die Konten summiert, die in USD abrechnen. Andere Währungen und Stückzähler (Anfrage-Guthaben, Reset-Gutscheine) bleiben draußen — der Wert kann also unter dem der Konten liegen.",
+  "descTotalCostsProjected": "Hochgerechnete Ausgaben zum Monatsende, aus dem bisher Ausgegebenen berechnet — keine Zahl des Anbieters. Nur über die Konten summiert, die in USD abrechnen.",
+  "descTotalAccounts": "Jedes in den Einstellungen eingeschaltete Konto — auch die, die der Adapter mangels Zugangsdaten gar nicht abfragen kann.",
+  "descTotalReachable": "Wie viele Konten als liefernd gelten. Ein gedrosseltes Konto bleibt mitgezählt — es behält seine letzten Werte, und seine letzte erfolgreiche Aktualisierung sagt, wie alt die sind."
 }

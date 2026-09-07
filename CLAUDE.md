@@ -340,14 +340,22 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     byte-gleich. **Der erste Lauf fand sofort einen Fehler:** die Modell-Kanäle trugen den
     Anbieter-Namen als festen String (`nameModel`-Rahmen statt `model.model`) — für das statische
     Namens-Gate unsichtbar, weil Laufzeitwert.
-40. **Beschreibungen gibt es nur, wo der Name nicht reicht** (0.12.0, Flotten-Standard): neun
-    `desc`-Schlüssel × 11 Sprachen für die Datenpunkte, deren Bedeutung man dem Namen nicht ansieht —
-    `info.unreach`/`info.error` (was „leer" und was „Unknown" heißt), `warning`/`limitReached`
-    (warum ein Modell-Fenster sie NICHT auslöst), `limits.*.active`, `limits.*.resetAt` (was ein
-    leerer Wert bedeutet), `credits.resetCredits`, `costs.projectedMonth` und
-    `total.maxLimitPercent` (beide berechnet, nicht vom Anbieter). Die übrigen 45 bleiben LEER —
-    „Kosten heute" erklärt sich selbst, und ein Satz, der den Namen wiederholt, ist schlechter als
-    keiner. Inventar: 51 von 96 Datenpunkten mit Beschreibung.
+40. **Jeder Datenpunkt ist ENTSCHIEDEN: erklärt oder als selbsterklärend deklariert** (Flotten-Gate
+    D08, `check-object-inventory.py`, seit 2026-09-07). 21 `desc`-Schlüssel × 11 Sprachen decken
+    76 der 96 Datenpunkte; die restlichen 20 stehen mit Begründung in `test/self-explaining.json`
+    (8 Muster — `limits.*.percent`, die fünf `credits.*`-Zahlen, `costs.total`,
+    `total.warningsActive`). Erklärt wird, wo der Name Kontext offenlässt: `costs.today`/`tokens.*`
+    zählen den **UTC**-Tag (der Zähler springt vor der lokalen Mitternacht), `models.*.tokensToday`
+    ist Ein- **und** Ausgabe zusammen (die Zähler unter `tokens` trennen sie), `costs.month` enthält
+    NIE den Abo-Preis, `credits.granted`/`toppedUp` sind die zwei Teile von `credits.remaining`,
+    `total.costs.*` summiert NUR USD-Konten (der Name sagt „alle Konten", die Summe nicht), und
+    `total.accounts` zählt auch Konten ohne brauchbaren Zugang mit. Deklariert wird nur, wo Name,
+    Rolle und Einheit die ganze Aussage sind. Ein Satz, der den Namen wiederholt, bleibt schlechter
+    als keiner — die Deklaration ist der zweite richtige Ausgang, nicht der bequeme.
+41. **Die Konfigseite ABONNIERT die Statuswerte** (0.12.0): vorher fragte sie alle vier Sekunden je
+    Abo eine Nachricht und je Konto zwei Zustände ab, solange sie offen war. `subscribeState` liefert
+    den aktuellen Wert beim Abonnieren gleich mit; gepollt wird nur noch der Anmelde-Status — alle
+    vier Sekunden ausschließlich während eines laufenden Gerätecode-Flusses, sonst alle 30 s.
 42. **Der Konto-Knoten heißt IMMER „<Name> (<Anbieter>)" — auch wenn beides gleich ist** (krobi
     2026-09-06, nach dem 0.12.0-Deploy entschieden): live liest sich das als „Claude (Claude)", und
     das Inventar zeigt, dass die Dopplung der NORMALFALL ist — die Konfigseite setzt bei den drei
@@ -356,10 +364,13 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     die Klammer wegzulassen, sobald Name == Label; krobi hat sich die vier Möglichkeiten angesehen und
     entschieden: **so lassen** („dann macht es auch durchaus sinn"). Der Anbieter steht damit ausnahmslos
     im Namen — auch bei einem frei benannten Zugang („Arbeitskonto (OpenRouter)"). Nicht erneut vorschlagen.
-41. **Die Konfigseite ABONNIERT die Statuswerte** (0.12.0): vorher fragte sie alle vier Sekunden je
-    Abo eine Nachricht und je Konto zwei Zustände ab, solange sie offen war. `subscribeState` liefert
-    den aktuellen Wert beim Abonnieren gleich mit; gepollt wird nur noch der Anmelde-Status — alle
-    vier Sekunden ausschließlich während eines laufenden Gerätecode-Flusses, sonst alle 30 s.
+43. **`info.lastUpdate` datiert die WERTE, nicht den Abfrageversuch** (2026-09-07, beim Schreiben
+    seiner Beschreibung gemessen): der Stempel hing an `reachable`, und `isDelivering()` zählt
+    `rate-limited` absichtlich dazu — jede gedrosselte Abfrage datierte damit Werte neu, die sie gar
+    nicht geholt hatte. Nach einem Tag Drosselung stand „vor einer Stunde" neben tagesalten Zahlen.
+    Er hängt jetzt an `state === "ok"`. `info.unreach` bleibt unverändert falsch, solange nur
+    gedrosselt wird — die beiden Aussagen gehören auseinander, und genau das prüft der Test
+    „a throttled poll leaves the last-update stamp where it was".
 
 ## Tests
 
