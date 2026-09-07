@@ -89,7 +89,9 @@ function state(
     common.unit = unit;
   }
   // Only where there is something to explain. A description that repeats the name
-  // is worse than none (fleet standard) — most datapoints here say what they are.
+  // is worse than none (fleet standard). Since the D08 gate (2026-09-07) EVERY
+  // datapoint is decided: it carries a `desc` or stands in test/self-explaining.json
+  // with the reason why its name is the whole statement.
   if (desc !== undefined) {
     common.desc = desc;
   }

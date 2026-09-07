@@ -371,6 +371,20 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     Er hängt jetzt an `state === "ok"`. `info.unreach` bleibt unverändert falsch, solange nur
     gedrosselt wird — die beiden Aussagen gehören auseinander, und genau das prüft der Test
     „a throttled poll leaves the last-update stamp where it was".
+44. **`tokens.inputToday` bleibt EIN Name für zwei Anbieter-Wahrheiten** (2026-09-07, krobi hat die
+    Entscheidung mir überlassen): Anthropic liefert `uncached_input_tokens`, OpenAI `input_tokens` —
+    der Anthropic-Wert lässt Cache-Treffer also weg und meldet bei cache-lastiger Nutzung zu wenig.
+    **Weder umbenannt noch im Parser ergänzt.** Der Feldname steht im Repo (Parser, Test, Fixture);
+    über `cache_creation`/`cache_read_input_tokens` steht NICHTS, und messen kann es hier niemand —
+    der Report braucht einen Organisations-Admin-Schlüssel, den ein Privatkonto nicht erzeugen kann.
+    Ein Parser für nie gesehene Felder wäre derselbe Fehler wie das aus der Doku gebaute
+    Copilot-Modul. Getrennte Namen wären außerdem die erste Stelle, an der der harmonisierte Baum
+    zwei Bedeutungen für EINEN Datenpunkt trüge, und bräuchten ein Kennzeichen im
+    transport-neutralen `TokenInfo`. **Der Name ist unvollständig, nicht falsch** (anders als
+    beszels `info.os_name`, das den Distributionsnamen unter „OS Version" trug) — deshalb sagt
+    `descTokensToday` nur „was der Tagesbericht des Anbieters gezählt hat" und behauptet nichts über
+    Cache-Treffer, und der anbieter-spezifische Vorbehalt steht in der Anbietertabelle von
+    `docs/{de,en}/README.md`. Nicht erneut vorschlagen.
 
 ## Tests
 
