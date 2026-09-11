@@ -167,11 +167,9 @@ jobs:
           fail_level: error
 
   adapter-tests:
-    # The six-way matrix tests each release commit ONCE — on its main-branch push. The tag run of
-    # the same commit keeps these jobs (the repochecker wants the matrix visible and no `always()`
-    # downstream) but skips their only step; the deploy job waits for the green main-branch run of
-    # this very commit instead (2026-09-08 — before that, every release ran the matrix twice for an
-    # identical tree, a third of all runner minutes).
+    # The tag push starts a COMPLETE second run: the matrix runs again there, and `deploy`
+    # depends on the tests of its own run. That is the property the repochecker verifies —
+    # never make this job or its step conditional on the ref.
     if: contains(github.event.head_commit.message, '[skip ci]') == false
     needs: [check-and-lint]
     runs-on: ${{ matrix.os }}
@@ -181,7 +179,6 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: Run tests
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: ioBroker/testing-action-adapter@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -200,29 +197,6 @@ jobs:
       id-token: write
       actions: read
     steps:
-      # The matrix ran on the main-branch push of this commit — publish only once that run is green.
-      - name: Wait for the green main-branch run of this commit
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const sha = context.sha;
-            const branch = context.payload.repository.default_branch;
-            const deadline = Date.now() + 30 * 60 * 1000;
-            for (;;) {
-              const { data } = await github.rest.actions.listWorkflowRuns({
-                owner, repo, workflow_id: "test-and-release.yml", head_sha: sha, branch, event: "push", per_page: 10,
-              });
-              const run = data.workflow_runs[0];
-              if (!run) { core.setFailed(`no main-branch run for ${sha.slice(0, 9)} — push ${branch} before the tag`); return; }
-              if (run.status === "completed") {
-                if (run.conclusion === "success") { core.info(`main-branch run ${run.id} is green`); return; }
-                core.setFailed(`main-branch run ${run.id} ended with ${run.conclusion} — nothing is published on a red tree`);
-                return;
-              }
-              if (Date.now() > deadline) { core.setFailed(`main-branch run ${run.id} still ${run.status} after 30 min`); return; }
-              await new Promise(r => setTimeout(r, 30000));
-            }
       - uses: ioBroker/testing-action-deploy@v1
         with:
           # Node 24 avoids npm@latest+Node22 MODULE_NOT_FOUND for promise-retry
