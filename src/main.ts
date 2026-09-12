@@ -483,6 +483,10 @@ export class AiUsageAdapter extends utils.Adapter {
             this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
           }
         },
+        readState: async id => {
+          const state = await this.getStateAsync(id).catch(() => null);
+          return state?.val ?? null;
+        },
         listStateIds: async prefix => {
           const start = `${this.namespace}.${prefix}.`;
           const view = await this.getObjectViewAsync("system", "state", {

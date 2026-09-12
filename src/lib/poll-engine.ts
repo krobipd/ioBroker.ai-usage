@@ -68,6 +68,16 @@ export interface EngineDeps {
   deleteObject(id: string): Promise<void>;
   /** Every state id that currently exists below `prefix` (relative to the instance). */
   listStateIds(prefix: string): Promise<string[]>;
+  /**
+   * Read back one of the adapter's OWN states, or null when it has no value yet.
+   *
+   * Used once per account at startup to learn whether the warn threshold was
+   * already exceeded before this process began. A threshold crossing is a
+   * TRANSITION, and a transition needs the previous state — held in memory only, a
+   * restart looked like a fresh crossing and raised the warning and the
+   * notification again, however long the value had already been standing.
+   */
+  readState(id: string): Promise<boolean | number | string | null>;
   /** Write a state value with ack — for MEASUREMENTS, where every cycle carries information. */
   setState(id: string, value: boolean | number | string): void;
   /**
@@ -493,7 +503,12 @@ export class PollEngine {
     // A provider that CLOSED a plan-wide window has said outright what the
     // percentage only implies. Both count.
     const locked = lockedWindows(snapshot);
-    if (locked.length > 0 && !runtime.locked) {
+    // Only from the SECOND round of this process on. Being locked has no datapoint
+    // of its own (decision 36 — it feeds `limitReached` and this line), so the
+    // first round has nothing to compare against: reporting a transition there
+    // claims an event nobody observed, and it repeated on every restart while the
+    // window had been locked for hours.
+    if (locked.length > 0 && !runtime.locked && runtime.firstPollDone) {
       this.deps.log.warn(`${config.name}: ${locked[0].label} is locked by the provider — ${locked[0].reason}`);
     }
     runtime.locked = locked.length > 0;
@@ -819,6 +834,20 @@ export class PollEngine {
     // usable credential has its answer already, and repeating "Unknown" there
     // would hide it.
     void this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
+    // Where the threshold stood BEFORE this process. A crossing is a transition,
+    // and the previous side of it lives in the adapter's own datapoint — the only
+    // place that survives a restart. Held in memory alone, every start of the
+    // instance looked like a fresh crossing and raised the warning and the
+    // ioBroker notification again, however long the value had been standing; a
+    // config change alone restarts the instance. Missing value (fresh install, the
+    // user deleted it) reads as false, which is exactly the old behaviour.
+    try {
+      runtime.status.warning = (await this.deps.readState(`${config.id}.warning`)) === true;
+    } catch (e) {
+      this.deps.log.debug(
+        `${config.name}: could not read the previous warning state (${e instanceof Error ? e.message : String(e)})`,
+      );
+    }
   }
 
   /** The totals skeleton (channel + states). */

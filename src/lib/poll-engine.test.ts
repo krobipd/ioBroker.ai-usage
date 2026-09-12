@@ -93,6 +93,7 @@ function makeHarness(): Harness {
       return Promise.resolve();
     },
     listStateIds: () => Promise.resolve([...existing]),
+    readState: id => Promise.resolve(states.get(id) ?? null),
     setState: (id, value) => void states.set(id, value),
     setStateChanged: (id, value) => {
       changedWrites.push(id);
@@ -833,6 +834,80 @@ describe("PollEngine", () => {
     const h = makeHarness();
     const warnings: string[] = [];
     h.deps.log.warn = m => void warnings.push(m);
+    const week = (lockedReason?: string): UsageSnapshot => ({
+      limits: [
+        {
+          name: "week",
+          label: "Week (all models)",
+          labelKey: "nameWindowWeek",
+          percent: 96,
+          ...(lockedReason ? { lockedReason } : {}),
+        },
+      ],
+    });
+    const provider = scriptedProvider([week(), week("usage_limit_reached")]);
+    const engine = new PollEngine([account({ id: "a", name: "Claude" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    expect(h.states.get("a.limitReached")).toBe(true);
+    expect(warnings.some(w => w.includes("locked by the provider"))).toBe(true);
+  });
+
+  test("a restart above the threshold does not warn or notify again", async () => {
+    // Measured with two engines against the same state store: the transition lived
+    // in memory only, so every start of the instance looked like a fresh crossing
+    // and raised the warning AND the ioBroker notification again — a config change
+    // alone restarts the instance, and each notification waits for the user.
+    const h = makeHarness();
+    const over = (): UsageSnapshot => ({
+      limits: [{ name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 85 }],
+    });
+    const first = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([over()])]]),
+      300,
+      h.deps,
+    );
+    await first.start();
+    await h.tick();
+    expect(h.states.get("a.warning")).toBe(true);
+    expect(h.notifications).toHaveLength(1);
+    first.stop();
+
+    // Second process, same database, same value.
+    const second = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([over()])]]),
+      300,
+      h.deps,
+    );
+    await second.start();
+    await h.tick();
+    expect(h.states.get("a.warning")).toBe(true);
+    expect(h.notifications).toHaveLength(1);
+  });
+
+  test("a threshold crossed WHILE the adapter was off is still reported", async () => {
+    // The other half: seeding from the datapoint must not swallow a real crossing.
+    const h = makeHarness();
+    h.states.set("a.warning", false);
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 91 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.warning")).toBe(true);
+    expect(h.notifications).toHaveLength(1);
+  });
+
+  test("a window that was ALREADY locked when the adapter started logs no transition", async () => {
+    // Being locked has no datapoint of its own (decision 36), so the first round of
+    // a process has nothing to compare against. Reporting a transition there claims
+    // an event nobody observed — and it repeated on every restart while the window
+    // had been locked for hours. The state itself is still correct.
+    const h = makeHarness();
     const provider = scriptedProvider([
       {
         limits: [
@@ -840,7 +915,7 @@ describe("PollEngine", () => {
             name: "week",
             label: "Week (all models)",
             labelKey: "nameWindowWeek",
-            percent: 96,
+            percent: 42,
             lockedReason: "usage_limit_reached",
           },
         ],
@@ -850,7 +925,7 @@ describe("PollEngine", () => {
     await engine.start();
     await h.tick();
     expect(h.states.get("a.limitReached")).toBe(true);
-    expect(warnings.some(w => w.includes("locked by the provider"))).toBe(true);
+    expect(h.warnings.some(w => w.includes("locked by the provider"))).toBe(false);
   });
 
   test("a throttled account counts as delivering everywhere, not only in the icon", async () => {
