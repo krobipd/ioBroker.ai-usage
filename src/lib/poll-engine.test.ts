@@ -1083,6 +1083,10 @@ describe("PollEngine", () => {
 
   test("a write waiting on the object database writes nothing after the shutdown", async () => {
     const h = makeHarness();
+    // A window the account no longer delivers, so the orphan sweep of this round
+    // would have something to DELETE — the part of the write path that must not run
+    // once the host has been told the adapter is done.
+    h.existing.push("a.limits.old.percent");
     const provider = scriptedProvider([
       { limits: [{ name: "session", labelKey: "nameWindowSession", label: "Session", percent: 42 }] },
     ]);
@@ -1102,5 +1106,8 @@ describe("PollEngine", () => {
     expect(h.states.get("a.info.unreach")).toBe(true);
     expect(h.states.get("info.connection")).toBe(false);
     expect(h.states.get("total.accountsReachable")).toBe(0);
+    // Nothing was written and nothing was deleted after the shutdown stamp.
+    expect(h.deleted).toEqual([]);
+    expect(h.states.get("a.limits.session.percent")).toBeUndefined();
   });
 });
