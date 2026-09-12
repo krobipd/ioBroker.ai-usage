@@ -10,7 +10,8 @@ import { fetchAllPages, isToday, monthStartIso, projectMonth } from "./report-ut
  * with `x-api-key` + `anthropic-version: 2023-06-01`, params starting_at/ending_at
  * (ISO) + bucket_width=1d, pagination via has_more/next_page (param `page`).
  * Usage results carry `uncached_input_tokens`/`output_tokens`; cost results carry
- * `amount` as a decimal STRING (USD).
+ * `amount` as a decimal string in the CURRENCY'S LOWEST UNIT (cents) — see the
+ * conversion in {@link parseAnthropicReports}.
  */
 const BASE = "https://api.anthropic.com/v1/organizations";
 
@@ -56,13 +57,11 @@ export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unkn
 
   let inputToday = 0;
   let outputToday = 0;
-  let sawUsageToday = false;
   for (const bucket of usageBuckets) {
     const entry = bucket as { starting_at?: unknown; start_time?: unknown; results?: unknown };
     if (!Array.isArray(entry?.results) || !isToday(entry.starting_at ?? entry.start_time, nowMs)) {
       continue;
     }
-    sawUsageToday = true;
     for (const result of entry.results) {
       const data = result as { uncached_input_tokens?: unknown; output_tokens?: unknown };
       const input = finiteNumber(data.uncached_input_tokens);
@@ -83,10 +82,11 @@ export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unkn
       projectedMonth: projectMonth(costMonth, nowMs),
       currency: "USD",
     },
+    // Unconditional, like `costs` above: a day with nothing used is a zero, not a
+    // missing datapoint. Left out, the counters kept yesterday's numbers under a
+    // name that says "today" while `costs.today` had correctly gone back to 0.
+    tokens: { inputToday, outputToday },
   };
-  if (sawUsageToday) {
-    snapshot.tokens = { inputToday, outputToday };
-  }
   return snapshot;
 }
 

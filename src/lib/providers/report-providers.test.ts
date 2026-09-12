@@ -47,6 +47,47 @@ describe("OpenAI reports", () => {
     ]);
   });
 
+  test("a day without usage reports zero and keeps every model of the month", () => {
+    // Measured: after UTC midnight the report has no bucket for today yet. Built
+    // from today's buckets only, the whole tokens/models block fell out of the
+    // snapshot — the counters kept yesterday's numbers under a name that says
+    // "today", and the orphan sweep deleted the model channels every night.
+    const snapshot = parseOpenAiReports(
+      [
+        {
+          start_time: Date.UTC(2026, 7, 24) / 1000,
+          results: [{ input_tokens: 500, output_tokens: 100, model: "gpt-5" }],
+        },
+      ],
+      [{ start_time: Date.UTC(2026, 7, 24) / 1000, results: [{ amount: { value: 1, currency: "usd" } }] }],
+      NOW,
+    );
+    expect(snapshot.tokens).toEqual({ inputToday: 0, outputToday: 0, perModel: [{ model: "gpt-5", tokens: 0 }] });
+    expect(snapshot.costs?.today).toBe(0);
+  });
+
+  test("the model list comes from the MONTH, the number from today", () => {
+    const snapshot = parseOpenAiReports(
+      [
+        {
+          start_time: Date.UTC(2026, 7, 10) / 1000,
+          results: [{ input_tokens: 900, output_tokens: 100, model: "gpt-5-mini" }],
+        },
+        {
+          start_time: Date.UTC(2026, 7, 25) / 1000,
+          results: [{ input_tokens: 300, output_tokens: 200, model: "gpt-5" }],
+        },
+      ],
+      [],
+      NOW,
+    );
+    expect(snapshot.tokens?.inputToday).toBe(300);
+    expect(snapshot.tokens?.perModel).toEqual([
+      { model: "gpt-5-mini", tokens: 0 },
+      { model: "gpt-5", tokens: 500 },
+    ]);
+  });
+
   test("the provider pages through has_more and sends the admin key", async () => {
     const calls: string[] = [];
     let usageCall = 0;
@@ -116,6 +157,20 @@ describe("Anthropic reports", () => {
     );
     expect(snapshot.costs?.month).toBe(10);
     expect(snapshot.costs?.projectedMonth).toBe(12.4);
+  });
+
+  test("a day without usage still reports zero tokens", () => {
+    const snapshot = parseAnthropicReports(
+      [
+        {
+          starting_at: "2026-08-24T00:00:00Z",
+          results: [{ uncached_input_tokens: 800, output_tokens: 150 }],
+        },
+      ],
+      [],
+      NOW,
+    );
+    expect(snapshot.tokens).toEqual({ inputToday: 0, outputToday: 0 });
   });
 
   test("the provider sends x-api-key + anthropic-version", async () => {

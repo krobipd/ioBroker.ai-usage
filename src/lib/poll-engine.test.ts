@@ -961,6 +961,29 @@ describe("PollEngine", () => {
     expect(h.states.get("total.maxLimitPercent")).toBe(10);
   });
 
+  test("an answer that carries no window at all sweeps NOTHING", async () => {
+    // A provider whose whole limit block fell silent (empty Gemini buckets, a
+    // report with no bucket for today). Before the guard this wiped the limit tree
+    // and reported the account as perfectly healthy while doing it.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      {
+        limits: [
+          { name: "session", labelKey: "nameWindowSession", label: "Session", percent: 95 },
+          { name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 60 },
+        ],
+      },
+      {},
+    ]);
+    const engine = new PollEngine([account({ id: "c", name: "C" })], new Map([["c", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("c.warning")).toBe(true);
+    h.deleted.length = 0;
+    await h.tick();
+    expect(h.deleted).toEqual([]);
+  });
+
   test("a write waiting on the object database writes nothing after the shutdown", async () => {
     const h = makeHarness();
     const provider = scriptedProvider([

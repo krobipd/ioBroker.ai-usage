@@ -11,6 +11,12 @@ import { finiteNumber, sanitizeId } from "../pure-helpers";
 import { CLAUDE_OAUTH, refreshTokens } from "./claude-auth";
 
 /**
+ * The top-level keys a usage answer is recognised by. Presence is what counts —
+ * their VALUES are null on an account that has not used anything yet.
+ */
+const CLAUDE_USAGE_KEYS = ["limits", "five_hour", "seven_day", "seven_day_sonnet", "extra_usage", "spend"] as const;
+
+/**
  * Parse a Claude subscription `GET /api/oauth/usage` response into a snapshot.
  *
  * Source-verified against the HA reference integration (trickv/hass-claude-usage):
@@ -31,6 +37,15 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
     throw new FetchError("service", "unexpected usage response");
   }
   const raw = body as Record<string, unknown>;
+  // Drift guard on the KEYS, not on the parsed result. An account that has used
+  // nothing yet sends the same keys with null values — that is a legitimately
+  // empty snapshot. A body that carries none of these keys at all is a shape that
+  // moved under us, and "the account reports nothing" would then switch every
+  // alarm off in silence and take the whole limit tree with it (decision 21: an
+  // answer that arrived but cannot be understood is a service fault).
+  if (!CLAUDE_USAGE_KEYS.some(key => key in raw)) {
+    throw new FetchError("service", "the usage response carries none of the known fields");
+  }
   const limits: LimitWindow[] = [];
   const seen = new Set<string>();
   const push = (

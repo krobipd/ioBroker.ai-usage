@@ -171,6 +171,31 @@ describe("orphanObjectIds", () => {
     const known = ["claude.info.unreach", "claude.limits.week.percent"];
     expect(orphanObjectIds(known, ["claude.limits.week.percent"], ["claude.info.unreach"])).toEqual([]);
   });
+
+  test("a round that says NOTHING about a branch never sweeps it", () => {
+    // An answer that carries no limit window at all has not reported that the
+    // windows are gone — it has reported nothing. Sweeping on that wiped the whole
+    // limit tree on a single unreadable answer (fleet rule: an empty API list is
+    // not a cleanup trigger).
+    const known = ["claude.limits.week.percent", "claude.limits.session.percent"];
+    expect(orphanObjectIds(known, [], [])).toEqual([]);
+  });
+
+  test("a report with no bucket for today keeps the model channels", () => {
+    // Measured: after UTC midnight the usage report has no bucket yet, the models
+    // branch fell silent and the whole subtree was deleted — every night.
+    const known = ["oai.models.gpt-5.tokensToday", "oai.costs.today"];
+    expect(orphanObjectIds(known, ["oai.costs.today"], [])).toEqual([]);
+  });
+
+  test("silence in ONE branch does not protect the other", () => {
+    // limits speaks, models does not: the vanished window still goes, the models
+    // subtree stays. The exemption is per branch, not a blanket amnesty.
+    const known = ["c.limits.week.percent", "c.limits.session.percent", "c.models.opus.tokensToday"];
+    const gone = orphanObjectIds(known, ["c.limits.session.percent"], []);
+    expect(gone).toContain("c.limits.week.percent");
+    expect(gone).not.toContain("c.models.opus.tokensToday");
+  });
 });
 
 describe("maxLimitPercent", () => {

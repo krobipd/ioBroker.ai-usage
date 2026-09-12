@@ -125,6 +125,30 @@ describe("parseClaudeUsage", () => {
   test("a malformed body is a network error", () => {
     expect(() => parseClaudeUsage(null)).toThrow(FetchError);
   });
+
+  test("a body carrying NONE of the known fields is a service fault, not an empty account", () => {
+    // Schema drift. Read as "the account reports nothing" it switched every alarm
+    // off in silence and let the orphan sweep take the whole limit tree with it.
+    expect(() => parseClaudeUsage({ something_new: { session: 12 } })).toThrow(FetchError);
+    try {
+      parseClaudeUsage({ something_new: {} });
+    } catch (e) {
+      expect((e as FetchError).kind).toBe("service");
+    }
+  });
+
+  test("an account that has used nothing yet is a valid EMPTY snapshot", () => {
+    // The counter-test to the guard above: the keys are there, the values are null
+    // (which is what the provider sends before the first use of a window). That is
+    // a legitimate empty answer and must NOT be reported as a broken service.
+    const snapshot = parseClaudeUsage({
+      five_hour: { utilization: null, resets_at: null },
+      seven_day: { utilization: null, resets_at: null },
+      extra_usage: { is_enabled: false },
+    });
+    expect(snapshot.limits).toBeUndefined();
+    expect(snapshot.credits).toBeUndefined();
+  });
 });
 
 describe("claudeSubProvider", () => {

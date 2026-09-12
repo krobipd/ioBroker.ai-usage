@@ -49,33 +49,42 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
 
   let inputToday = 0;
   let outputToday = 0;
+  // Every model of the MONTH, each with TODAY's count. The report is fetched for
+  // the whole month grouped by model anyway, so the list costs nothing extra — and
+  // it is what keeps the model channels in place: built from today's buckets only,
+  // the whole `models.*` branch fell out of the answer after every UTC midnight
+  // until the first request of the new day, and the orphan sweep deleted it.
   const perModel = new Map<string, { tokens: number }>();
-  let sawUsageToday = false;
   for (const bucket of usageBuckets) {
     const entry = bucket as { start_time?: unknown; results?: unknown };
-    if (!Array.isArray(entry?.results) || !isToday(entry.start_time, nowMs)) {
+    if (!Array.isArray(entry?.results)) {
       continue;
     }
-    sawUsageToday = true;
+    const today = isToday(entry.start_time, nowMs);
     for (const result of entry.results) {
       const data = result as { input_tokens?: unknown; output_tokens?: unknown; model?: unknown };
       const input = finiteNumber(data.input_tokens);
       const output = finiteNumber(data.output_tokens);
-      if (input !== undefined) {
+      if (today && input !== undefined) {
         inputToday += input;
       }
-      if (output !== undefined) {
+      if (today && output !== undefined) {
         outputToday += output;
       }
       if (typeof data.model === "string" && data.model) {
-        const tokens = (input ?? 0) + (output ?? 0);
         const existing = perModel.get(data.model) ?? { tokens: 0 };
-        existing.tokens += tokens;
+        if (today) {
+          existing.tokens += (input ?? 0) + (output ?? 0);
+        }
         perModel.set(data.model, existing);
       }
     }
   }
 
+  // Built unconditionally, exactly like `costs` above: a day with nothing used is
+  // a zero, not a missing datapoint. Left out, the counters kept yesterday's
+  // numbers under a name that says "today", right next to a `costs.today` that had
+  // correctly gone back to 0.
   const snapshot: UsageSnapshot = {
     costs: {
       today: round2(costToday),
@@ -83,14 +92,12 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
       projectedMonth: projectMonth(costMonth, nowMs),
       currency,
     },
-  };
-  if (sawUsageToday) {
-    snapshot.tokens = {
+    tokens: {
       inputToday,
       outputToday,
       perModel: [...perModel.entries()].map(([model, data]) => ({ model, tokens: data.tokens })),
-    };
-  }
+    },
+  };
   return snapshot;
 }
 

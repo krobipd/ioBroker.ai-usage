@@ -497,11 +497,20 @@ export function orphanObjectIds(
   // The subtrees whose members the answer still delivers — a state inside one of
   // them survives even when its own id was not written this round.
   const livingSubtrees = new Set<string>();
+  // Which branches this round says ANYTHING about. A round that delivers no
+  // `limits.*` at all has not reported that the windows are gone — it has
+  // reported nothing, which is a different statement (an empty answer, a
+  // provider whose schema drifted, a report with no bucket for today). Sweeping
+  // on that is the "empty API list as a cleanup trigger" the fleet forbids: it
+  // wiped a whole limit tree on one unreadable answer and deleted the model
+  // channels every night an organisation account had no usage yet.
+  const spokenBranches = new Set<string>();
   for (const id of current) {
     const parts = id.split(".");
     // <account>.limits.<window>.<state> / <account>.models.<model>.<state>
     if (parts.length >= 4 && (parts[1] === "limits" || parts[1] === "models")) {
       livingSubtrees.add(parts.slice(0, 3).join("."));
+      spokenBranches.add(parts[1]);
     }
   }
   const goneStates = known.filter(id => {
@@ -510,8 +519,11 @@ export function orphanObjectIds(
     }
     const parts = id.split(".");
     if (parts.length >= 4 && (parts[1] === "limits" || parts[1] === "models")) {
-      // Structure: gone only when the whole window/model fell out of the answer.
-      return !livingSubtrees.has(parts.slice(0, 3).join("."));
+      // Structure: gone only when the whole window/model fell out of an answer
+      // that still speaks about this branch. A window that disappears while other
+      // windows are delivered is still swept — decision 15 is unchanged; only the
+      // total silence of a branch is exempt.
+      return spokenBranches.has(parts[1]) && !livingSubtrees.has(parts.slice(0, 3).join("."));
     }
     // Everything outside those subtrees (credits/costs/tokens values, available)
     // stays once created — a provider that stops a field mid-life leaves a frozen

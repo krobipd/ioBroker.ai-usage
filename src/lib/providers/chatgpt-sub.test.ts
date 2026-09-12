@@ -103,6 +103,16 @@ describe("parseChatgptUsage", () => {
     expect(snapshot.limits).toBeUndefined();
   });
 
+  test("a body carrying NONE of the known fields is a service fault", () => {
+    expect(() => parseChatgptUsage({ something_new: 1 })).toThrow(FetchError);
+  });
+
+  test("an account with nothing used yet stays a valid empty snapshot", () => {
+    const snapshot = parseChatgptUsage({ rate_limit: { primary_window: null, secondary_window: null } });
+    expect(snapshot.limits).toBeUndefined();
+    expect(snapshot.credits).toBeUndefined();
+  });
+
   test("a non-object answer is a network failure, not a silent empty snapshot", () => {
     expect(() => parseChatgptUsage("nope")).toThrow(FetchError);
   });
@@ -168,7 +178,9 @@ describe("chatgptSubProvider", () => {
       () => Promise.resolve({}),
       (_url, headers) => {
         seen.push(headers);
-        return Promise.resolve({});
+        // A recognisable but empty answer — the drift guard rejects a body that
+        // carries none of the known keys, and this test is about the header.
+        return Promise.resolve({ rate_limit: {} });
       },
       () => 0,
     );

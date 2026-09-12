@@ -65,6 +65,9 @@ function readWindow(
   return window;
 }
 
+/** The top-level keys a `/wham/usage` answer is recognised by — presence, not value. */
+const CHATGPT_USAGE_KEYS = ["rate_limit", "credits", "additional_rate_limits"] as const;
+
 /**
  * Parse a `/wham/usage` answer into a snapshot.
  *
@@ -82,6 +85,14 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
     throw new FetchError("service", "unexpected usage response");
   }
   const raw = body as Record<string, unknown>;
+  // Same drift guard as the Claude parser, on the KEYS: an account with nothing
+  // used yet still sends `rate_limit` with null windows, so presence is the test,
+  // not the parsed result. A body carrying none of them is a shape that moved —
+  // reported as a healthy but empty account it would silently clear the alarms
+  // and let the orphan sweep take the limit tree.
+  if (!CHATGPT_USAGE_KEYS.some(key => key in raw)) {
+    throw new FetchError("service", "the usage response carries none of the known fields");
+  }
   const limits: LimitWindow[] = [];
   const rateLimit = (raw.rate_limit ?? {}) as Record<string, unknown>;
   const session = readWindow(rateLimit.primary_window, "session", "Session (5 h)", "nameWindowSession");
