@@ -93,6 +93,7 @@ interface Internals {
   countUpsert(id: string): void;
   logDatapointBalance(): void;
   knownStateIds: Set<string>;
+  existingObjectIds: Set<string>;
   signIn: { state(provider: string): Promise<{ status: string; reason?: string }> };
   onUnload(cb: () => void): void;
 }
@@ -327,7 +328,7 @@ describe("the leftover supportedMessages key", () => {
     expect(seen).toContain("system.adapter.ai-usage.0");
     expect(extend).toHaveBeenCalledTimes(1);
     // Nothing else was set up: no object snapshot, no state written.
-    expect(adapter.getObjectViewAsync).not.toHaveBeenCalled();
+    expect(adapter.getAdapterObjectsAsync).not.toHaveBeenCalled();
     expect(adapter.setState).not.toHaveBeenCalled();
   });
 
@@ -357,7 +358,7 @@ describe("the leftover supportedMessages key", () => {
 
     await (adapter as unknown as { onReady(): Promise<void> }).onReady();
 
-    expect(adapter.getObjectViewAsync).toHaveBeenCalled();
+    expect(adapter.getAdapterObjectsAsync).toHaveBeenCalled();
   });
 
   test("an unreadable instance object does not stop the startup", async () => {
@@ -406,7 +407,7 @@ describe("manifest objects reach an existing installation", () => {
 describe("object housekeeping", () => {
   test("an empty account table deletes nothing — the guard against wiping the tree", async () => {
     const adapter = makeAdapter();
-    adapter.getAdapterObjectsAsync = vi.fn(() => Promise.resolve({ "ai-usage.0.claude": {} } as never));
+    internals(adapter).existingObjectIds = new Set(["claude"]);
     await internals(adapter).cleanupStaleObjects([]);
     expect(adapter.delObjectAsync).not.toHaveBeenCalled();
   });
@@ -427,15 +428,7 @@ describe("object housekeeping", () => {
 
   test("a branch of an account that is no longer in the table goes", async () => {
     const adapter = makeAdapter();
-    adapter.getAdapterObjectsAsync = vi.fn(() =>
-      Promise.resolve({
-        "ai-usage.0.claude": {},
-        "ai-usage.0.claude.info.unreach": {},
-        "ai-usage.0.old-api": {},
-        "ai-usage.0.info": {},
-        "ai-usage.0.total": {},
-      } as never),
-    );
+    internals(adapter).existingObjectIds = new Set(["claude", "claude.info.unreach", "old-api", "info", "total"]);
     await internals(adapter).cleanupStaleObjects([{ id: "claude" }]);
     expect(adapter.delObjectAsync).toHaveBeenCalledTimes(1);
     expect(adapter.delObjectAsync).toHaveBeenCalledWith("old-api", { recursive: true });
@@ -446,11 +439,12 @@ describe("object housekeeping", () => {
     // states that were already there. Counting "the create path touched it" would
     // report the entire tree as new after every restart and turn the line into noise.
     const adapter = makeAdapter();
-    adapter.getObjectViewAsync = vi.fn(() =>
+    adapter.getAdapterObjectsAsync = vi.fn(() =>
       Promise.resolve({
-        rows: [{ id: "ai-usage.0.claude.warning" }, { id: "ai-usage.0.claude.limits.week.percent" }],
-      }),
-    ) as unknown as typeof adapter.getObjectViewAsync;
+        "ai-usage.0.claude.warning": { type: "state" },
+        "ai-usage.0.claude.limits.week.percent": { type: "state" },
+      } as never),
+    );
     await internals(adapter).snapshotExistingStates();
 
     // The engine upserts both existing states again, as it does on every start.
@@ -463,9 +457,9 @@ describe("object housekeeping", () => {
 
   test("only what the snapshot did not hold counts as new", async () => {
     const adapter = makeAdapter();
-    adapter.getObjectViewAsync = vi.fn(() =>
-      Promise.resolve({ rows: [{ id: "ai-usage.0.claude.warning" }] }),
-    ) as unknown as typeof adapter.getObjectViewAsync;
+    adapter.getAdapterObjectsAsync = vi.fn(() =>
+      Promise.resolve({ "ai-usage.0.claude.warning": { type: "state" } } as never),
+    );
     await internals(adapter).snapshotExistingStates();
 
     internals(adapter).countUpsert("claude.warning"); // already there
@@ -478,7 +472,7 @@ describe("object housekeeping", () => {
 
   test("the balance is written once, not once per account", async () => {
     const adapter = makeAdapter();
-    adapter.getObjectViewAsync = vi.fn(() => Promise.resolve({ rows: [] }));
+    adapter.getAdapterObjectsAsync = vi.fn(() => Promise.resolve({} as never));
     await internals(adapter).snapshotExistingStates();
     internals(adapter).countUpsert("claude.warning");
     internals(adapter).logDatapointBalance();
@@ -488,13 +482,18 @@ describe("object housekeeping", () => {
 
   test("the startup snapshot records the existing ids without the instance prefix", async () => {
     const adapter = makeAdapter();
-    adapter.getObjectViewAsync = vi.fn(() =>
+    adapter.getAdapterObjectsAsync = vi.fn(() =>
       Promise.resolve({
-        rows: [{ id: "ai-usage.0.claude.warning" }, { id: "ai-usage.0.total.accounts" }],
-      }),
-    ) as unknown as typeof adapter.getObjectViewAsync;
+        "ai-usage.0.claude": { type: "device" },
+        "ai-usage.0.claude.warning": { type: "state" },
+        "ai-usage.0.total.accounts": { type: "state" },
+      } as never),
+    );
     await internals(adapter).snapshotExistingStates();
+    // Only the STATES count towards the datapoint balance…
     expect([...internals(adapter).knownStateIds]).toEqual(["claude.warning", "total.accounts"]);
+    // …while the cleanup needs the parents too — one read for both.
+    expect([...internals(adapter).existingObjectIds]).toEqual(["claude", "claude.warning", "total.accounts"]);
   });
 });
 

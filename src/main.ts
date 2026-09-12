@@ -64,6 +64,14 @@ export class AiUsageAdapter extends utils.Adapter {
    * snapshot is a real addition (beszel pattern).
    */
   private knownStateIds = new Set<string>();
+  /**
+   * Every object id the adapter already had at startup — states and their parents.
+   *
+   * Read together with {@link knownStateIds} in one pass: the stale-object cleanup
+   * needs the channels and devices too, and used to ask the database a second time
+   * for what the first read had already brought back.
+   */
+  private existingObjectIds = new Set<string>();
   /** Datapoints created since the snapshot. */
   private createdStates = 0;
   /** Datapoints removed since the snapshot. */
@@ -455,7 +463,7 @@ export class AiUsageAdapter extends utils.Adapter {
       }
       const providers = new Map<string, UsageProvider>();
       for (const account of accounts) {
-        const provider = await this.makeProvider(account);
+        const provider = await this.makeProvider(account, interval);
         if (provider) {
           providers.set(account.id, provider);
         }
@@ -539,21 +547,26 @@ export class AiUsageAdapter extends utils.Adapter {
   }
 
   /**
-   * Read every existing state id once, before anything creates or deletes.
+   * Read the adapter's own objects ONCE, before anything creates or deletes.
    *
-   * @returns nothing; fills {@link knownStateIds}
+   * Fills {@link knownStateIds} with the states — the baseline the datapoint
+   * balance is counted against — and keeps the whole map for the stale-object
+   * cleanup, which used to fetch it a second time a moment later.
+   *
+   * @returns nothing; fills {@link knownStateIds} and {@link existingObjectIds}
    */
   private async snapshotExistingStates(): Promise<void> {
     try {
-      const view = await this.getObjectViewAsync("system", "state", {
-        startkey: `${this.namespace}.`,
-        endkey: `${this.namespace}.${SORT_KEY_END}`,
-      });
-      for (const row of view?.rows ?? []) {
-        this.knownStateIds.add(row.id.substring(this.namespace.length + 1));
+      const objects = await this.getAdapterObjectsAsync();
+      for (const [fullId, object] of Object.entries(objects)) {
+        const id = fullId.substring(this.namespace.length + 1);
+        this.existingObjectIds.add(id);
+        if (object?.type === "state") {
+          this.knownStateIds.add(id);
+        }
       }
     } catch (e) {
-      this.log.debug(`Could not snapshot existing states: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.debug(`Could not snapshot existing objects: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -593,14 +606,15 @@ export class AiUsageAdapter extends utils.Adapter {
    * Build the provider for one account.
    *
    * @param account the validated account config
+   * @param intervalSec the poll interval, for providers that pace a secondary call
    * @returns the provider, or undefined to leave the account unpolled
    */
-  private async makeProvider(account: AccountConfig): Promise<UsageProvider | undefined> {
+  private async makeProvider(account: AccountConfig, intervalSec: number): Promise<UsageProvider | undefined> {
     switch (account.provider) {
       case "claude-sub":
         return claudeSubProvider(this.tokenStore(account.provider), postJson);
       case "chatgpt-sub":
-        return chatgptSubProvider(this.tokenStore(account.provider), postJson);
+        return chatgptSubProvider(this.tokenStore(account.provider), postJson, getJson, Date.now, intervalSec);
       case "gemini-sub":
         return geminiSubProvider(this.tokenStore(account.provider), postJson, postForm);
       case "openrouter": {
@@ -702,10 +716,10 @@ export class AiUsageAdapter extends utils.Adapter {
     }
     const keep = new Set([...accounts.map(account => account.id), "info", "total"]);
     try {
-      const objects = await this.getAdapterObjectsAsync();
+      // From the startup snapshot — the same read, not a second one.
       const roots = new Set<string>();
-      for (const id of Object.keys(objects)) {
-        const root = id.substring(this.namespace.length + 1).split(".")[0];
+      for (const id of this.existingObjectIds) {
+        const root = id.split(".")[0];
         if (root && !keep.has(root)) {
           roots.add(root);
         }

@@ -205,6 +205,8 @@ export function parseChatgptResetCredits(body: unknown, nowMs: number): { count:
  * @param postJson the JSON-POST seam (token refresh)
  * @param fetchJson the JSON-GET seam
  * @param now clock (ms)
+ * @param intervalSec the adapter's poll interval — sets how often the voucher
+ *   inventory is asked for (roughly hourly, whatever the user configured)
  * @returns the provider
  */
 export function chatgptSubProvider(
@@ -212,7 +214,11 @@ export function chatgptSubProvider(
   postJson: JsonPost,
   fetchJson: JsonFetch = getJson,
   now: () => number = Date.now,
+  intervalSec = 300,
 ): UsageProvider {
+  // Counts down to the next voucher fetch; 0 means "ask on this round", so the
+  // first round of a process always does.
+  let sinceVouchers = 0;
   return {
     kind: "chatgpt-sub",
     fetch: async (): Promise<UsageSnapshot> => {
@@ -241,6 +247,19 @@ export function chatgptSubProvider(
       // discard the usage snapshot that already succeeded. The datapoints keep
       // their last value in that case (the orphan sweep no longer touches
       // credit values), so a transient miss never makes them come and go.
+      //
+      // Not every cycle. Vouchers are bought and redeemed by hand, so the answer is
+      // near-static, while `/wham/usage` is IP-throttled and this call goes into the
+      // same bucket on the same host — it doubled the requests of every ChatGPT
+      // account for a value that barely moves. Fetched on the first round of the
+      // process and then once an hour, derived from the poll interval so a faster
+      // or slower setting does not change the cadence.
+      const voucherEvery = Math.max(1, Math.round(3600 / Math.max(1, intervalSec)));
+      const due = sinceVouchers <= 0;
+      sinceVouchers = due ? voucherEvery - 1 : sinceVouchers - 1;
+      if (!due) {
+        return snapshot;
+      }
       try {
         const vouchers = parseChatgptResetCredits(
           await fetchJson(CHATGPT_RESET_CREDITS_URL, {

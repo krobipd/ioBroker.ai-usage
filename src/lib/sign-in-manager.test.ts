@@ -1,6 +1,7 @@
 import type { PostOptions } from "./http";
 import type { TokenSet, TokenStore } from "./provider";
 import { SignInManager, type SignInDeps } from "./sign-in-manager";
+import { SIGN_IN_FLOWS } from "./sign-in";
 
 /**
  * A token store that lives in a variable — the adapter owns the real file.
@@ -99,11 +100,12 @@ function makeHarness(): Harness {
 
 describe("which providers sign in", () => {
   test("only the three subscriptions, never a key account", () => {
-    expect(SignInManager.handles("claude-sub")).toBe(true);
-    expect(SignInManager.handles("chatgpt-sub")).toBe(true);
-    expect(SignInManager.handles("gemini-sub")).toBe(true);
-    expect(SignInManager.handles("openrouter")).toBe(false);
-    expect(SignInManager.handles("nonsense")).toBe(false);
+    // Straight at the table the adapter itself reads (`main.ts` → providerFrom).
+    // This used to go through a static helper on the manager that no production
+    // code ever called — a green test about a path the adapter does not take.
+    expect(Object.keys(SIGN_IN_FLOWS).sort()).toEqual(["chatgpt-sub", "claude-sub", "gemini-sub"]);
+    expect(SIGN_IN_FLOWS.openrouter).toBeUndefined();
+    expect(SIGN_IN_FLOWS.nonsense).toBeUndefined();
   });
 });
 

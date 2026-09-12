@@ -140,10 +140,19 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     if (this.unmounted) {
       return;
     }
+    // Re-armed from scratch, so a beat that has just become wrong is dropped: after
+    // starting the device-code flow the pending 30-second timer would otherwise run
+    // out first, and the card needed up to 34 s to show "signed in" — in the one
+    // flow where the user is actively waiting.
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
     const waiting = Object.values(this.state.signIn).some(state => state?.status === "awaiting-device");
     this.timer = setTimeout(
       () => {
-        void this.refreshSignIn().then(() => this.scheduleSignInPoll());
+        // `finally`, not `then`: a single rejection would end the chain for good and
+        // the card would stop refreshing until the page is reloaded.
+        void this.refreshSignIn().finally(() => this.scheduleSignInPoll());
       },
       waiting ? DEVICE_POLL_MS : IDLE_POLL_MS,
     );
@@ -334,11 +343,16 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     // Unlike the background status poll, an explicit click deserves an answer:
     // no answer at all is shown as exactly that, never silently swallowed.
     const shown: SignInState | null = answer ?? { status: "failed", reason: I18n.t("aiu_noAnswer") };
-    this.setState(prev => ({
-      busy: "",
-      signIn: { ...prev.signIn, [provider]: shown },
-      drafts: { ...prev.drafts, [provider]: "" },
-    }));
+    this.setState(
+      prev => ({
+        busy: "",
+        signIn: { ...prev.signIn, [provider]: shown },
+        drafts: { ...prev.drafts, [provider]: "" },
+      }),
+      // The new state decides the beat — a started device-code flow has to be
+      // polled every four seconds, not on the thirty-second timer still pending.
+      () => this.scheduleSignInPoll(),
+    );
   }
 
   /** The current accounts rows from the (unsaved) config data. */

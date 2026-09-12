@@ -74,16 +74,6 @@ export class SignInManager {
   public constructor(private readonly deps: SignInDeps) {}
 
   /**
-   * Whether this provider signs in at all.
-   *
-   * @param provider the provider kind
-   * @returns true for the three subscriptions
-   */
-  public static handles(provider: string): boolean {
-    return SIGN_IN_FLOWS[provider] !== undefined;
-  }
-
-  /**
    * Report whether a provider's stored sign-in was rejected (from the poll engine).
    *
    * @param provider the provider kind

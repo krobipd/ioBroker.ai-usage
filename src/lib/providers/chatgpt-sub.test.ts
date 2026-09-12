@@ -211,6 +211,35 @@ describe("chatgptSubProvider", () => {
     }
   });
 
+  test("the voucher inventory is asked for on the first round and then hourly", async () => {
+    // `/wham/usage` is IP-throttled and this second call goes into the same bucket
+    // on the same host, for a value only bought and redeemed by hand. Every cycle
+    // it doubled the requests of a ChatGPT account for nothing.
+    const urls: string[] = [];
+    const provider = chatgptSubProvider(
+      memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
+      () => Promise.resolve({}),
+      url => {
+        urls.push(url);
+        return Promise.resolve({ rate_limit: { primary_window: { used_percent: 3 } } });
+      },
+      () => 0,
+      300,
+    );
+    const vouchers = (): number => urls.filter(url => url.includes("rate-limit-reset-credits")).length;
+    await provider.fetch();
+    expect(vouchers()).toBe(1);
+    for (let round = 0; round < 11; round++) {
+      await provider.fetch();
+    }
+    expect(vouchers()).toBe(1);
+    // …the twelfth round of a 300 s interval is an hour later.
+    await provider.fetch();
+    expect(vouchers()).toBe(2);
+    // The usage call itself runs every single round.
+    expect(urls.filter(url => url.includes("/wham/usage"))).toHaveLength(13);
+  });
+
   test("a failing voucher call never discards the usage snapshot", async () => {
     const tokens: TokenSet = { accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 };
     const provider = chatgptSubProvider(
