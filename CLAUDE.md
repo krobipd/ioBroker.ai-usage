@@ -386,6 +386,94 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     Cache-Treffer, und der anbieter-spezifische Vorbehalt steht in der Anbietertabelle von
     `docs/{de,en}/README.md`. Nicht erneut vorschlagen.
 
+45. **Anthropic rechnet in CENT** (0.13.0, Nachrecherche zur Audit-Welle): die Referenz des
+    Kosten-Berichts sagt zum Feld `amount` wörtlich „Cost amount in lowest currency units (e.g.
+    cents) as a decimal string. For example, `"123.45"` in `"USD"` represents `$1.23`" — bestätigt
+    in der Anleitungsseite („All costs in USD, reported as decimal strings in lowest units
+    (cents)"). Der Parser summierte und schrieb als USD: **jede Kostenzahl eines
+    Organisationskontos war hundertfach zu hoch**, und über `computeTotals` auch `total.costs.*`.
+    Umgerechnet wird EINMAL auf die Summe, nicht je Posten. **OpenAI ist gegengeprüft und NICHT
+    betroffen** (`amount.value` ist das Geld selbst). Der bestehende Test bestätigte den Fehler —
+    er fütterte Dollar und erwartete Dollar; er füttert jetzt Cent und erwartet dieselben Dollar.
+    Nie an einem echten Organisationskonto geprüft (krobis Prüffläche ist das Claude-Abo) — das
+    steht so im Changelog und in der Anbietertabelle.
+46. **Ein SCHREIB-Fehler ist kein Anbieter-Fehler** (0.13.0): `applySnapshot` lag im selben `try`
+    wie der Abruf, also landete ein abgelehntes `extendObject`/`getObjectViewAsync` in
+    `handleFailure` und wurde `network`. Nur: `failCount` wird vor jedem Abruf genullt, die dritte
+    Strafe kam also nie — das Konto blieb dauerhaft grün, `info.error` leer, der
+    `lastUpdate`-Stempel rückte weiter, und die einzige Spur war eine `debug`-Zeile. Eigener
+    `try/catch`, eigener Zustand `storage-error` (zählt nicht als liefernd), Dedup auf der
+    KATEGORIE (einmal `warn`, danach `debug` — `CLAUDE_CODING.md`). `runtime.status.snapshot` wird
+    erst NACH dem Schreiben gesetzt, sonst rechnen die Summen mit Zahlen, die nie im Baum ankamen.
+    Der Schreibpfad fasst die Datenbank nur an, wenn ein Objekt entstehen muss — neues Fenster,
+    neues Modell, oder die erste Runde nach einem Neustart.
+47. **Entscheidung 32 gilt für JEDEN `await` des Abfragepfads** (0.13.0, die fehlende Hälfte): die
+    Stopp-Prüfung stand nur hinter `provider.fetch()`. Objekte anlegen und Zustands-Ids lesen warten
+    ebenfalls auf die Datenbank, und ein Abschalten, das in dieses Warten fällt, ließ die Runde
+    danach zu Ende laufen — sie schrieb Werte und dann `unreach = false` über den Offline-Stempel,
+    den `markAllOffline()` gerade gesetzt hatte, nachdem der Host schon „fertig" gehört hatte.
+    Geprüft wird jetzt nach der Objekt-Schleife, nach dem Waisen-Aufräumer und nach der Rückkehr
+    aus `applySnapshot`. Die erste der drei verhindert, dass der Aufräumer beim Beenden noch
+    LÖSCHT — das fand erst der Mutationslauf (Nadel A15 überlebte den ersten Durchgang).
+48. **Eine leere Antwort ist kein Aufräum-Auslöser** (0.13.0, Flotten-Regel „Leere API-Listen NICHT
+    als Cleanup-Trigger"): Der Waisen-Aufräumer las „diese Runde lieferte nichts unter `limits`" als
+    „die Fenster sind weg". Gemessen: eine wohlgeformte Antwort ohne bekanntes Feld löschte alle
+    neun Limit-Objekte, setzte `warning`/`limitReached` zurück, `total.maxLimitPercent` von 95 auf
+    0 — und meldete das Konto dabei als einwandfrei. Ein Teilbaum wird jetzt nur gefegt, wenn die
+    Runde über SEINEN Zweig etwas sagt; Entscheidung 15 bleibt sonst unverändert. Die andere Hälfte
+    liegt im Parser: ein Rumpf ohne einen einzigen bekannten Schlüssel ist Drift und damit
+    `service` (Entscheidung 21). Geprüft werden die SCHLÜSSEL, nicht das Ergebnis — ein Konto ohne
+    Nutzung schickt dieselben Schlüssel mit `null`, und das bleibt ein gültiger leerer Schnappschuss.
+    **Ausgenommen:** Gemini (ein leeres `buckets` ist dort nicht eindeutig), OpenRouter und DeepSeek
+    (werfen schon bei fehlender Struktur).
+49. **Der Tagesbericht liefert IMMER** (0.13.0): `snapshot.tokens` wurde nur bei Nutzung gebaut,
+    `snapshot.costs` dagegen immer. Nach UTC-Mitternacht führte der Bericht noch keinen Eimer für
+    heute → der ganze `tokens`/`models`-Block fiel aus der Antwort, die Zähler behielten die Zahl
+    von GESTERN unter einem Namen, der „heute" sagt, und der Waisen-Aufräumer löschte jede Nacht die
+    Modell-Kanäle (drei INFO-Zeilen, danach neu angelegt). Der Block wird jetzt unbedingt gebaut, mit
+    0; die OpenAI-Modellliste kommt aus dem GANZEN Monat (die Abfrage holt ihn ohnehin mit
+    `group_by=model`), der Wert bleibt der von heute. **Das ist NICHT Entscheidung 44** — die hat den
+    NAMEN geschlossen, hier geht es um den WERT.
+50. **Ein Übergang wird nur behauptet, wenn er beobachtet wurde** (0.13.0): Warnschwelle und
+    Sperr-Meldung sind Flanken, und die vorherige Seite lag nur im Speicher. Gemessen mit zwei
+    Engines gegen denselben Zustandsspeicher: ein Konto unverändert bei 85 % erzeugte beim zweiten
+    Start dieselbe Warnung UND dieselbe `userActionRequired`-Benachrichtigung, obwohl sein eigener
+    `warning`-Datenpunkt schon `true` sagte — und ein Konfig-Wechsel startet die Instanz. Der
+    Ausgangswert kommt jetzt aus `<konto>.warning` (ein `getStateAsync` je Konto beim Start; fehlt
+    der Wert, ist er `false` wie bisher). Für `locked` gibt es keine Quelle (Entscheidung 36 gab ihm
+    bewusst keinen Datenpunkt, und `limitReached` ist mehrdeutig) — dort schweigt die erste Runde
+    eines Prozesses, der Zustand selbst stimmt ab der ersten Runde.
+51. **Die Summe kennt das gesperrte Fenster** (0.13.0, Erweiterung von 36): `computeTotals` las nur
+    den Prozentwert, also sagte `total.limitReached` „nein", während das Konto bei 42 % mit
+    `locked_reason` „ja" sagte — zwei Datenpunkte desselben Adapters im Widerspruch. Ausgewertet wird
+    dieselbe `lockedWindows()`, die die Engine benutzt; ein gesperrtes MODELL-Fenster hebt die Summe
+    weiterhin nicht, es sprach nie fürs Konto.
+52. **Indikatoren aus dem Baumbauer gehen über den Vergleichs-Schreibweg** (0.13.0, Erweiterung von
+    13): Die Flotten-Regel („jedes `indicator.*` mit `setStateChangedAsync`") galt überall außer im
+    Baumbauer, der alle seine Writes gleich behandelte — `limits.<fenster>.active` und
+    `credits.available` bekamen in jedem Zyklus einen neuen Zeitstempel auf einem unveränderten
+    Wahrheitswert. Entschieden wird an der ROLLE, die das `ObjectDef` ohnehin trägt
+    (`StateWrite.indicator`). Die 16 Messwerte daneben bleiben beim normalen `setState`.
+53. **Eine verworfene Konto-Zeile wird benannt** (0.13.0): unbekannter Anbieter, keine bildbare Id
+    oder eine Id, die eine andere Zeile schon hat — die Zeile verschwand wortlos, und die Startzeile
+    zählt nur die Überlebenden. Zwei Speicher-Namen können auf dieselbe Id fallen („my key" und
+    „my.key" werden beide `my_key-api`), das sieht kein Nutzer kommen. `parseAccounts` gibt die
+    verworfenen Zeilen mit Grund zurück, `onReady` schreibt je eine `warn`-Zeile. Die
+    Reserve-Prüfung auf `info`/`total` ist mit dem heutigen Id-Schema **unerreichbar** (ein Abo hat
+    eine feste Id, ein Schlüssel-Konto endet immer auf `-api`) — sie bleibt als Wächter und ist im
+    Code als solcher benannt, statt einen Test zu bekommen, der etwas anderes behauptet.
+54. **Das Gutschein-Inventar wird stündlich geholt, nicht je Zyklus** (0.13.0): Gutscheine werden von
+    Hand gekauft und eingelöst, die Antwort ist also nahezu statisch — während `/wham/usage`
+    IP-gedrosselt ist und dieser zweite Aufruf in denselben Eimer auf demselben Host geht. Er lief
+    beim ersten Abruf des Prozesses und danach jeden n-ten, aus dem eingestellten Takt abgeleitet.
+    Bleibt „best effort": sein Fehlschlag verwirft die Hauptantwort weiterhin nicht.
+    ⚠️ **Nicht zu verwechseln mit dem verworfenen Monatsbericht-Puffer:** dort wäre die Anfragezahl
+    GLEICH geblieben (ein Tages-Abruf ist ebenfalls zwei Anfragen), hier wird wirklich eine Anfrage
+    je Zyklus gespart. `limit=31` ist bei beiden Berichts-Anbietern das dokumentierte Maximum für
+    Tages-Eimer, ein Monat passt also in EINE Seite — Entscheidung 26 ist damit mit den Zahlen des
+    Anbieters bestätigt, und Anthropic erlaubt ausdrücklich „polling once per minute for sustained
+    use". Der Puffer ist gemessen verworfen; nicht erneut vorschlagen.
+
 ## Tests
 
 ```
