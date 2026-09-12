@@ -151,7 +151,7 @@ so instead of pretending to be connected; signing in again is all it takes.
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 0.13.0 (2026-09-12)
 
 - Fixed: The costs of an Anthropic organisation account were a hundred times too high — the provider counts them in cents, the adapter read them as dollars
 - Fixed: The same error was in the adapter-wide cost totals
@@ -166,6 +166,7 @@ so instead of pretending to be connected; signing in again is all it takes.
 - Improved: The "active window" and DeepSeek "available" flags are written only when they actually change, so their timestamp stops moving on every poll
 - Improved: The ChatGPT voucher inventory is fetched about once an hour instead of every poll, halving that account's requests
 - Improved: The settings page shows a finished device-code sign-in right away instead of up to half a minute later
+- Improved: The provider table now says that Anthropic's cost report leaves out Priority Tier spend, so an organisation on that tier really spends more than the figures show
 
 ### 0.12.1 (2026-09-07)
 
@@ -211,10 +212,6 @@ so instead of pretending to be connected; signing in again is all it takes.
 - Changed: New Claude sign-ins request only the profile permission — the stored access can no longer create API keys or run models
 - New: ChatGPT accounts show their purchasable limit-reset credits — how many are available and when the next one expires
 - Improved: An unreadable provider answer is now reported as a service fault instead of a missing connection
-
-### 0.9.3 (2026-08-27)
-
-- Fixed: The first start after updating no longer leaves a warning in the log
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

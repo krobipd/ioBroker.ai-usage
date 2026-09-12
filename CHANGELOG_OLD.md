@@ -1,6 +1,10 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.9.3 (2026-08-27)
+
+- Fixed: The first start after updating no longer leaves a warning in the log
+
 ## 0.9.2 (2026-08-27)
 
 - Fixed: Stopping the instance now marks the accounts as offline on installations that were updated too, not only on fresh ones — the previous version left them showing as online

@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.12.1",
+    "version": "0.13.0",
     "news": {
-      "NEXT": {
+      "0.13.0": {
         "en": "Costs of an Anthropic organisation account were a hundred times too high, an account whose values cannot be stored no longer claims to deliver, and an empty answer no longer deletes datapoints.",
         "de": "Anthropic-Organisationskosten waren hundertfach zu hoch, ein Konto ohne speicherbare Werte meldet sich nicht mehr als liefernd, und eine leere Antwort löscht keine Datenpunkte mehr.",
         "ru": "Расходы организации Anthropic были завышены в сто раз, аккаунт без сохраняемых значений больше не считается работающим, а пустой ответ больше не удаляет точки данных.",
