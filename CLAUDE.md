@@ -397,6 +397,18 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     er fütterte Dollar und erwartete Dollar; er füttert jetzt Cent und erwartet dieselben Dollar.
     Nie an einem echten Organisationskonto geprüft (krobis Prüffläche ist das Claude-Abo) — das
     steht so im Changelog und in der Anbietertabelle.
+    **Gegenprobe an fremden Implementierungen (2026-09-12), weil die Doku-Zeile allein den Fix
+    trägt:** zwei unabhängige Leser desselben Endpunkts teilen ebenfalls durch 100 —
+    `akitaonrails/ai-usagebar` (`src/anthropic_api/types.rs`: `Ok(cents / 100.0)`, mit Test
+    „100,0 + 34,5 Cent = $1,345") und `openclaw/openclaw` (`extensions/anthropic/usage.ts`:
+    `(parseProviderUsageNumber(result?.amount) ?? 0) / 100`). Keine Implementierung liest das
+    Feld als Dollar.
+    **Dieselbe Doku-Seite nennt eine ECHTE Unvollständigkeit der Zahl** (Warnkasten + FAQ):
+    „Priority Tier costs use a different billing model and are not included in the cost
+    endpoint." Eine Organisation auf dieser Abrechnungsstufe gibt also mehr aus, als
+    `costs.month`/`costs.today` melden — der Adapter kann das nicht sehen und sagt es deshalb in
+    der Anbietertabelle von `docs/{de,en}/README.md`. Dort bestätigt sich auch Entscheidung 26:
+    `1d` hat „Default limit 7 buckets, Maximum limit 31 buckets".
 46. **Ein SCHREIB-Fehler ist kein Anbieter-Fehler** (0.13.0): `applySnapshot` lag im selben `try`
     wie der Abruf, also landete ein abgelehntes `extendObject`/`getObjectViewAsync` in
     `handleFailure` und wurde `network`. Nur: `failCount` wird vor jedem Abruf genullt, die dritte
