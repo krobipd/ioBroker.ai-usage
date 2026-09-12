@@ -199,9 +199,11 @@ jobs:
     steps:
       - uses: ioBroker/testing-action-deploy@v1
         with:
-          # Node 24 avoids npm@latest+Node22 MODULE_NOT_FOUND for promise-retry
-          # during the publish step (seen in parcelapp v0.4.0 deploy).
-          node-version: "24.x"
+          # Any major above 22 avoids the npm@latest+Node22 MODULE_NOT_FOUND for
+          # promise-retry during the publish step (seen in parcelapp v0.4.0 deploy).
+          # The value follows the highest even major of the test matrix — odd majors
+          # never become LTS, so the publish must not drift onto one.
+          node-version: "26.x"
           build: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           sentry: true
