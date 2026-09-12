@@ -483,7 +483,13 @@ export class PollEngine {
       return;
     }
     for (const write of writes) {
-      this.deps.setState(write.id, write.value);
+      // Indicators through the comparing write, measurements through the plain one
+      // — the fleet rule, decided at the ROLE the tree builder already carries.
+      if (write.indicator) {
+        void this.deps.setStateChanged(write.id, write.value);
+      } else {
+        this.deps.setState(write.id, write.value);
+      }
     }
     await this.removeVanished(
       runtime,

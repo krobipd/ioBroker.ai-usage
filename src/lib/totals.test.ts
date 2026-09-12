@@ -46,6 +46,40 @@ describe("computeTotals", () => {
     expect(totals.limitReached).toBe(true);
   });
 
+  test("a window the provider LOCKED lifts the sum as well", () => {
+    // Decision 36 on both levels. Reading the percentage alone the sum said "no
+    // limit reached" while the account's own limitReached said true at 42 % — two
+    // datapoints of one adapter contradicting each other about the same fact.
+    const snapshot = {
+      limits: [
+        {
+          name: "session",
+          label: "Session (5 h)",
+          labelKey: "nameWindowSession",
+          percent: 42,
+          lockedReason: "usage_limit_reached",
+        },
+      ],
+    };
+    expect(computeTotals([{ snapshot, reachable: true, warning: false }], 1).limitReached).toBe(true);
+  });
+
+  test("a locked MODEL window does not lift the sum — it never spoke for the account", () => {
+    const snapshot = {
+      limits: [
+        {
+          name: "fable",
+          label: "Week (Fable)",
+          labelKey: "nameWindowModelWeek",
+          percent: 42,
+          scoped: true,
+          lockedReason: "usage_limit_reached",
+        },
+      ],
+    };
+    expect(computeTotals([{ snapshot, reachable: true, warning: false }], 1).limitReached).toBe(false);
+  });
+
   test("foreign currencies and piece-credits stay out of the money sums", () => {
     const totals = computeTotals(
       [

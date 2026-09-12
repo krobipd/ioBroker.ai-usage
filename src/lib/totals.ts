@@ -1,6 +1,6 @@
 import type { UsageSnapshot } from "./provider";
 import { round2 } from "./pure-helpers";
-import { maxLimitPercent } from "./snapshot-tree";
+import { lockedWindows, maxLimitPercent } from "./snapshot-tree";
 
 /** One account's contribution to the totals. */
 export interface AccountStatus {
@@ -81,6 +81,14 @@ export function computeTotals(statuses: readonly AccountStatus[], configured: nu
       if (percent >= 100) {
         limitReached = true;
       }
+    }
+    // A window the provider CLOSED counts here exactly as it does per account
+    // (decision 36 — `locked_reason` is the honest signal, the percentage only
+    // implies it). Reading the percentage alone, the sum said "no limit reached"
+    // while the account's own `limitReached` said true at 42 % — two datapoints of
+    // one adapter contradicting each other about the same fact.
+    if (lockedWindows(snapshot).length > 0) {
+      limitReached = true;
     }
   }
   return {

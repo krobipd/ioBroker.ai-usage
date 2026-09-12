@@ -854,6 +854,28 @@ describe("PollEngine", () => {
     expect(warnings.some(w => w.includes("locked by the provider"))).toBe(true);
   });
 
+  test("an indicator from the tree builder goes through the changed-write", async () => {
+    // The fleet rule is "every indicator.* through setStateChangedAsync". The two
+    // indicators the tree builder produces — a window's `active` flag and DeepSeek's
+    // `available` — went through the unconditional write, putting a new timestamp on
+    // an unchanged boolean every cycle. The measurements around them do not change.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      {
+        limits: [{ name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 61 }],
+        available: true,
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "d", name: "D" })], new Map([["d", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.changedWrites).toContain("d.limits.week.active");
+    expect(h.changedWrites).toContain("d.credits.available");
+    // …and the measurements stay on the plain write.
+    expect(h.changedWrites).not.toContain("d.limits.week.percent");
+    expect(h.states.get("d.limits.week.percent")).toBe(61);
+  });
+
   test("a restart above the threshold does not warn or notify again", async () => {
     // Measured with two engines against the same state store: the transition lived
     // in memory only, so every start of the instance looked like a fresh crossing

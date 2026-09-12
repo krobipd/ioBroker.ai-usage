@@ -284,9 +284,9 @@ describe("which window is in force", () => {
         },
       ],
     });
-    expect(writes).toContainEqual({ id: "claude.limits.session.active", value: false });
-    expect(writes).toContainEqual({ id: "claude.limits.week.active", value: false });
-    expect(writes).toContainEqual({ id: "claude.limits.weekly_scoped-Fable.active", value: true });
+    expect(writes).toContainEqual({ id: "claude.limits.session.active", value: false, indicator: true });
+    expect(writes).toContainEqual({ id: "claude.limits.week.active", value: false, indicator: true });
+    expect(writes).toContainEqual({ id: "claude.limits.weekly_scoped-Fable.active", value: true, indicator: true });
   });
 
   test("without a mark the window that speaks for the account is the one in force", () => {
@@ -298,8 +298,8 @@ describe("which window is in force", () => {
         { name: "week", label: "Week", labelKey: "nameWindowWeekShort", percent: 61 },
       ],
     });
-    expect(writes).toContainEqual({ id: "chatgpt.limits.session.active", value: false });
-    expect(writes).toContainEqual({ id: "chatgpt.limits.week.active", value: true });
+    expect(writes).toContainEqual({ id: "chatgpt.limits.session.active", value: false, indicator: true });
+    expect(writes).toContainEqual({ id: "chatgpt.limits.week.active", value: true, indicator: true });
   });
 
   test("a model window is never in force while a plan-wide one exists", () => {
@@ -309,8 +309,8 @@ describe("which window is in force", () => {
         { name: "pro", label: "pro", labelKey: "nameWindowQuota", percent: 100, scoped: true },
       ],
     });
-    expect(writes).toContainEqual({ id: "gemini.limits.pro.active", value: false });
-    expect(writes).toContainEqual({ id: "gemini.limits.week.active", value: true });
+    expect(writes).toContainEqual({ id: "gemini.limits.pro.active", value: false, indicator: true });
+    expect(writes).toContainEqual({ id: "gemini.limits.week.active", value: true, indicator: true });
   });
 
   test("the flag is a read-only indicator", () => {

@@ -61,6 +61,18 @@ export interface StateWrite {
   id: string;
   /** The value. */
   value: boolean | number | string;
+  /**
+   * True for a state whose role is `indicator` — it goes through the comparing
+   * write, like every other indicator of the fleet.
+   *
+   * The rule ("state datapoints with `setStateChangedAsync`, measurements with
+   * `setState`") existed, but the two indicators built here — a window's `active`
+   * flag and DeepSeek's `available` — came out of the tree builder, where every
+   * write was treated the same. Written unconditionally they put a new timestamp
+   * on an unchanged boolean in every cycle, which is a history entry per poll and
+   * buries the one real switch.
+   */
+  indicator?: true;
 }
 
 /**
@@ -88,6 +100,7 @@ function state(
   if (unit !== undefined) {
     common.unit = unit;
   }
+  const write: StateWrite = role === "indicator" ? { id, value, indicator: true } : { id, value };
   // Only where there is something to explain. A description that repeats the name
   // is worse than none (fleet standard). Since the D08 gate (2026-09-07) EVERY
   // datapoint is decided: it carries a `desc` or stands in test/self-explaining.json
@@ -95,7 +108,7 @@ function state(
   if (desc !== undefined) {
     common.desc = desc;
   }
-  return { def: { id, type: "state", common }, write: { id, value } };
+  return { def: { id, type: "state", common }, write };
 }
 
 /** What speaks for an account: a percentage, its label, and the window it came from. */
