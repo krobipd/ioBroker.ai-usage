@@ -241,9 +241,10 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     und die Engine sind reine Module, die die Tests ohne all das fahren. `src/lib/i18n.ts` liest die
     elf Dateien deshalb selbst; sein einziger Mehrwert wäre die Sprachwahl gewesen — genau der
     Schritt, der hier nicht passieren darf. Fehlt ein Schlüssel, steht er als Name im Baum: sichtbar
-    und greppbar, statt leer. Umfang: 49 Schlüssel × 11 Sprachen, gegengeprüft von
-    `i18n.test.ts` (jede Sprache dieselben Schlüssel, `%s` überall gleich oft, und jeder im
-    Quelltext benutzte Schlüssel existiert).
+    und greppbar, statt leer. Umfang: 81 Schlüssel × 11 Sprachen (49 Namen zum Zeitpunkt von
+    0.11.0, dazu die `desc`-Schlüssel der D08-Welle — die Zahl wächst mit dem Baum, maßgeblich ist
+    `admin/i18n/en.json`), gegengeprüft von `i18n.test.ts` (jede Sprache dieselben Schlüssel, `%s`
+    überall gleich oft, und jeder im Quelltext benutzte Schlüssel existiert).
 24. **Die drei Manifest-Objekte werden im `onReady` per `extendObject` erneuert** (0.11.0):
     js-controller wendet `instanceObjects` selbst an, aber mit `preserve` auf `common.name` — eine
     UMBENENNUNG erreicht sonst nur neue Anlagen, während Manifest und Namens-Gate grün aussehen.
