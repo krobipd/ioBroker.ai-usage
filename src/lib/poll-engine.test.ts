@@ -44,6 +44,12 @@ interface Harness {
   authStates: { accountId: string; rejected: boolean }[];
   /** How many repeating timers are armed right now. */
   intervalCount(): number;
+  /** Every warning the engine logged, in order. */
+  warnings: string[];
+  /** While set, the object database rejects every upsert with this message. */
+  rejectUpserts: { message: string } | null;
+  /** Make the NEXT upsert wait; returns the function that lets it through. */
+  holdNextUpsert(): () => void;
   /** Fire every scheduled one-shot immediately queued and each interval once. */
   tick(): Promise<void>;
   clock: { now: number };
@@ -61,11 +67,26 @@ function makeHarness(): Harness {
   const pending: (() => void)[] = [];
   const intervals: (() => void)[] = [];
   const clock = { now: 1_000_000 };
+  const warnings: string[] = [];
+  const control: { rejectUpserts: { message: string } | null; hold: boolean; release: (() => void) | null } = {
+    rejectUpserts: null,
+    hold: false,
+    release: null,
+  };
   const deps: EngineDeps = {
-    upsertObject: def => {
+    upsertObject: async def => {
+      if (control.hold) {
+        // One-shot: only the NEXT upsert waits, so the round can finish after release.
+        control.hold = false;
+        await new Promise<void>(resolve => {
+          control.release = resolve;
+        });
+      }
+      if (control.rejectUpserts) {
+        throw new Error(control.rejectUpserts.message);
+      }
       objects.push(def.id);
       upserted.set(def.id, def);
-      return Promise.resolve();
     },
     deleteObject: id => {
       deleted.push(id);
@@ -88,7 +109,7 @@ function makeHarness(): Harness {
     },
     cancel: () => undefined,
     now: () => clock.now,
-    log: { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined },
+    log: { debug: () => undefined, info: () => undefined, warn: m => void warnings.push(m), error: () => undefined },
     notify: (_account, message) => void notifications.push(message),
     authState: (accountId, rejected) => void authStates.push({ accountId, rejected }),
   };
@@ -103,6 +124,17 @@ function makeHarness(): Harness {
     notifications,
     authStates,
     clock,
+    warnings,
+    get rejectUpserts() {
+      return control.rejectUpserts;
+    },
+    set rejectUpserts(value) {
+      control.rejectUpserts = value;
+    },
+    holdNextUpsert: () => {
+      control.hold = true;
+      return () => control.release?.();
+    },
     intervalCount: () => intervals.length,
     tick: async () => {
       // First tick(s) drain the staggered one-shots; afterwards each tick is one interval round.
@@ -848,5 +880,107 @@ describe("PollEngine", () => {
     );
     await engine.start();
     expect(h.upserted.get("claude")?.common.name).toBe("Claude Max (Claude)");
+  });
+
+  test("a rejected object write is not a provider failure — the account stops claiming to deliver", async () => {
+    const h = makeHarness();
+    const snapshot: UsageSnapshot = {
+      limits: [{ name: "session", labelKey: "nameWindowSession", label: "Session", percent: 12 }],
+    };
+    const provider = scriptedProvider([snapshot, snapshot, snapshot, snapshot]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    // The database starts refusing AFTER the skeleton is in place.
+    h.rejectUpserts = { message: "Objects DB timeout" };
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(h.states.get("a.info.error")).toContain("object database");
+    expect(h.states.get("total.accountsReachable")).toBe(0);
+    // Filed as a network failure it would have needed three strikes it can never
+    // reach, because the counter is reset before every fetch.
+    await h.tick();
+    await h.tick();
+    expect(h.states.get("a.info.unreach")).toBe(true);
+  });
+
+  test("a storage failure warns once and then goes quiet", async () => {
+    const h = makeHarness();
+    const snapshot: UsageSnapshot = { credits: { remaining: 5, currency: "USD" } };
+    const provider = scriptedProvider([snapshot, snapshot, snapshot]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    h.rejectUpserts = { message: "Objects DB timeout" };
+    await h.tick();
+    await h.tick();
+    await h.tick();
+    expect(h.warnings.filter(line => line.includes("could not be stored"))).toHaveLength(1);
+  });
+
+  test("the last-update stamp does not move when nothing was written", async () => {
+    const h = makeHarness();
+    // The second round brings a window the account did not have — that is when the
+    // write path touches the object database again on an established account.
+    const provider = scriptedProvider([
+      { limits: [{ name: "session", labelKey: "nameWindowSession", label: "Session", percent: 12 }] },
+      {
+        limits: [
+          { name: "session", labelKey: "nameWindowSession", label: "Session", percent: 12 },
+          { name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 30 },
+        ],
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    const stamped = h.states.get("a.info.lastUpdate");
+    expect(stamped).toBeDefined();
+    h.rejectUpserts = { message: "Objects DB timeout" };
+    h.clock.now += 600_000;
+    await h.tick();
+    expect(h.states.get("a.info.lastUpdate")).toBe(stamped);
+  });
+
+  test("the totals do not run ahead of a tree that was never written", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { limits: [{ name: "session", labelKey: "nameWindowSession", label: "Session", percent: 10 }] },
+      {
+        limits: [
+          { name: "session", labelKey: "nameWindowSession", label: "Session", percent: 90 },
+          { name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 20 },
+        ],
+      },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("total.maxLimitPercent")).toBe(10);
+    h.rejectUpserts = { message: "Objects DB timeout" };
+    await h.tick();
+    // The second snapshot never reached the tree, so the sum must not report it.
+    expect(h.states.get("total.maxLimitPercent")).toBe(10);
+  });
+
+  test("a write waiting on the object database writes nothing after the shutdown", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { limits: [{ name: "session", labelKey: "nameWindowSession", label: "Session", percent: 42 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    const release = h.holdNextUpsert();
+    await h.tick(); // the round is now stuck inside applySnapshot
+    // onUnload: cancel the timers, then say that nothing delivers any more.
+    engine.stop();
+    await engine.markAllOffline();
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(h.states.get("info.connection")).toBe(false);
+    // …and only now does the object database answer. The host has already been told.
+    release();
+    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
+    expect(h.states.get("a.info.unreach")).toBe(true);
+    expect(h.states.get("info.connection")).toBe(false);
+    expect(h.states.get("total.accountsReachable")).toBe(0);
   });
 });

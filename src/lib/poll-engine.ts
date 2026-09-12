@@ -11,8 +11,15 @@ import { computeTotals, type AccountStatus } from "./totals";
  * `ok` and `rate-limited` mean the AI service is up and talking to us,
  * `unauthorized` means it is up but rejects our sign-in, `service-down` means the
  * service itself answered with a fault, `no-connection` means we never reached it.
+ *
+ * `storage-error` is about OUR side: the numbers arrived, the object database did
+ * not take them. It has to stay apart from the four above — run together with
+ * `network` (which is what a rejected `extendObject` used to become) the account
+ * kept claiming to deliver, because the network counter is reset before every
+ * fetch and therefore never reached its third strike.
  */
-export type AccountState = "ok" | "unauthorized" | "rate-limited" | "service-down" | "no-connection" | "not-signed-in";
+export type AccountState =
+  "ok" | "unauthorized" | "rate-limited" | "service-down" | "no-connection" | "not-signed-in" | "storage-error";
 
 /**
  * Whether an account is delivering usable numbers right now.
@@ -130,6 +137,12 @@ interface AccountRuntime {
   backoffMs: number;
   /** Whether the auth-broken notification has been raised (reset on success). */
   authNotified: boolean;
+  /**
+   * Whether the last write of a fetched snapshot was rejected by the object
+   * database — carries the log de-duplication (warn once, debug on repeat; the
+   * fleet keys such a guard on the CATEGORY, not on the message).
+   */
+  storageFailed: boolean;
   /** Whether the last query was rejected as unauthorized — reported to the sign-in card. */
   authRejected: boolean;
   /** Whether a plan-wide window was reported as CLOSED by the provider on the last answer. */
@@ -206,6 +219,7 @@ export class PollEngine {
         backoffMs: BACKOFF_START_MS,
         authNotified: false,
         authRejected: false,
+        storageFailed: false,
         serviceOnline: false,
         state: provider ? "no-connection" : "not-signed-in",
         // Nothing known until the service says something; the skeleton writes
@@ -364,8 +378,9 @@ export class PollEngine {
       return;
     }
     const wasFailing = runtime.state !== "ok";
+    let fetched: UsageSnapshot | undefined;
     try {
-      const snapshot = await (runtime.provider as UsageProvider).fetch();
+      fetched = await (runtime.provider as UsageProvider).fetch();
       // The answer can arrive AFTER onUnload: `stop()` cancels the timers, it
       // cannot cancel a request already in flight. Writing now would undo
       // `markAllOffline()` and leave a stopped adapter claiming the account is
@@ -376,7 +391,6 @@ export class PollEngine {
       runtime.failCount = 0;
       runtime.backoffMs = BACKOFF_START_MS;
       runtime.authNotified = false;
-      runtime.status.snapshot = snapshot;
       runtime.serviceOnline = true;
       runtime.state = "ok";
       runtime.error = "";
@@ -384,17 +398,39 @@ export class PollEngine {
         runtime.authRejected = false;
         this.deps.authState?.(config.id, false);
       }
-      if (wasFailing) {
-        // The failure said so in the log; the recovery has to as well, or the
-        // last word on this account stays a warning that is no longer true.
-        this.deps.log.info(`${config.name}: delivering again`);
-      }
-      await this.applySnapshot(runtime, snapshot);
     } catch (e) {
       if (this.stopped) {
         return;
       }
       this.handleFailure(runtime, e);
+    }
+    if (fetched !== undefined) {
+      // The WRITE path has its own guard. Inside the fetch `try` a rejected
+      // `extendObject` or `getObjectViewAsync` arrived at `handleFailure` and was
+      // filed as a network error — but `failCount` is reset above before every
+      // fetch, so the third strike never came: the account stayed green, the
+      // last-update stamp kept moving, and the only trace was a debug line.
+      try {
+        await this.applySnapshot(runtime, fetched);
+        if (this.stopped) {
+          return;
+        }
+        // Only now: the totals must not run ahead of the tree they claim to sum.
+        runtime.status.snapshot = fetched;
+        runtime.storageFailed = false;
+        if (wasFailing) {
+          // The failure said so in the log; the recovery has to as well, or the
+          // last word on this account stays a warning that is no longer true.
+          // It belongs here, not next to the fetch: "delivering again" means the
+          // values reached the tree, not that the request came back.
+          this.deps.log.info(`${config.name}: delivering again`);
+        }
+      } catch (e) {
+        if (this.stopped) {
+          return;
+        }
+        this.handleStorageFailure(runtime, e);
+      }
     }
     runtime.status.reachable = isDelivering(runtime.state);
     this.writeAccountInfo(runtime);
@@ -428,6 +464,14 @@ export class PollEngine {
         runtime.createdObjects.add(object.id);
       }
     }
+    // Decision 32 applies to EVERY await of the poll path, not only to the fetch.
+    // Creating the objects waits on the database, and a shutdown that lands in
+    // that wait used to let the round run to its end afterwards — writing values
+    // and then `unreach = false` on top of the offline stamp `markAllOffline()`
+    // had already set, after the host had been told the adapter was done.
+    if (this.stopped) {
+      return;
+    }
     for (const write of writes) {
       this.deps.setState(write.id, write.value);
     }
@@ -435,6 +479,9 @@ export class PollEngine {
       runtime,
       writes.map(write => write.id),
     );
+    if (this.stopped) {
+      return;
+    }
     // Only PLAN-WIDE windows speak for the account — a per-model bucket at 100 %
     // must not read as "this AI is full" (krobi 2026-08-26, again 2026-09-06:
     // "fable 100% ist das fable limit, aber weder das 5h stunden limit noch das
@@ -481,6 +528,34 @@ export class PollEngine {
       this.deps.log.info(`${runtime.config.name}: removed "${id}" — the provider no longer reports it`);
     }
     runtime.deliveredIds = delivered;
+  }
+
+  /**
+   * The numbers arrived, the object database did not take them.
+   *
+   * Not a provider failure: the service answered, so `serviceOnline` stays true and
+   * the network counter is untouched. What is broken is our own side, and the
+   * account is not delivering while it lasts — the tree is frozen on old values.
+   *
+   * The log is de-duplicated on the CATEGORY, not on the message (fleet rule): one
+   * warn naming the likely cause, debug for every repeat. A database that stays
+   * down would otherwise write a warning every poll interval.
+   *
+   * @param runtime the account's runtime
+   * @param error the thrown error
+   */
+  private handleStorageFailure(runtime: AccountRuntime, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    runtime.state = "storage-error";
+    runtime.error = `Values fetched but not stored — the object database rejected the write (${message})`;
+    if (runtime.storageFailed) {
+      this.deps.log.debug(`${runtime.config.name}: the object database still rejects the write (${message})`);
+      return;
+    }
+    runtime.storageFailed = true;
+    this.deps.log.warn(
+      `${runtime.config.name}: the values were fetched but could not be stored — the object database rejected the write (${message})`,
+    );
   }
 
   /**
