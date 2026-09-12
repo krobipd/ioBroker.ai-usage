@@ -94,6 +94,12 @@ interface Internals {
   logDatapointBalance(): void;
   knownStateIds: Set<string>;
   existingObjectIds: Set<string>;
+  makeProvider(
+    account: { provider: string; name: string; credentialId: string },
+    intervalSec: number,
+  ): Promise<{ kind: string } | undefined>;
+  resolveKey(account: { name: string; credentialId: string }): Promise<string | undefined>;
+  engine: { deps?: unknown } | null;
   signIn: { state(provider: string): Promise<{ status: string; reason?: string }> };
   onUnload(cb: () => void): void;
 }
@@ -550,5 +556,107 @@ describe("shutdown", () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     expect(done).toHaveBeenCalledTimes(1);
     expect(adapter.log.debug).toHaveBeenCalledWith(expect.stringContaining("rejected"));
+  });
+});
+
+describe("building a provider for every account kind", () => {
+  // Seven kinds, one contract. The wiring itself had no test: a kind that fell out
+  // of the switch would simply leave its account unpolled, and the skeleton around
+  // it still looks healthy.
+  const kinds = [
+    "claude-sub",
+    "chatgpt-sub",
+    "gemini-sub",
+    "openrouter",
+    "deepseek",
+    "openai",
+    "anthropic-api",
+  ] as const;
+
+  for (const kind of kinds) {
+    test(`${kind} gets a provider of its own kind`, async () => {
+      const adapter = makeAdapter();
+      const provider = await internals(adapter).makeProvider(
+        { provider: kind, name: kind, credentialId: "system.credentials.x" },
+        300,
+      );
+      expect(provider?.kind).toBe(kind);
+    });
+  }
+});
+
+describe("resolving a stored key", () => {
+  test("no credential picked: the account stays unpolled and the reason is named", async () => {
+    const adapter = makeAdapter();
+    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "" });
+    expect(key).toBeUndefined();
+    expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("no credential selected"));
+  });
+
+  test("a credential without a key is named too, not silently skipped", async () => {
+    const adapter = makeAdapter();
+    const core = (await import("@iobroker/adapter-core")) as unknown as {
+      Credentials: { getCredentials: ReturnType<typeof vi.fn> };
+    };
+    core.Credentials.getCredentials = vi.fn(() => Promise.resolve({ values: {} }));
+    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
+    expect(key).toBeUndefined();
+    expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("carries no API key"));
+  });
+
+  test("an unreadable credential does not take the startup down", async () => {
+    const adapter = makeAdapter();
+    const core = (await import("@iobroker/adapter-core")) as unknown as {
+      Credentials: { getCredentials: ReturnType<typeof vi.fn> };
+    };
+    core.Credentials.getCredentials = vi.fn(() => Promise.reject(new Error("storage locked")));
+    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
+    expect(key).toBeUndefined();
+    expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("storage locked"));
+    core.Credentials.getCredentials = vi.fn(() => Promise.resolve({ values: { key: "k" } }));
+  });
+
+  test("a usable credential comes back as the key itself", async () => {
+    const adapter = makeAdapter();
+    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
+    expect(key).toBe("k");
+  });
+});
+
+describe("discarded account rows reach the log", () => {
+  test("a row the parser cannot use is named at startup", async () => {
+    const adapter = makeAdapter();
+    adapter.config = {
+      accounts: [
+        { name: "Good", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 },
+        { name: "Broken", provider: "not-a-provider", credentialId: "system.credentials.x", warnThreshold: 80 },
+      ],
+      pollInterval: 300,
+      notifications: true,
+    };
+    await (adapter as unknown as { onReady(): Promise<void> }).onReady();
+    expect(adapter.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Account row "Broken" is not being monitored'),
+    );
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("the notification seam is wired only when the user asked for notifications", async () => {
+    // `notify` is optional on purpose: switched off, the engine must not even be
+    // handed a callback, or a threshold crossing would still reach the user.
+    const withNotifications = makeAdapter();
+    withNotifications.config = { accounts: [], pollInterval: 300, notifications: true };
+    await (withNotifications as unknown as { onReady(): Promise<void> }).onReady();
+
+    const adapter = makeAdapter();
+    adapter.config = {
+      accounts: [{ name: "Router", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 }],
+      pollInterval: 300,
+      notifications: false,
+    };
+    await (adapter as unknown as { onReady(): Promise<void> }).onReady();
+    const deps = (internals(adapter).engine as unknown as { deps: { notify?: unknown } }).deps;
+    expect(deps.notify).toBeUndefined();
+    internals(adapter).onUnload(() => undefined);
   });
 });
