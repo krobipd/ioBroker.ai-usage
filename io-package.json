@@ -3,6 +3,19 @@
     "name": "ai-usage",
     "version": "0.12.1",
     "news": {
+      "NEXT": {
+        "en": "Costs of an Anthropic organisation account were a hundred times too high, an account whose values cannot be stored no longer claims to deliver, and an empty answer no longer deletes datapoints.",
+        "de": "Anthropic-Organisationskosten waren hundertfach zu hoch, ein Konto ohne speicherbare Werte meldet sich nicht mehr als liefernd, und eine leere Antwort löscht keine Datenpunkte mehr.",
+        "ru": "Расходы организации Anthropic были завышены в сто раз, аккаунт без сохраняемых значений больше не считается работающим, а пустой ответ больше не удаляет точки данных.",
+        "pt": "Os custos de uma organização Anthropic eram cem vezes maiores, uma conta sem valores guardáveis deixa de se declarar operacional, e uma resposta vazia já não apaga pontos de dados.",
+        "nl": "Kosten van een Anthropic-organisatie waren honderd keer te hoog, een account zonder opslagbare waarden meldt zich niet meer als leverend, en een leeg antwoord verwijdert geen datapunten meer.",
+        "fr": "Les coûts d'une organisation Anthropic étaient cent fois trop élevés, un compte sans valeurs enregistrables ne se déclare plus fonctionnel, et une réponse vide ne supprime plus de points de donnée.",
+        "it": "I costi di un'organizzazione Anthropic erano cento volte troppo alti, un account senza valori salvabili non si dichiara più operativo, e una risposta vuota non cancella più datapoint.",
+        "es": "Los costes de una organización de Anthropic eran cien veces mayores, una cuenta sin valores guardables ya no se declara operativa, y una respuesta vacía ya no borra puntos de datos.",
+        "pl": "Koszty organizacji Anthropic były stukrotnie zawyżone, konto bez zapisywalnych wartości nie zgłasza się już jako działające, a pusta odpowiedź nie usuwa już punktów danych.",
+        "uk": "Витрати організації Anthropic були завищені в сто разів, обліковий запис без збережуваних значень більше не вважається робочим, а порожня відповідь більше не видаляє точки даних.",
+        "zh-cn": "Anthropic 组织账户费用曾高出一百倍；数值无法写入的账户不再自称正常供数；空响应也不再删除数据点。"
+      },
       "0.12.1": {
         "en": "The last-update stamp no longer moves forward while the provider is only throttling, and twenty-five more datapoints explain themselves in the object tree.",
         "de": "Der Stempel der letzten Aktualisierung rückt nicht mehr vor, solange der Anbieter nur drosselt, und fünfundzwanzig weitere Datenpunkte erklären sich im Objektbaum selbst.",
@@ -80,19 +93,6 @@
         "pl": "Zatrzymanie instancji oznacza teraz konta jako offline także na zaktualizowanych instalacjach, nie tylko na nowych — wcześniej pozostawały online",
         "uk": "Зупинка екземпляра тепер позначає облікові записи офлайн і на оновлених інсталяціях, а не лише на нових — раніше вони лишалися онлайн",
         "zh-cn": "停止实例现在在已更新的安装上也会把账户标记为离线，而不只是全新安装——此前它们仍显示为在线"
-      },
-      "0.9.1": {
-        "en": "While an account has nothing to report — adapter off, or started and not asked yet — the reason now reads \"Unknown\" instead of a sentence about the adapter",
-        "de": "Solange ein Konto nichts zu melden hat — Adapter aus oder gestartet und noch nichts gefragt — steht als Grund jetzt „Unknown\" statt eines Satzes über den Adapter",
-        "ru": "Пока по аккаунту нечего сообщить — адаптер выключен или запущен и ещё не опрошен — в причине теперь стоит «Unknown» вместо фразы про адаптер",
-        "pt": "Enquanto uma conta não tem nada a comunicar — adaptador desligado ou iniciado e ainda sem consulta — o motivo passa a ser \"Unknown\" em vez de uma frase sobre o adaptador",
-        "nl": "Zolang een account niets te melden heeft — adapter uit of gestart en nog niets opgevraagd — staat er als reden nu \"Unknown\" in plaats van een zin over de adapter",
-        "fr": "Tant qu'un compte n'a rien à signaler — adaptateur arrêté ou démarré sans interrogation — la raison affiche désormais « Unknown » au lieu d'une phrase sur l'adaptateur",
-        "it": "Finché un account non ha nulla da segnalare — adapter spento o avviato senza interrogazione — il motivo indica ora \"Unknown\" invece di una frase sull'adapter",
-        "es": "Mientras una cuenta no tenga nada que informar — adaptador apagado o iniciado sin consultar — el motivo muestra ahora \"Unknown\" en vez de una frase sobre el adaptador",
-        "pl": "Dopóki konto nie ma nic do zgłoszenia — adapter wyłączony lub uruchomiony i jeszcze nieodpytany — jako powód widnieje teraz „Unknown\" zamiast zdania o adapterze",
-        "uk": "Поки обліковий запис не має про що повідомити — адаптер вимкнено або запущено й ще не опитано — як причина тепер стоїть «Unknown» замість фрази про адаптер",
-        "zh-cn": "当某个账户暂无可报告的内容时——适配器已停止，或刚启动尚未查询——原因显示为“Unkn”，而不再是一句关于适配器的说明"
       }
     },
     "plugins": {

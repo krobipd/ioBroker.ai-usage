@@ -153,17 +153,18 @@ so instead of pretending to be connected; signing in again is all it takes.
 
 ### **WORK IN PROGRESS**
 
-- Fixed: The costs of an Anthropic organisation account were a hundred times too high — the provider reports them in cents and the adapter read them as dollars. The same mistake was in the adapter-wide cost totals. Never verified against a real organisation account; the correction follows Anthropic's own API reference
-- Fixed: An account whose values could not be written to the object database kept reporting itself as delivering, with a last-update stamp that went on moving — a database fault is now shown as what it is
-- Fixed: An answer that was still waiting on the object database while the adapter shut down could mark accounts online again afterwards, and could still delete objects
-- Fixed: An answer a provider sends in a shape the adapter does not recognise is now reported as a service fault. Before, it read as "this account has nothing", which switched every warning off and deleted the account's limit windows
-- Fixed: The limit windows and model channels of an account are no longer deleted when a single answer says nothing about them — an organisation account lost its model channels every night until the first request of the new day
-- Fixed: Token counters of an organisation account show 0 after UTC midnight instead of keeping yesterday's numbers under a name that says "today"
-- Fixed: Restarting the instance while an account is above its warn threshold no longer raises the warning and the notification again
+- Fixed: The costs of an Anthropic organisation account were a hundred times too high — the provider counts them in cents, the adapter read them as dollars
+- Fixed: The same error was in the adapter-wide cost totals
+- Fixed: An account whose values could not be written to the object database kept reporting itself as delivering, with a last-update stamp that went on moving
+- Fixed: An answer still waiting on the object database during shutdown could mark accounts online again afterwards, or delete objects
+- Fixed: An answer in a shape the adapter does not recognise now counts as a service fault, instead of reading as "this account has nothing"
+- Fixed: Limit windows and model channels are no longer deleted when a single answer says nothing about them
+- Fixed: Token counters of an organisation account show 0 after UTC midnight instead of keeping yesterday's numbers
+- Fixed: Restarting the instance above the warn threshold no longer raises the warning and the notification again
 - Fixed: The "limit reached" total now counts a window the provider has closed, the way each account already did
-- Fixed: A configured account row the adapter cannot use (unknown provider, or an object id another row already has) now says so in the log instead of disappearing
-- Improved: The two indicators of a limit window and of the DeepSeek balance are only written when they change — an unchanged value no longer lands in the history on every poll
-- Improved: The ChatGPT voucher inventory is fetched about once an hour instead of on every poll, which halves the requests of a ChatGPT account
+- Fixed: A configured account row the adapter cannot use now says so in the log instead of disappearing
+- Improved: The "active window" and DeepSeek "available" flags are written only when they actually change, so their timestamp stops moving on every poll
+- Improved: The ChatGPT voucher inventory is fetched about once an hour instead of every poll, halving that account's requests
 - Improved: The settings page shows a finished device-code sign-in right away instead of up to half a minute later
 
 ### 0.12.1 (2026-09-07)
