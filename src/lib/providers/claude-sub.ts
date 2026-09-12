@@ -191,15 +191,18 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
 function applyExtraUsage(raw: Record<string, unknown>, snapshot: UsageSnapshot): void {
   const extra = raw.extra_usage as Record<string, unknown> | undefined | null;
   const spend = raw.spend as Record<string, unknown> | undefined | null;
+  // `finiteNumber`, not `Number`: `Number(null)` is 0, and this block is the one
+  // place in the adapter that still used the raw conversion. A null amount would
+  // have been written as a $0 ceiling and a $0 month — as fact, and into
+  // `total.costs.month` with it.
   if (extra && extra.is_enabled === true) {
-    const divisor = 10 ** (Number.isFinite(Number(extra.decimal_places)) ? Number(extra.decimal_places) : 2);
-    const used = Number(extra.used_credits);
-    const limit = Number(extra.monthly_limit);
-    const percent = Number(extra.utilization);
+    const divisor = 10 ** (finiteNumber(extra.decimal_places) ?? 2);
+    const used = finiteNumber(extra.used_credits);
+    const limit = finiteNumber(extra.monthly_limit);
     snapshot.credits = {
-      used: Number.isFinite(used) ? used / divisor : undefined,
-      limit: Number.isFinite(limit) ? limit / divisor : undefined,
-      percent: Number.isFinite(percent) ? percent : undefined,
+      used: used !== undefined ? used / divisor : undefined,
+      limit: limit !== undefined ? limit / divisor : undefined,
+      percent: finiteNumber(extra.utilization),
       currency: "USD",
     };
     if (snapshot.credits.used !== undefined) {
@@ -210,16 +213,14 @@ function applyExtraUsage(raw: Record<string, unknown>, snapshot: UsageSnapshot):
   if (spend && spend.enabled === true) {
     const money = (value: unknown): number | undefined => {
       const obj = value as Record<string, unknown> | null | undefined;
-      const amount = Number(obj?.amount_minor);
-      const exponent = Number(obj?.exponent);
-      return Number.isFinite(amount) ? amount / 10 ** (Number.isFinite(exponent) ? exponent : 2) : undefined;
+      const amount = finiteNumber(obj?.amount_minor);
+      return amount !== undefined ? amount / 10 ** (finiteNumber(obj?.exponent) ?? 2) : undefined;
     };
     const used = money(spend.used);
-    const percent = Number(spend.percent);
     snapshot.credits = {
       used,
       limit: money(spend.limit),
-      percent: Number.isFinite(percent) ? percent : undefined,
+      percent: finiteNumber(spend.percent),
       currency: "USD",
     };
     if (used !== undefined) {

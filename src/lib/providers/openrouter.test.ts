@@ -22,6 +22,12 @@ describe("parseOpenRouterKeyInfo", () => {
     expect(snapshot.credits?.percent).toBeUndefined();
   });
 
+  test("an answer without a single usable figure creates no credits block", () => {
+    // Decision 6: a capability without a usable value gets no datapoint. The block
+    // used to be a plain literal, so an empty `data` still produced a bare channel.
+    expect(parseOpenRouterKeyInfo({ data: {} }).credits).toBeUndefined();
+  });
+
   test("a malformed body is a network error, not a crash", () => {
     expect(() => parseOpenRouterKeyInfo({})).toThrow(FetchError);
     expect(() => parseOpenRouterKeyInfo(null)).toThrow(FetchError);

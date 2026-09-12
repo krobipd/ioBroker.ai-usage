@@ -436,7 +436,12 @@ export class AiUsageAdapter extends utils.Adapter {
       // Parsed ONCE and handed on: the cleanup used to parse the same table a second
       // time, so a change in the parser could have been applied to one and not the
       // other.
-      const accounts = parseAccounts(this.config.accounts);
+      const { accounts, discarded } = parseAccounts(this.config.accounts);
+      for (const row of discarded) {
+        // Named, not swallowed: the start line below counts what survived, so a row
+        // that vanished here left the user with no way to tell it ever existed.
+        this.log.warn(`Account row "${row.label}" is not being monitored — ${row.reason}`);
+      }
       const interval = clampPollInterval(this.config.pollInterval);
       // Baseline first: the cleanup deletes and the engine creates, both are counted
       // against this snapshot.

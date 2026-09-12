@@ -25,6 +25,7 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
   let costMonth = 0;
   let costToday = 0;
   let currency = "USD";
+  let currencySeen = false;
   for (const bucket of costBuckets) {
     const entry = bucket as { start_time?: unknown; results?: unknown };
     if (!Array.isArray(entry?.results)) {
@@ -33,12 +34,21 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
     let sum = 0;
     for (const result of entry.results) {
       const amount = (result as { amount?: { value?: unknown; currency?: unknown } })?.amount;
+      const code = typeof amount?.currency === "string" && amount.currency ? amount.currency.toUpperCase() : "";
+      // The FIRST currency seen owns the sum; a bucket in another one is skipped
+      // rather than added to it. Before, the code of the LAST bucket won while the
+      // sum had already swallowed every currency — `totals.ts` does the same on the
+      // level above, this one was missing it.
+      if (code && !currencySeen) {
+        currency = code;
+        currencySeen = true;
+      }
+      if (code && code !== currency) {
+        continue;
+      }
       const value = finiteNumber(amount?.value);
       if (value !== undefined) {
         sum += value;
-      }
-      if (typeof amount?.currency === "string" && amount.currency) {
-        currency = amount.currency.toUpperCase();
       }
     }
     costMonth += sum;

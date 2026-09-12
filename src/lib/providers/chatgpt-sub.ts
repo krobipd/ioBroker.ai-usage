@@ -166,6 +166,7 @@ export function parseChatgptResetCredits(body: unknown, nowMs: number): { count:
   }
   let count = 0;
   let nextExpiry = "";
+  let nextExpiryMs = Number.POSITIVE_INFINITY;
   for (const entry of list) {
     if (typeof entry !== "object" || entry === null) {
       continue;
@@ -180,8 +181,13 @@ export function parseChatgptResetCredits(body: unknown, nowMs: number): { count:
       if (Number.isFinite(expiryMs) && expiryMs <= nowMs) {
         continue; // stale: still flagged available, but already expired
       }
-      if (!nextExpiry || expiresAt < nextExpiry) {
+      // Compared as a POINT IN TIME, not as text. Sorting the strings works only
+      // while every stamp has the same shape and zone; one with an offset
+      // ("+02:00") sorts by its digits and names the wrong next expiry. The
+      // millisecond value is right there from the staleness check above.
+      if (!nextExpiry || (Number.isFinite(expiryMs) && expiryMs < nextExpiryMs)) {
         nextExpiry = expiresAt;
+        nextExpiryMs = expiryMs;
       }
     }
     count++;

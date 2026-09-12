@@ -282,6 +282,23 @@ describe("parseChatgptResetCredits", () => {
     expect(result).toEqual({ count: 1, nextExpiry: "2026-09-30T00:00:00Z" });
   });
 
+  test("the earliest expiry is found by TIME, not by string order", () => {
+    // Sorting the raw strings only works while every stamp has the same shape and
+    // zone. "2026-09-13T01:00:00+02:00" is earlier than "2026-09-12T23:30:00Z" but
+    // sorts after it by digits alone.
+    const result = parseChatgptResetCredits(
+      {
+        credits: [
+          { status: "available", expires_at: "2026-09-12T23:30:00Z" },
+          { status: "available", expires_at: "2026-09-13T01:00:00+02:00" },
+        ],
+      },
+      Date.UTC(2026, 8, 12, 12),
+    );
+    expect(result.count).toBe(2);
+    expect(result.nextExpiry).toBe("2026-09-13T01:00:00+02:00");
+  });
+
   test("a voucher without an expiry counts and leaves the companion empty", () => {
     expect(parseChatgptResetCredits({ credits: [{ id: "x", status: "available" }] }, NOW)).toEqual({
       count: 1,

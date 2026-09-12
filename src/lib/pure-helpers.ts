@@ -58,10 +58,27 @@ export function accountId(provider: string, credentialId: string): string {
   return suffix ? `${suffix}-api` : "";
 }
 
+/** A configured row the parser could not use, with the reason a user can act on. */
+export interface DiscardedRow {
+  /** What the row calls itself — name, credential or provider, whichever there is. */
+  label: string;
+  /** Why it was dropped, in plain words. */
+  reason: string;
+}
+
+/** What {@link parseAccounts} makes of the table: what it took, and what it dropped. */
+export interface ParsedAccounts {
+  /** The usable accounts, in table order. */
+  accounts: AccountConfig[];
+  /** The rows that were dropped — one warning each, so nothing disappears silently. */
+  discarded: DiscardedRow[];
+}
+
 /**
- * Parse and validate the admin accounts table. Rows without a usable name or with an
- * unknown provider are skipped (type-guarded — the table is external input).
- * Duplicate ids keep the first row.
+ * Parse and validate the admin accounts table (type-guarded — the table is external
+ * input). Duplicate ids keep the first row. Every row that cannot be used comes back
+ * in `discarded` with the reason, so the startup can say what it dropped instead of
+ * counting only the survivors.
  *
  * A row exists exactly as long as its switch is on: switching an account off removes
  * the row, which is also what lets the stale-object cleanup work off this one list.
@@ -72,16 +89,18 @@ export function accountId(provider: string, credentialId: string): string {
  * restarts the instance for no gain.
  *
  * @param raw the native.accounts value
- * @returns the validated accounts
+ * @returns the usable accounts plus the rows that were dropped, with reasons
  */
-export function parseAccounts(raw: unknown): AccountConfig[] {
+export function parseAccounts(raw: unknown): ParsedAccounts {
   if (!Array.isArray(raw)) {
-    return [];
+    return { accounts: [], discarded: [] };
   }
   const accounts: AccountConfig[] = [];
+  const discarded: DiscardedRow[] = [];
   const seen = new Set<string>();
   for (const entry of raw) {
     if (typeof entry !== "object" || entry === null) {
+      discarded.push({ label: String(entry), reason: "the row is not a table entry" });
       continue;
     }
     const row = entry as Record<string, unknown>;
@@ -89,7 +108,27 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
     const credentialId = typeof row.credentialId === "string" ? row.credentialId : "";
     const id = accountId(provider, credentialId);
     const name = (typeof row.name === "string" ? row.name.trim() : "") || id;
-    if (!id || RESERVED_ROOT_IDS.includes(id) || !PROVIDER_KINDS.includes(provider) || seen.has(id)) {
+    // Every reason is named. A row that silently vanished left the user with a
+    // start line counting only what survived — three rows in, one account out, and
+    // nothing in the log to say why.
+    const label = name || credentialId || provider || "(unnamed row)";
+    if (!PROVIDER_KINDS.includes(provider)) {
+      discarded.push({ label, reason: `unknown provider "${provider}"` });
+      continue;
+    }
+    if (!id) {
+      discarded.push({ label, reason: "no usable object id — pick a credential for this row" });
+      continue;
+    }
+    // Unreachable with today's id scheme — a subscription owns a fixed id and a key
+    // account always ends in "-api", so neither can become `info` or `total`. Kept
+    // as the guard on the adapter's own roots for the day that scheme changes.
+    if (RESERVED_ROOT_IDS.includes(id)) {
+      discarded.push({ label, reason: `the id "${id}" is reserved by the adapter` });
+      continue;
+    }
+    if (seen.has(id)) {
+      discarded.push({ label, reason: `another row already uses the id "${id}"` });
       continue;
     }
     seen.add(id);
@@ -102,7 +141,7 @@ export function parseAccounts(raw: unknown): AccountConfig[] {
       warnThreshold: Number.isFinite(threshold) && threshold >= 10 && threshold <= 100 ? threshold : 80,
     });
   }
-  return accounts;
+  return { accounts, discarded };
 }
 
 /**

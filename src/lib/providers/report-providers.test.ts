@@ -47,6 +47,22 @@ describe("OpenAI reports", () => {
     ]);
   });
 
+  test("a bucket in another currency is skipped, not added to the sum", () => {
+    // The code of the LAST bucket used to win while the sum had already swallowed
+    // every currency. `totals.ts` refuses a foreign currency one level up; this
+    // level did not.
+    const snapshot = parseOpenAiReports(
+      [],
+      [
+        { start_time: Date.UTC(2026, 7, 25) / 1000, results: [{ amount: { value: 2, currency: "usd" } }] },
+        { start_time: Date.UTC(2026, 7, 24) / 1000, results: [{ amount: { value: 999, currency: "eur" } }] },
+      ],
+      NOW,
+    );
+    expect(snapshot.costs?.currency).toBe("USD");
+    expect(snapshot.costs?.month).toBe(2);
+  });
+
   test("a day without usage reports zero and keeps every model of the month", () => {
     // Measured: after UTC midnight the report has no bucket for today yet. Built
     // from today's buckets only, the whole tokens/models block fell out of the

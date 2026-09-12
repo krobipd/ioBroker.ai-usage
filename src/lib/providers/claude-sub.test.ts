@@ -122,6 +122,30 @@ describe("parseClaudeUsage", () => {
     expect(snapshot.costs).toEqual({ month: 4.5, currency: "USD" });
   });
 
+  test("null in the extra-usage block invents no zero credits", () => {
+    // `Number(null)` is 0, and this block was the last place still using the raw
+    // conversion: a $0 ceiling and a $0 month written as fact, into total.costs.month
+    // with it. The fleet guard (`coerceFiniteNumber` at every API boundary) applies
+    // here like everywhere else.
+    const snapshot = parseClaudeUsage({
+      limits: [{ kind: "session", percent: 5 }],
+      extra_usage: { is_enabled: true, used_credits: null, monthly_limit: null, utilization: null },
+    });
+    expect(snapshot.credits?.used).toBeUndefined();
+    expect(snapshot.credits?.limit).toBeUndefined();
+    expect(snapshot.credits?.percent).toBeUndefined();
+    expect(snapshot.costs).toBeUndefined();
+  });
+
+  test("null in the spend block does the same", () => {
+    const snapshot = parseClaudeUsage({
+      limits: [{ kind: "session", percent: 5 }],
+      spend: { enabled: true, used: { amount_minor: null, exponent: 2 }, limit: null, percent: null },
+    });
+    expect(snapshot.credits?.used).toBeUndefined();
+    expect(snapshot.costs).toBeUndefined();
+  });
+
   test("a malformed body is a network error", () => {
     expect(() => parseClaudeUsage(null)).toThrow(FetchError);
   });

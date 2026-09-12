@@ -375,11 +375,16 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
     }
     if (tokens.perModel && tokens.perModel.length > 0) {
       channel(`${accountId}.models`, tName("nameModels"));
+      // The same duplicate guard the three window parsers carry. Two model names
+      // can fold onto one id ("gpt-4.1" and "gpt-4_1" both become "gpt-4_1"), and
+      // without this both wrote into the same datapoint — last one wins, no hint.
+      const seenModels = new Set<string>();
       for (const model of tokens.perModel) {
         const modelId = sanitizeId(model.model);
-        if (!modelId) {
+        if (!modelId || seenModels.has(modelId)) {
           continue;
         }
+        seenModels.add(modelId);
         // A translated frame around the provider's model name — the fleet standard
         // wants a translation object on EVERY object type, and the plain string
         // here was invisible to the static name gate because it is a runtime

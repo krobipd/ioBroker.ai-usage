@@ -95,6 +95,22 @@ describe("mapSnapshot", () => {
     expect(writes).toContainEqual({ id: "oai.costs.projectedMonth", value: 22 });
   });
 
+  test("two model names that fold onto one id create ONE datapoint", () => {
+    // "gpt-4.1" and "gpt-4_1" both sanitize to "gpt-4_1". Without the guard both
+    // wrote into the same datapoint — last one wins, and nothing says so. The three
+    // window parsers have carried this check all along.
+    const { writes } = mapSnapshot("oai", {
+      tokens: {
+        perModel: [
+          { model: "gpt-4.1", tokens: 10 },
+          { model: "gpt-4_1", tokens: 999 },
+        ],
+      },
+    });
+    const model = writes.filter(write => write.id.startsWith("oai.models."));
+    expect(model).toEqual([{ id: "oai.models.gpt-4_1.tokensToday", value: 10 }]);
+  });
+
   test("an empty snapshot yields nothing at all", () => {
     const { objects, writes } = mapSnapshot("empty", {});
     expect(objects).toHaveLength(0);

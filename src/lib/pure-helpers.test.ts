@@ -41,10 +41,11 @@ describe("accountId", () => {
 
 describe("parseAccounts", () => {
   test("accepts valid rows and derives the object id", () => {
-    const accounts = parseAccounts([
+    const { accounts, discarded } = parseAccounts([
       { name: "Claude Max", provider: "claude-sub", credentialId: "", warnThreshold: 90, enabled: true },
       { name: "Router", provider: "openrouter", credentialId: "system.credentials.or", enabled: true },
     ]);
+    expect(discarded).toEqual([]);
     expect(accounts).toEqual([
       { name: "Claude Max", id: "claude", provider: "claude-sub", credentialId: "", warnThreshold: 90 },
       {
@@ -58,7 +59,7 @@ describe("parseAccounts", () => {
   });
 
   test("skips unknown providers, credential-less key rows and duplicates", () => {
-    const accounts = parseAccounts([
+    const { accounts, discarded } = parseAccounts([
       { name: "What", provider: "not-a-provider", credentialId: "system.credentials.x", enabled: true },
       { name: "No credential", provider: "openrouter", credentialId: "", enabled: true },
       { name: "Twice", provider: "openrouter", credentialId: "system.credentials.twice", enabled: true },
@@ -66,10 +67,27 @@ describe("parseAccounts", () => {
     ]);
     expect(accounts.map(a => a.id)).toEqual(["twice-api"]);
     expect(accounts[0].provider).toBe("openrouter");
+    // …and every skipped row says why. Silently dropped, the start line counted
+    // only the survivors and the user had no way to tell the row ever existed.
+    expect(discarded.map(row => row.label)).toEqual(["What", "No credential", "Twice again"]);
+    expect(discarded[0].reason).toContain("unknown provider");
+    expect(discarded[1].reason).toContain("no usable object id");
+    expect(discarded[2].reason).toContain("already uses the id");
+  });
+
+  test("two credentials that fold onto the SAME id: the second is named, not swallowed", () => {
+    // `system.credentials.my key` and `system.credentials.my.key` both sanitize to
+    // `my_key-api`. Measured before the fix: three rows in, one account out, silence.
+    const { accounts, discarded } = parseAccounts([
+      { name: "A", provider: "openrouter", credentialId: "system.credentials.my key" },
+      { name: "B", provider: "openrouter", credentialId: "system.credentials.my.key" },
+    ]);
+    expect(accounts.map(a => a.id)).toEqual(["my_key-api"]);
+    expect(discarded).toEqual([{ label: "B", reason: 'another row already uses the id "my_key-api"' }]);
   });
 
   test("two subscriptions of different kinds live side by side", () => {
-    const accounts = parseAccounts([
+    const { accounts } = parseAccounts([
       { name: "Claude", provider: "claude-sub", credentialId: "", enabled: true },
       { name: "ChatGPT", provider: "chatgpt-sub", credentialId: "", enabled: true },
       { name: "Gemini", provider: "gemini-sub", credentialId: "", enabled: true },
@@ -78,15 +96,15 @@ describe("parseAccounts", () => {
   });
 
   test("tolerates a malformed table (API boundary)", () => {
-    expect(parseAccounts(undefined)).toEqual([]);
-    expect(parseAccounts("nope")).toEqual([]);
-    expect(parseAccounts([null, 42, "x"])).toEqual([]);
+    expect(parseAccounts(undefined).accounts).toEqual([]);
+    expect(parseAccounts("nope").accounts).toEqual([]);
+    expect(parseAccounts([null, 42, "x"]).accounts).toEqual([]);
   });
 
   test("clamps an out-of-range warn threshold to the default", () => {
     const [account] = parseAccounts([
       { name: "A", provider: "deepseek", credentialId: "system.credentials.a", warnThreshold: 400, enabled: true },
-    ]);
+    ]).accounts;
     expect(account.warnThreshold).toBe(80);
   });
 });

@@ -23,15 +23,15 @@ export function parseOpenRouterKeyInfo(body: unknown): UsageSnapshot {
   const remaining =
     finiteNumber(info.limit_remaining) ??
     (used !== undefined && limit !== undefined ? round2(limit - used) : undefined);
-  const snapshot: UsageSnapshot = {
-    credits: {
-      used,
-      limit,
-      remaining,
-      percent: used !== undefined && limit !== undefined && limit > 0 ? round2((used / limit) * 100) : undefined,
-      currency: "USD",
-    },
-  };
+  const percent = used !== undefined && limit !== undefined && limit > 0 ? round2((used / limit) * 100) : undefined;
+  const snapshot: UsageSnapshot = {};
+  // Only when there is something to say. The block used to be a plain object
+  // literal, so it was always present — an answer without a single usable figure
+  // still created an empty `credits` channel in the tree (decision 6: a capability
+  // without a usable value gets no datapoint).
+  if (used !== undefined || limit !== undefined || remaining !== undefined || percent !== undefined) {
+    snapshot.credits = { used, limit, remaining, percent, currency: "USD" };
+  }
   if (used !== undefined) {
     snapshot.costs = { total: used, currency: "USD" };
   }
