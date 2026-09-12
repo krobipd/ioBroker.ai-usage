@@ -220,7 +220,7 @@ function routes() {
     },
     {
       match: "api.anthropic.com/v1/organizations/cost_report",
-      body: { data: [{ starting_at: todayIso(), results: [{ amount: "5.75" }] }], has_more: false, next_page: null },
+      body: { data: [{ starting_at: todayIso(), results: [{ amount: "575.00" }] }], has_more: false, next_page: null },
     },
   ];
 }

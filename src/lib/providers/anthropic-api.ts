@@ -24,8 +24,15 @@ const BASE = "https://api.anthropic.com/v1/organizations";
  * @returns the snapshot
  */
 export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unknown[], nowMs: number): UsageSnapshot {
-  let costMonth = 0;
-  let costToday = 0;
+  // Summed in CENTS. The cost report states the amount "in lowest currency units
+  // (e.g. cents) as a decimal string", with its own worked example: "123.45" in
+  // "USD" is $1.23 (Admin API reference, cost report response schema; repeated in
+  // the Usage-and-Cost guide as "decimal strings in lowest units (cents)"). Read as
+  // dollars — which is what this did until 0.13.0 — every figure was a hundred
+  // times too high, and fed `total.costs.*` that way. OpenAI is the other way
+  // round: there `amount.value` is the money itself, so only this parser divides.
+  let centsMonth = 0;
+  let centsToday = 0;
   for (const bucket of costBuckets) {
     const entry = bucket as { starting_at?: unknown; start_time?: unknown; results?: unknown };
     if (!Array.isArray(entry?.results)) {
@@ -38,11 +45,14 @@ export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unkn
         sum += amount;
       }
     }
-    costMonth += sum;
+    centsMonth += sum;
     if (isToday(entry.starting_at ?? entry.start_time, nowMs)) {
-      costToday += sum;
+      centsToday += sum;
     }
   }
+  // Converted ONCE, on the sum — dividing each item first would round repeatedly.
+  const costMonth = centsMonth / 100;
+  const costToday = centsToday / 100;
 
   let inputToday = 0;
   let outputToday = 0;

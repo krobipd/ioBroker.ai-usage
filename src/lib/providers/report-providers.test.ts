@@ -81,14 +81,41 @@ describe("Anthropic reports", () => {
           results: [{ uncached_input_tokens: 800, output_tokens: 150 }],
         },
       ],
+      // CENTS — that is what the cost report sends (see the unit test below).
       [
-        { starting_at: "2026-08-25T00:00:00Z", results: [{ amount: "0.55" }] },
-        { starting_at: "2026-08-10T00:00:00Z", results: [{ amount: "1.45" }] },
+        { starting_at: "2026-08-25T00:00:00Z", results: [{ amount: "55.00" }] },
+        { starting_at: "2026-08-10T00:00:00Z", results: [{ amount: "145.00" }] },
       ],
       NOW,
     );
     expect(snapshot.costs).toMatchObject({ today: 0.55, month: 2, currency: "USD" });
     expect(snapshot.tokens).toEqual({ inputToday: 800, outputToday: 150 });
+  });
+
+  test("the cost report counts in CENTS — the provider's own worked example", () => {
+    // Admin API reference, cost report response schema: `amount` is the "cost
+    // amount in lowest currency units (e.g. cents) as a decimal string. For
+    // example, "123.45" in "USD" represents $1.23." Read as dollars, every cost
+    // figure of an Anthropic organisation account was a hundred times too high —
+    // and `total.costs.*` summed it that way.
+    const snapshot = parseAnthropicReports(
+      [],
+      [{ starting_at: "2026-08-25T00:00:00Z", results: [{ amount: "123.45" }] }],
+      NOW,
+    );
+    expect(snapshot.costs?.today).toBe(1.23);
+    expect(snapshot.costs?.month).toBe(1.23);
+  });
+
+  test("the projection is built from the converted sum, not from the cents", () => {
+    // 31 days in August, day 25 of the month: 1000 cents = $10 so far.
+    const snapshot = parseAnthropicReports(
+      [],
+      [{ starting_at: "2026-08-10T00:00:00Z", results: [{ amount: "1000" }] }],
+      NOW,
+    );
+    expect(snapshot.costs?.month).toBe(10);
+    expect(snapshot.costs?.projectedMonth).toBe(12.4);
   });
 
   test("the provider sends x-api-key + anthropic-version", async () => {
