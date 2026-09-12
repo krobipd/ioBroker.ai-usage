@@ -31,6 +31,10 @@ export default [
     ignores: [
       ".dev-server/",
       ".vscode/",
+      // The remember plugin's scratch directory. Its `last-ndc.ts` is a unix
+      // TIMESTAMP, not TypeScript — eslint went by the extension and failed the
+      // whole run on a file that is not ours and is git-ignored anyway.
+      ".remember/",
       "*.test.js",
       // Only the two ioBroker template files under test/ stay out — the repo-standards
       // suite next to them is ours and is linted like every other test (fleet rule
