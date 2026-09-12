@@ -43,3 +43,6 @@ src-admin/.mf/
 
 # Build output is not versioned: the CI builds before test and publish (common.nogit)
 build/
+
+# Session memory of the note-taking hook — never repository content
+.remember/
