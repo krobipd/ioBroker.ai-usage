@@ -49,23 +49,69 @@ async function request(url: string, init: RequestInit, authOn400 = false): Promi
   } catch (e) {
     throw new FetchError("network", e instanceof Error ? e.message : String(e));
   }
-  if (response.status === 401 || response.status === 403 || (authOn400 && response.status === 400)) {
-    throw new FetchError("auth", `HTTP ${response.status}`);
-  }
-  if (response.status === 429) {
-    throw new FetchError("rate-limit", "HTTP 429");
-  }
   if (!response.ok) {
+    // The status alone reaches the user as `info.error`, and "HTTP 401" tells them
+    // nothing they can act on. OpenRouter, OpenAI and Anthropic all answer with
+    // `{ error: { message } }` — reading it turns the datapoint into "invalid API
+    // key". Best effort in the strictest sense: the status decides the class, the
+    // body only decorates the text, and a body that cannot be read changes nothing.
+    const detail = await errorDetail(response);
+    if (response.status === 401 || response.status === 403 || (authOn400 && response.status === 400)) {
+      throw new FetchError("auth", `HTTP ${response.status}${detail}`);
+    }
+    if (response.status === 429) {
+      throw new FetchError("rate-limit", `HTTP 429${detail}`);
+    }
     // 5xx = the service answered and is broken; anything else unexpected is treated
     // the same way, because the service DID answer — only a throw above means we
     // never reached it.
-    throw new FetchError("service", `HTTP ${response.status}`);
+    throw new FetchError("service", `HTTP ${response.status}${detail}`);
   }
   try {
     return await response.json();
   } catch (e) {
     throw new FetchError("service", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+/** Longest provider message taken over into the error text. */
+const MAX_DETAIL_CHARS = 200;
+
+/**
+ * The provider's own words for a failed request, ready to append.
+ *
+ * Never throws and never rejects: a body that is missing, unreadable, not JSON or
+ * shaped differently simply yields "" and the caller keeps the bare status. The
+ * body of a failed response is consumed here either way, so nothing is left
+ * dangling (measured 2026-09-12: the "socket leak" this used to be blamed on does
+ * not exist).
+ *
+ * @param response the failed response
+ * @returns " — <message>" or an empty string
+ */
+async function errorDetail(response: Response): Promise<string> {
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    return "";
+  }
+  let message: unknown;
+  try {
+    const body = JSON.parse(text) as { error?: unknown; message?: unknown };
+    const error = body.error;
+    message =
+      typeof error === "string" ? error : ((error as { message?: unknown })?.message ?? body.message ?? undefined);
+  } catch {
+    // Not JSON: a short plain-text body is still better than nothing, a long one
+    // (an HTML error page from a proxy) is noise.
+    message = text.trim().length > 0 && text.trim().length <= MAX_DETAIL_CHARS ? text.trim() : undefined;
+  }
+  if (typeof message !== "string" || message.trim().length === 0) {
+    return "";
+  }
+  const trimmed = message.trim();
+  return ` — ${trimmed.length > MAX_DETAIL_CHARS ? `${trimmed.slice(0, MAX_DETAIL_CHARS)}…` : trimmed}`;
 }
 
 /**

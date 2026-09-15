@@ -1,6 +1,15 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.10.0 (2026-09-01)
+
+- Fixed: The reset-time datapoint of a limit window no longer disappears and reappears — it stays and simply empties while no window is running
+- Fixed: The settings page no longer shows the sign-in screen to a signed-in account, and its rows load without waiting for the credential storage scan
+- Improved: Claude usage is read with far fewer rejections — the query now identifies itself the way the endpoint expects
+- Changed: New Claude sign-ins request only the profile permission — the stored access can no longer create API keys or run models
+- New: ChatGPT accounts show their purchasable limit-reset credits — how many are available and when the next one expires
+- Improved: An unreadable provider answer is now reported as a service fault instead of a missing connection
+
 ## 0.9.3 (2026-08-27)
 
 - Fixed: The first start after updating no longer leaves a warning in the log

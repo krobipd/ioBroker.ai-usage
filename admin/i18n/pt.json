@@ -51,7 +51,6 @@
   "nameModels": "Utilização por modelo",
   "nameModel": "Modelo %s",
   "nameModelTokens": "%s tokens hoje",
-  "nameModelCosts": "%s custos hoje",
   "nameAvailable": "Saldo suficiente para chamadas",
   "nameWindowSession": "Sessão (5 h)",
   "nameWindowWeek": "Semana (todos os modelos)",

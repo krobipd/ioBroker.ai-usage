@@ -16,7 +16,11 @@ function scriptedProvider(script: (UsageSnapshot | (() => never))[]): UsageProvi
       provider.fetches++;
       const next = script.shift();
       if (!next) {
-        throw new Error("script exhausted");
+        // A TEST failure, not a provider one. As a bare Error this went through the
+        // engine's classification — which now reads a non-FetchError as a service
+        // fault, so a test that polls one round too often would quietly assert on
+        // "service-down" instead of failing.
+        throw new FetchError("service", "TEST BUG: the scripted provider ran out of results");
       }
       if (typeof next === "function") {
         next();
@@ -46,6 +50,10 @@ interface Harness {
   intervalCount(): number;
   /** Every warning the engine logged, in order. */
   warnings: string[];
+  /** Every info line the engine logged, in order. */
+  infos: string[];
+  /** While set, `listStateIds` rejects with this message (the orphan sweep fails). */
+  rejectListStateIds: { message: string } | null;
   /** While set, the object database rejects every upsert with this message. */
   rejectUpserts: { message: string } | null;
   /** Make the NEXT upsert wait; returns the function that lets it through. */
@@ -68,8 +76,15 @@ function makeHarness(): Harness {
   const intervals: (() => void)[] = [];
   const clock = { now: 1_000_000 };
   const warnings: string[] = [];
-  const control: { rejectUpserts: { message: string } | null; hold: boolean; release: (() => void) | null } = {
+  const infos: string[] = [];
+  const control: {
+    rejectUpserts: { message: string } | null;
+    rejectListStateIds: { message: string } | null;
+    hold: boolean;
+    release: (() => void) | null;
+  } = {
     rejectUpserts: null,
+    rejectListStateIds: null,
     hold: false,
     release: null,
   };
@@ -92,7 +107,12 @@ function makeHarness(): Harness {
       deleted.push(id);
       return Promise.resolve();
     },
-    listStateIds: () => Promise.resolve([...existing]),
+    listStateIds: () => {
+      if (control.rejectListStateIds) {
+        return Promise.reject(new Error(control.rejectListStateIds.message));
+      }
+      return Promise.resolve([...existing]);
+    },
     readState: id => Promise.resolve(states.get(id) ?? null),
     setState: (id, value) => void states.set(id, value),
     setStateChanged: (id, value) => {
@@ -110,7 +130,12 @@ function makeHarness(): Harness {
     },
     cancel: () => undefined,
     now: () => clock.now,
-    log: { debug: () => undefined, info: () => undefined, warn: m => void warnings.push(m), error: () => undefined },
+    log: {
+      debug: () => undefined,
+      info: m => void infos.push(m),
+      warn: m => void warnings.push(m),
+      error: () => undefined,
+    },
     notify: (_account, message) => void notifications.push(message),
     authState: (accountId, rejected) => void authStates.push({ accountId, rejected }),
   };
@@ -126,11 +151,18 @@ function makeHarness(): Harness {
     authStates,
     clock,
     warnings,
+    infos,
     get rejectUpserts() {
       return control.rejectUpserts;
     },
     set rejectUpserts(value) {
       control.rejectUpserts = value;
+    },
+    get rejectListStateIds() {
+      return control.rejectListStateIds;
+    },
+    set rejectListStateIds(value) {
+      control.rejectListStateIds = value;
     },
     holdNextUpsert: () => {
       control.hold = true;
@@ -1109,5 +1141,186 @@ describe("PollEngine", () => {
     // Nothing was written and nothing was deleted after the shutdown stamp.
     expect(h.deleted).toEqual([]);
     expect(h.states.get("a.limits.session.percent")).toBeUndefined();
+  });
+});
+
+describe("what the audit of 2026-09-15 found", () => {
+  test("a tolerated network failure leaves the last-update stamp where it was", async () => {
+    // The counterpart to the throttle case (decision 43): the network branch only
+    // sets the state on the THIRD strike, so strikes one and two left it on "ok" —
+    // and the stamp hung on that state. The round fetched nothing and still dated
+    // the values as fresh.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { credits: { used: 10, limit: 100, percent: 10, currency: "USD" } },
+      () => {
+        throw new FetchError("network", "ECONNRESET");
+      },
+    ]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    const stamped = h.states.get("router.info.lastUpdate");
+    expect(stamped).toBeTruthy();
+    h.clock.now += 600_000;
+    await h.tick();
+    // Still green — one hiccup must not flap the indicator (decision 11) …
+    expect(h.states.get("router.info.unreach")).toBe(false);
+    // … but the values are the ones from ten minutes ago, and the stamp says so.
+    expect(h.states.get("router.info.lastUpdate")).toBe(stamped);
+  });
+
+  test("an answer that cannot be processed is a service fault, not a lost connection", async () => {
+    // Everything that is not a FetchError landed in the network branch: three
+    // tolerated attempts, two debug lines, and only then "not reachable" — the one
+    // thing that was certainly not the case, because the answer had arrived.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { credits: { used: 1, limit: 100, percent: 1, currency: "USD" } },
+      () => {
+        throw new TypeError("Cannot read properties of undefined (reading 'usage')");
+      },
+    ]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    // At once, not after three strikes, and not as "no connection".
+    expect(h.states.get("router.info.unreach")).toBe(true);
+    expect(h.states.get("router.info.error")).toContain("could not be processed");
+    expect(h.states.get("router.info.error")).not.toContain("Not reachable");
+    expect(h.warnings.some(w => w.includes("could not be processed"))).toBe(true);
+  });
+
+  test("a failed orphan sweep keeps the round: the values are in the tree", async () => {
+    // The sweep ran inside the storage guard, so its failure discarded a round whose
+    // values had demonstrably been written: the account reported "fetched but not
+    // stored" while its datapoints moved on, and the totals froze on the previous
+    // snapshot — two datapoints of one adapter contradicting each other.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { credits: { used: 10, limit: 100, percent: 10, currency: "USD" } },
+      { credits: { used: 25, limit: 100, percent: 25, currency: "USD" } },
+    ]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    h.rejectListStateIds = { message: "getObjectView: database not connected" };
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("router.credits.used")).toBe(10);
+    // The account keeps delivering — nothing the provider sent was lost.
+    expect(h.states.get("router.info.unreach")).toBe(false);
+    expect(h.states.get("router.info.error")).toBe("");
+    expect(h.states.get("router.info.lastUpdate")).toBeTruthy();
+    // The totals see the snapshot that reached the tree, not the one before it.
+    expect(h.states.get("total.maxLimitPercent")).toBe(10);
+    // Said once, then de-duplicated on the category.
+    expect(h.warnings.filter(w => w.includes("could not be cleaned up"))).toHaveLength(1);
+    await h.tick();
+    expect(h.states.get("total.maxLimitPercent")).toBe(25);
+    expect(h.warnings.filter(w => w.includes("could not be cleaned up"))).toHaveLength(1);
+  });
+
+  test("an answered rejection clears the network strike counter", async () => {
+    // Two transport failures, then a throttle — the service demonstrably answered —
+    // then one more transport failure. Counting all three together declared the
+    // account unreachable on evidence that had been contradicted in between.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { credits: { used: 1, limit: 100, percent: 1, currency: "USD" } },
+      () => {
+        throw new FetchError("network", "ETIMEDOUT");
+      },
+      () => {
+        throw new FetchError("network", "ETIMEDOUT");
+      },
+      () => {
+        throw new FetchError("rate-limit", "HTTP 429");
+      },
+      () => {
+        throw new FetchError("network", "ETIMEDOUT");
+      },
+    ]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    // The throttle answers, and it also arms the backoff — jump past it.
+    await h.tick();
+    h.clock.now += 3_600_000;
+    await h.tick();
+    expect(h.states.get("router.info.error")).not.toContain("Not reachable after");
+  });
+
+  test("signing out clears the account's alarms and drops it from the totals", async () => {
+    // Values stay (decision 6/15) — alarms do not. An account signed out at 100 %
+    // held `warning`, `limitReached` and every total that counts them until someone
+    // signed in again, and an automation waiting on them never moved.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 100 }] },
+      () => {
+        throw new FetchError("no-credentials", "Not signed in — start the Claude sign-in in the instance settings");
+      },
+    ]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("router.warning")).toBe(true);
+    expect(h.states.get("router.limitReached")).toBe(true);
+    expect(h.states.get("total.limitReached")).toBe(true);
+    expect(h.states.get("total.warningsActive")).toBe(1);
+    expect(h.states.get("total.maxLimitPercent")).toBe(100);
+
+    await h.tick();
+    expect(h.states.get("router.warning")).toBe(false);
+    expect(h.states.get("router.limitReached")).toBe(false);
+    expect(h.states.get("total.limitReached")).toBe(false);
+    expect(h.states.get("total.warningsActive")).toBe(0);
+    expect(h.states.get("total.maxLimitPercent")).toBe(0);
+    // The measured value stays — it is not a lie, only unattended.
+    expect(h.states.get("router.limits.week.percent")).toBe(100);
+    expect(h.states.get("router.info.unreach")).toBe(true);
+    // Through the comparing write, like every other alarm of this adapter.
+    expect(h.changedWrites).toContain("router.warning");
+  });
+
+  test("a rejected sign-in keeps the alarms — it is an outage, not a sign-out", async () => {
+    // The other half of the rule above: `auth` means the provider REJECTED a
+    // sign-in. The account is still watched, so its last known state stands.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { limits: [{ name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 100 }] },
+      () => {
+        throw new FetchError("auth", "HTTP 401");
+      },
+    ]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    expect(h.states.get("router.warning")).toBe(true);
+    expect(h.states.get("total.limitReached")).toBe(true);
+  });
+
+  test("the first successful poll of a process does not announce a recovery", async () => {
+    // Every account starts as "no-connection" (decision 19c), so the first answer
+    // always looked like a recovery: one info line per account per restart, about a
+    // failure nobody had been told about.
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      { credits: { used: 1, limit: 100, percent: 1, currency: "USD" } },
+      () => {
+        throw new FetchError("service", "HTTP 503");
+      },
+      { credits: { used: 2, limit: 100, percent: 2, currency: "USD" } },
+    ]);
+    const engine = new PollEngine([account()], new Map([["router", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.infos.filter(line => line.includes("delivering again"))).toHaveLength(0);
+    await h.tick();
+    await h.tick();
+    // …but a recovery from a failure the log DID report is still announced.
+    expect(h.infos.filter(line => line.includes("delivering again"))).toHaveLength(1);
   });
 });

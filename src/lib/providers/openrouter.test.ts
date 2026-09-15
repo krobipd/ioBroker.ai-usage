@@ -28,9 +28,14 @@ describe("parseOpenRouterKeyInfo", () => {
     expect(parseOpenRouterKeyInfo({ data: {} }).credits).toBeUndefined();
   });
 
-  test("a malformed body is a network error, not a crash", () => {
-    expect(() => parseOpenRouterKeyInfo({})).toThrow(FetchError);
-    expect(() => parseOpenRouterKeyInfo(null)).toThrow(FetchError);
+  test("a malformed body is a SERVICE fault, not a network error", () => {
+    // The class is the point, not the throw: OpenRouter answered, we could not read
+    // it (decision 21). As `network` it would have been tolerated three times and
+    // then reported as "no connection" — about a host that had replied.
+    for (const body of [{}, null]) {
+      expect(() => parseOpenRouterKeyInfo(body)).toThrow(FetchError);
+      expect(() => parseOpenRouterKeyInfo(body)).toThrow(expect.objectContaining({ kind: "service" }));
+    }
   });
 });
 

@@ -70,7 +70,7 @@ ai-usage.0
 ├─ <account>                  e.g. claude, chatgpt, gemini, <name>-api
 │  ├─ info.unreach            the offline marker; drives the icon in the object tree
 │  ├─ info.error              why, in plain text; empty while everything works
-│  ├─ info.lastUpdate         last successful query
+│  ├─ info.lastUpdate         when the current values were fetched
 │  ├─ warning                 above the account's warn threshold
 │  ├─ limitReached            at 100 %
 │  ├─ limits.<window>.percent      utilisation of a limit window
@@ -119,14 +119,19 @@ warning its label.
 `info.unreach` means **"this account is not delivering"** and drives the connection icon
 next to the account in the object tree:
 
-| Situation                                      | Icon                               | `info.error`                         |
-| ---------------------------------------------- | ---------------------------------- | ------------------------------------ |
-| Everything works                               | green                              | empty                                |
-| Throttled by the provider                      | green — the last values still hold | says so, with the retry delay        |
-| Sign-in rejected                               | red                                | "Sign-in rejected — …"               |
-| The service reports a fault                    | red                                | "The AI service reports a fault — …" |
-| Not reachable at all                           | red, after three attempts          | "Not reachable after N attempts — …" |
-| Instance stopped, or started and not asked yet | red                                | `Unknown`                            |
+| Situation                                      | Icon                               | `info.error`                            |
+| ---------------------------------------------- | ---------------------------------- | --------------------------------------- |
+| Everything works                               | green                              | empty                                   |
+| Throttled by the provider                      | green — the last values still hold | says so, with the retry delay           |
+| Sign-in rejected                               | red                                | "Sign-in rejected — …"                  |
+| The service reports a fault                    | red                                | "The AI service reports a fault — …"    |
+| The answer cannot be processed                 | red, at once                       | "The answer could not be processed — …" |
+| Not reachable at all                           | red, after three attempts          | "Not reachable after N attempts — …"    |
+| Signed out, or no key stored                   | red, no alarms of this account     | "Not signed in — …"                     |
+| Instance stopped, or started and not asked yet | red                                | `Unknown`                               |
+
+Where the provider sends a reason of its own ("invalid API key", "rate limit exceeded"), it is
+carried into `info.error` instead of a bare status code.
 
 ---
 

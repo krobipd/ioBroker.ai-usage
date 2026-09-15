@@ -12,6 +12,13 @@ import { sanitizeId } from "./pure-helpers";
  * clock time a user reads and an automation waits for; the minute is the honest
  * precision, and it is stable.
  *
+ * Rounded to the NEAREST minute, not up. Rounding up would put the stated end
+ * never before the real one — but it also undoes the stabilisation this function
+ * exists for: the provider's own jitter straddles the minute boundary (…09:59.898
+ * and …10:00.364 are the same window end, measured), and the ceiling maps them to
+ * 14:10 and 14:11. The flapping is the bigger lie; the half-minute the value can
+ * sit early is inside the precision the minute already declares.
+ *
  * @param iso the provider's timestamp
  * @returns the timestamp rounded to the minute, or "" when it is unusable
  */
@@ -62,17 +69,30 @@ export interface StateWrite {
   /** The value. */
   value: boolean | number | string;
   /**
-   * True for a state whose role is `indicator` — it goes through the comparing
-   * write, like every other indicator of the fleet.
+   * True for a state that goes through the COMPARING write, like every indicator
+   * of the fleet — set for a state whose role is `indicator` or `date`.
    *
    * The rule ("state datapoints with `setStateChangedAsync`, measurements with
-   * `setState`") existed, but the two indicators built here — a window's `active`
-   * flag and DeepSeek's `available` — came out of the tree builder, where every
-   * write was treated the same. Written unconditionally they put a new timestamp
-   * on an unchanged boolean in every cycle, which is a history entry per poll and
-   * buries the one real switch.
+   * `setState`") existed, but everything built here was treated the same. Written
+   * unconditionally they put a new timestamp on an unchanged value in every cycle,
+   * which is a history entry per poll and buries the one real switch.
+   *
+   * The line runs between a MEASUREMENT and an ANNOUNCED FACT, and the role is
+   * where the tree builder already says which is which. A percentage, a counter,
+   * an amount of money: the timestamp carries information, "measured again, same
+   * value" is a statement about now. A window's end, the next voucher expiry, a
+   * plan's credit ceiling: the provider announces them and they change at most
+   * once per window or per plan — a new timestamp on them says nothing.
    */
-  indicator?: true;
+  compare?: true;
+}
+
+/** A state definition together with the value to write — the tree builder's unit. */
+interface StatePair {
+  /** The object definition. */
+  def: ObjectDef;
+  /** The value to write for it. */
+  write: StateWrite;
 }
 
 /**
@@ -95,12 +115,12 @@ function state(
   value: boolean | number | string,
   unit?: string,
   desc?: ioBroker.StringOrTranslated,
-): { def: ObjectDef; write: StateWrite } {
+): StatePair {
   const common: ObjectDef["common"] = { name, type, role, read: true, write: false };
   if (unit !== undefined) {
     common.unit = unit;
   }
-  const write: StateWrite = role === "indicator" ? { id, value, indicator: true } : { id, value };
+  const write: StateWrite = role === "indicator" || role === "date" ? { id, value, compare: true } : { id, value };
   // Only where there is something to explain. A description that repeats the name
   // is worse than none (fleet standard). Since the D08 gate (2026-09-07) EVERY
   // datapoint is decided: it carries a `desc` or stands in test/self-explaining.json
@@ -109,6 +129,24 @@ function state(
     common.desc = desc;
   }
   return { def: { id, type: "state", common }, write };
+}
+
+/**
+ * Mark a state as an announced fact although its ROLE does not say so.
+ *
+ * The role decides by default (see {@link StateWrite.compare}). `credits.limit` is
+ * the single state where the two disagree: it carries `value` like the credit
+ * figures next to it, but it is the plan's ceiling — it changes when the plan
+ * changes, not when someone uses the service. One named exception beats turning
+ * the rule into a second mechanism.
+ *
+ * @param pair the definition/value pair to mark
+ * @param pair.def the object definition, passed through unchanged
+ * @param pair.write the value write that gets the comparing flag
+ * @returns the same pair, with the value on the comparing write path
+ */
+function compared(pair: StatePair): StatePair {
+  return { def: pair.def, write: { ...pair.write, compare: true } };
 }
 
 /** What speaks for an account: a percentage, its label, and the window it came from. */
@@ -149,7 +187,7 @@ export interface TreeResult {
 export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeResult {
   const objects: ObjectDef[] = [];
   const writes: StateWrite[] = [];
-  const add = (pair: { def: ObjectDef; write: StateWrite }): void => {
+  const add = (pair: StatePair): void => {
     objects.push(pair.def);
     writes.push(pair.write);
   };
@@ -226,7 +264,11 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
       add(state(`${accountId}.credits.used`, tName("nameCreditsUsed"), "number", "value", credits.used, unit));
     }
     if (credits.limit !== undefined) {
-      add(state(`${accountId}.credits.limit`, tName("nameCreditsLimit"), "number", "value", credits.limit, unit));
+      add(
+        compared(
+          state(`${accountId}.credits.limit`, tName("nameCreditsLimit"), "number", "value", credits.limit, unit),
+        ),
+      );
     }
     if (credits.remaining !== undefined) {
       add(

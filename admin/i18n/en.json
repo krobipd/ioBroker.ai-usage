@@ -51,7 +51,6 @@
   "nameModels": "Per-model usage",
   "nameModel": "Model %s",
   "nameModelTokens": "%s tokens today",
-  "nameModelCosts": "%s costs today",
   "nameAvailable": "Balance sufficient for calls",
   "nameWindowSession": "Session (5 h)",
   "nameWindowWeek": "Week (all models)",

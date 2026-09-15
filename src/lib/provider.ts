@@ -249,6 +249,17 @@ export interface TokenStore {
   load(): Promise<TokenSet | null>;
   /** Persist tokens (encrypted by the adapter). */
   save(tokens: TokenSet): Promise<void>;
+  /**
+   * Take over tokens the PROVIDER has already rotated, replacing `previous`.
+   *
+   * Separate from {@link save} because the two have opposite failure rules. A
+   * sign-in is the user standing in front of the adapter: if it cannot be written,
+   * they have to be told. A refresh has already happened on the server — the old
+   * refresh token is spent the moment the answer arrives (they rotate and are
+   * single-use) — so the fresh pair must be kept even when the disk refuses, and
+   * it must NOT be written at all if a sign-out has meanwhile emptied the store.
+   */
+  replace(previous: TokenSet, next: TokenSet): Promise<void>;
   /** Forget the tokens (sign out / unusable refresh token). */
   clear(): Promise<void>;
 }

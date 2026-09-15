@@ -185,7 +185,13 @@ export class AiUsageAdapter extends utils.Adapter {
       typeof (message as { provider?: unknown })?.provider === "string"
         ? (message as { provider: string }).provider
         : "";
-    return SIGN_IN_FLOWS[value] ? value : undefined;
+    // `Object.hasOwn`, not a truthiness test: the table comes out of
+    // `Object.fromEntries` and therefore carries Object.prototype, so
+    // `SIGN_IN_FLOWS["constructor"]` is truthy. A message naming a prototype key
+    // passed this guard, found no matching flow in the manager, and fell through
+    // to the ChatGPT device-code branch — a real request to OpenAI, triggered by a
+    // word. The messagebox is an API boundary; it gets a boundary guard.
+    return Object.hasOwn(SIGN_IN_FLOWS, value) ? value : undefined;
   }
 
   /**
@@ -233,6 +239,9 @@ export class AiUsageAdapter extends utils.Adapter {
     const file = join(dir, `tokens-${provider}.json`);
     let cached: TokenSet | null = null;
     let read = false;
+    // De-duplicates the best-effort write warning of `replace`; one store per
+    // provider (decision 16), so this is already per provider.
+    let writeFailed = false;
     return {
       load: async (): Promise<TokenSet | null> => {
         if (!read) {
@@ -248,10 +257,45 @@ export class AiUsageAdapter extends utils.Adapter {
         await writeFile(file, this.encrypt(JSON.stringify(tokens)), { encoding: "utf8", mode: 0o600 });
         cached = tokens;
         read = true;
+        writeFailed = false;
+      },
+      replace: async (previous: TokenSet, next: TokenSet): Promise<void> => {
+        // THE GATE FIRST. A sign-out that landed while the refresh was in flight
+        // set `cached` to null and deleted the file; writing now would resurrect
+        // the sign-in the user just ended (decision 16, the half that was still
+        // open). Putting the write before this check is the bug, not a detail.
+        if (cached !== previous) {
+          return;
+        }
+        // THEN the cache, THEN the disk. The refresh already happened on the
+        // server, so the spent pair is worthless: `cached = next` must not depend
+        // on the write succeeding. It used to, and one full disk cost the sign-in
+        // for good — measured: ENOSPC on one poll, HTTP 400 on the next.
+        cached = next;
+        read = true;
+        try {
+          await mkdir(dir, { recursive: true });
+          await writeFile(file, this.encrypt(JSON.stringify(next)), { encoding: "utf8", mode: 0o600 });
+          writeFailed = false;
+        } catch (e) {
+          // Best effort by design: the fresh tokens are usable, the next refresh
+          // writes again. De-duplicated on the CATEGORY, not on the message.
+          const message = e instanceof Error ? e.message : String(e);
+          const label = PROVIDER_LABELS[provider] ?? provider;
+          if (writeFailed) {
+            this.log.debug(`${label}: the refreshed tokens still cannot be stored (${message})`);
+            return;
+          }
+          writeFailed = true;
+          this.log.warn(
+            `${label}: the refreshed tokens could not be stored (${message}) — kept in memory, a restart needs a new sign-in`,
+          );
+        }
       },
       clear: async (): Promise<void> => {
         cached = null;
         read = true;
+        writeFailed = false;
         await unlink(file).catch(() => {
           /* already gone */
         });
@@ -458,7 +502,7 @@ export class AiUsageAdapter extends utils.Adapter {
       await this.removeMovedStates(accounts);
       if (accounts.length === 0) {
         this.log.info("No AI accounts configured — add accounts in the instance settings");
-        await this.setState("info.connection", { val: false, ack: true });
+        await this.setStateChangedAsync("info.connection", { val: false, ack: true });
         return;
       }
       const providers = new Map<string, UsageProvider>();
@@ -766,7 +810,7 @@ export class AiUsageAdapter extends utils.Adapter {
       const engine = this.engine;
       this.engine?.stop();
       this.engine = null;
-      void (engine?.markAllOffline() ?? this.setState("info.connection", { val: false, ack: true }))
+      void (engine?.markAllOffline() ?? this.setStateChangedAsync("info.connection", { val: false, ack: true }))
         .then(() => this.log.debug("Shutdown: final states written"))
         .catch(e => this.log.debug(`Shutdown: final states rejected — ${e instanceof Error ? e.message : String(e)}`))
         .finally(callback);

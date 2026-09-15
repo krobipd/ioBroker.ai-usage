@@ -106,16 +106,20 @@ export function parseAccounts(raw: unknown): ParsedAccounts {
     const row = entry as Record<string, unknown>;
     const provider = typeof row.provider === "string" ? row.provider : "";
     const credentialId = typeof row.credentialId === "string" ? row.credentialId : "";
-    const id = accountId(provider, credentialId);
-    const name = (typeof row.name === "string" ? row.name.trim() : "") || id;
-    // Every reason is named. A row that silently vanished left the user with a
-    // start line counting only what survived — three rows in, one account out, and
-    // nothing in the log to say why.
-    const label = name || credentialId || provider || "(unnamed row)";
+    // The provider is checked BEFORE `accountId` reads the id table. The table is
+    // built with `Object.fromEntries` and carries Object.prototype, so a row naming
+    // a prototype key ("constructor") used to make `id` — and with it `name` and
+    // the warning text — a function on the way to being discarded.
+    const label = (typeof row.name === "string" ? row.name.trim() : "") || credentialId || provider || "(unnamed row)";
     if (!PROVIDER_KINDS.includes(provider)) {
+      // Every reason is named. A row that silently vanished left the user with a
+      // start line counting only what survived — three rows in, one account out,
+      // and nothing in the log to say why.
       discarded.push({ label, reason: `unknown provider "${provider}"` });
       continue;
     }
+    const id = accountId(provider, credentialId);
+    const name = (typeof row.name === "string" ? row.name.trim() : "") || id;
     if (!id) {
       discarded.push({ label, reason: "no usable object id — pick a credential for this row" });
       continue;

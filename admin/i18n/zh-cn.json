@@ -51,7 +51,6 @@
   "nameModels": "各模型用量",
   "nameModel": "模型 %s",
   "nameModelTokens": "%s 今日 Token",
-  "nameModelCosts": "%s 今日费用",
   "nameAvailable": "余额足以发起调用",
   "nameWindowSession": "会话（5 小时）",
   "nameWindowWeek": "一周（所有模型）",

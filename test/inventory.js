@@ -263,6 +263,15 @@ tests.integration(ADAPTER_DIR, {
                 stale.push(`${id}: ${f} still ${JSON.stringify(got.common?.[f])}`);
               }
             }
+            // The KIND of the object (state/channel/device/folder/meta) lives one level
+            // ABOVE `common`; the `type` in COMPARED is the VALUE type (string/number/
+            // boolean) — something entirely different that merely shares the name.
+            // Without this comparison a kind migration that never reaches an existing
+            // installation stays green: every text matches while every datapoint under
+            // the wrongly declared container is a repochecker finding.
+            if (got.type !== obj.type) {
+              stale.push(`${id}: type still ${JSON.stringify(got.type)}, want ${JSON.stringify(obj.type)}`);
+            }
           }
           assert.deepStrictEqual(stale, [], `objects an update did not reach:\n${stale.join("\n")}`);
         });

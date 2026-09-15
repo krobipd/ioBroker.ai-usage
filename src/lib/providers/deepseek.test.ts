@@ -26,9 +26,13 @@ describe("parseDeepSeekBalance", () => {
     expect(snapshot.credits?.remaining).toBe(5);
   });
 
-  test("a malformed body is a network error", () => {
-    expect(() => parseDeepSeekBalance({})).toThrow(FetchError);
-    expect(() => parseDeepSeekBalance(null)).toThrow(FetchError);
+  test("a malformed body is a SERVICE fault, not a network error", () => {
+    // Decision 21: the answer arrived and is unreadable — that is the service
+    // being broken, not the connection being gone.
+    for (const body of [{}, null]) {
+      expect(() => parseDeepSeekBalance(body)).toThrow(FetchError);
+      expect(() => parseDeepSeekBalance(body)).toThrow(expect.objectContaining({ kind: "service" }));
+    }
   });
 });
 

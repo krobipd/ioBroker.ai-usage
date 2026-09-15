@@ -6,6 +6,8 @@ const files = new Map<string, string>();
 const writeOptions = new Map<string, unknown>();
 /** Paths whose read fails with something other than "not there". */
 const unreadable = new Set<string>();
+/** While set, every write is refused with this message (a full or read-only disk). */
+const writeFailure = { message: "" };
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(() => Promise.resolve(undefined)),
@@ -24,6 +26,9 @@ vi.mock("node:fs/promises", () => ({
     return Promise.resolve(content);
   }),
   writeFile: vi.fn((path: string, content: string, options?: unknown) => {
+    if (writeFailure.message) {
+      return Promise.reject(new Error(writeFailure.message));
+    }
     files.set(path, content);
     writeOptions.set(path, options);
     return Promise.resolve();
@@ -115,6 +120,7 @@ function makeAdapter(): AiUsageAdapter {
   files.clear();
   writeOptions.clear();
   unreadable.clear();
+  writeFailure.message = "";
   return new AiUsageAdapter();
 }
 
@@ -190,6 +196,51 @@ describe("token store", () => {
     files.set(CLAUDE_FILE, `enc:${JSON.stringify({ accessToken: "a" })}`);
     expect(await internals(adapter).tokenStore("claude-sub").load()).toBeNull();
   });
+
+  test("a refresh whose write fails keeps the rotated tokens — the server already rotated", async () => {
+    // The refresh happened on the SERVER: by the time the answer is here the old
+    // refresh token is spent (decision 3). Taking the new pair only after a
+    // successful write meant one full disk cost the sign-in permanently — measured
+    // at the real store: ENOSPC on one poll, HTTP 400 on the next.
+    const adapter = makeAdapter();
+    const store = internals(adapter).tokenStore("claude-sub");
+    await store.save(tokens);
+    const rotated: TokenSet = { accessToken: "at2", refreshToken: "rt2", expiresAt: 9_999_999_999_999 };
+    writeFailure.message = "ENOSPC: no space left on device";
+    // Must NOT throw: the caller has nothing better to offer than these tokens.
+    await store.replace(tokens, rotated);
+    expect(await store.load()).toEqual(rotated);
+    expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("could not be stored"));
+
+    // The disk recovers; the next rotation writes both pairs' worth in one go.
+    writeFailure.message = "";
+    const again: TokenSet = { accessToken: "at3", refreshToken: "rt3", expiresAt: 9_999_999_999_999 };
+    await store.replace(rotated, again);
+    expect(files.get(CLAUDE_FILE)).toBe(`enc:${JSON.stringify(again)}`);
+    // De-duplicated on the category: the second failure would be debug, not warn.
+    expect(adapter.log.warn).toHaveBeenCalledTimes(1);
+  });
+
+  test("a sign-out during a refresh is not written back", async () => {
+    // `clear()` empties the store and deletes the file. A refresh that was already
+    // in flight comes back afterwards — and used to re-create exactly the file the
+    // user had just removed (decision 16, the half that was still open).
+    const adapter = makeAdapter();
+    const store = internals(adapter).tokenStore("claude-sub");
+    await store.save(tokens);
+    await store.clear();
+    await store.replace(tokens, { accessToken: "at2", refreshToken: "rt2", expiresAt: 9_999_999_999_999 });
+    expect(await store.load()).toBeNull();
+    expect(files.has(CLAUDE_FILE)).toBe(false);
+  });
+
+  test("a sign-in that cannot be written still fails loudly", async () => {
+    // The other side of the rule: during a sign-in the user is standing in front of
+    // the adapter and has to learn that nothing was stored.
+    const adapter = makeAdapter();
+    writeFailure.message = "EACCES: permission denied";
+    await expect(internals(adapter).tokenStore("claude-sub").save(tokens)).rejects.toThrow("EACCES");
+  });
 });
 
 describe("messages", () => {
@@ -214,6 +265,22 @@ describe("messages", () => {
     });
     expect(answers).toHaveLength(2);
     expect(answers.every(a => !!(a as { error?: string }).error)).toBe(true);
+  });
+
+  test("a prototype key is not a provider — no sign-in flow starts for it", async () => {
+    // The provider tables come out of `Object.fromEntries` and therefore carry
+    // Object.prototype: `SIGN_IN_FLOWS["constructor"]` is truthy. The guard tested
+    // truthiness, so the word passed, the manager found no matching flow and fell
+    // through to the ChatGPT device-code branch — a real request to OpenAI,
+    // triggered by a message anyone with messagebox access can send.
+    const adapter = makeAdapter();
+    const answers: { error?: string }[] = [];
+    adapter.sendTo = vi.fn((_from: string, _cmd: string, response: unknown) => void answers.push(response as never));
+    for (const provider of ["constructor", "toString", "valueOf", "__proto__", "hasOwnProperty"]) {
+      await internals(adapter).onMessage({ command: "signInStart", message: { provider }, from: "x", callback: 1 });
+    }
+    expect(answers).toHaveLength(5);
+    expect(answers.every(a => !!a.error)).toBe(true);
   });
 });
 
@@ -529,7 +596,7 @@ describe("shutdown", () => {
     // Resolves on a LATER turn of the event loop, like a real database round trip —
     // an `async () => push()` would record the write synchronously and the test
     // would pass even with the callback fired first.
-    adapter.setState = vi.fn(
+    adapter.setStateChangedAsync = vi.fn(
       () =>
         new Promise<string>(resolve =>
           setImmediate(() => {
@@ -542,7 +609,9 @@ describe("shutdown", () => {
     internals(adapter).onUnload(done);
     await new Promise(resolve => setTimeout(resolve, 10));
     expect(order).toEqual(["write", "callback"]);
-    expect(adapter.setState).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
+    // The comparing write, like every other `info.connection` write of this adapter
+    // (decision 13) — the two paths in main.ts used the plain one.
+    expect(adapter.setStateChangedAsync).toHaveBeenCalledWith("info.connection", { val: false, ack: true });
     expect(done).toHaveBeenCalledTimes(1);
   });
 
@@ -550,7 +619,9 @@ describe("shutdown", () => {
     // The states database going down mid-shutdown must not leave the controller
     // waiting for a callback that never comes.
     const adapter = makeAdapter();
-    adapter.setState = vi.fn(() => Promise.reject(new Error("connection closed")));
+    // The method the shutdown actually calls — the harness stubs it to RESOLVE, so
+    // rejecting `setState` instead would have left this test green and blind.
+    adapter.setStateChangedAsync = vi.fn(() => Promise.reject(new Error("connection closed")));
     const done = vi.fn();
     internals(adapter).onUnload(done);
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -644,8 +715,14 @@ describe("discarded account rows reach the log", () => {
   test("the notification seam is wired only when the user asked for notifications", async () => {
     // `notify` is optional on purpose: switched off, the engine must not even be
     // handed a callback, or a threshold crossing would still reach the user.
+    // WITH an account: without one `onReady` returns before an engine exists, so
+    // the "switched on" half was never actually exercised.
     const withNotifications = makeAdapter();
-    withNotifications.config = { accounts: [], pollInterval: 300, notifications: true };
+    withNotifications.config = {
+      accounts: [{ name: "Router", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 }],
+      pollInterval: 300,
+      notifications: true,
+    };
     await (withNotifications as unknown as { onReady(): Promise<void> }).onReady();
 
     const adapter = makeAdapter();
@@ -658,5 +735,12 @@ describe("discarded account rows reach the log", () => {
     const deps = (internals(adapter).engine as unknown as { deps: { notify?: unknown } }).deps;
     expect(deps.notify).toBeUndefined();
     internals(adapter).onUnload(() => undefined);
+
+    // The other half, which the test never made: switched ON, the seam must
+    // actually be there. Asserting only the absence let a wiring that never
+    // provides it pass.
+    const wired = (internals(withNotifications).engine as unknown as { deps: { notify?: unknown } }).deps;
+    expect(typeof wired.notify).toBe("function");
+    internals(withNotifications).onUnload(() => undefined);
   });
 });

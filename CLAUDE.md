@@ -487,6 +487,94 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     Anbieters bestätigt, und Anthropic erlaubt ausdrücklich „polling once per minute for sustained
     use". Der Puffer ist gemessen verworfen; nicht erneut vorschlagen.
 
+55. **`info.lastUpdate` datiert das ERGEBNIS DIESER RUNDE, nicht den gehaltenen Zustand** (0.14.0,
+    Audit 2026-09-15 · F1): Entscheidung 43 hat den Drossel-Fall geschlossen, der Netz-Fall blieb
+    offen. Der Netz-Zweig setzt `runtime.state` erst beim DRITTEN Streich — bei Versuch eins und
+    zwei stand dort weiter `"ok"`, und der Stempel hing daran. Eine Runde, die nichts geholt hat,
+    datierte damit die Werte neu. `pollOnce` führt jetzt eine lokale Wahrheit `delivered` (Abruf
+    gelungen UND Schreiben ohne Speicherfehler) und reicht sie an `writeAccountInfo`. Kein neues
+    Runtime-Feld: die Aussage gilt genau für diesen Durchlauf.
+56. **Die Token-Ablage folgt dem SERVER, nicht der Platte** (0.14.0 · F2 + F3, die zweite Hälfte von
+    Entscheidung 16): `TokenStore.replace(previous, next)` für den Auffrisch-Pfad, in genau dieser
+    Reihenfolge — (1) Tor: schreibt nichts, wenn der Zwischenspeicher nicht mehr `previous` hält
+    (ein Abmelden mitten in der Auffrischung hätte sonst die gerade gelöschte Datei wieder
+    angelegt), (2) Zwischenspeicher übernimmt die neuen Token, (3) Datei best effort, ein Fehler ist
+    eine `warn`-Zeile (Kategorie-Dedup), kein Wurf. **Die Reihenfolge IST der Fund** — lägen Tor und
+    Schreibvorgang andersherum, wäre der Fix wirkungslos. Gemessen an der ECHTEN `makeTokenStore`:
+    vorher kostete EIN `ENOSPC` die Anmeldung dauerhaft (nächster Poll `auth: HTTP 400`, weil der
+    Server längst rotiert hatte). `save()` bleibt für die ANMELDUNG streng: dort steht der Nutzer
+    daneben und soll den Fehler sehen.
+57. **Ein Nicht-`FetchError` ist ein Dienst-Defekt, kein Netzfehler** (0.14.0 · F2b, Entscheidung 21
+    eine Ebene tiefer): ein Parser-`TypeError` lief als Netzfehler mit drei tolerierten Versuchen —
+    zwei Runden still in `debug`, dann „nicht erreichbar" über einen Host, der geantwortet hatte.
+    Jetzt sofort `service-down` mit `warn` (Kategorie-Dedup, wie der `service`-Zweig).
+58. **Der Waisen-Abgleich ist WARTUNG, nicht Speichern** (0.14.0 · F5): er lief im selben
+    `try` wie die Wertschreibungen, also verwarf sein Fehlschlag eine Runde, deren Werte
+    nachweislich im Baum standen — das Konto meldete „fetched but not stored", während seine
+    Datenpunkte weiterliefen, und `total.*` fror auf dem vorherigen Schnappschuss ein. Eigener
+    `try/catch`, eigene `warn`-Dedup, `deliveredIds` bleibt unverändert (der Sweep MUSS in der
+    nächsten Runde erneut gegen die Datenbank vergleichen). Entscheidung 46 bleibt gewahrt: der
+    Schnappschuss wird erst übernommen, wenn die Werte geschrieben sind.
+59. **Eine beantwortete Ablehnung nullt den Netz-Strafzähler** (0.14.0 · F6): `failCount` wurde nur
+    bei Erfolg und im `service`-Zweig genullt. Zwei Netzfehler, dazwischen ein `auth`/`rate-limit`/
+    `no-credentials` — also ein BEWEIS, dass die Verbindung steht — und der nächste Netzfehler war
+    der dritte Streich. Der Zähler startet jetzt in allen drei Zweigen neu, mit derselben
+    Begründung, die im `service`-Zweig schon stand (Entscheidung 11).
+60. **Angekündigte FAKTEN gehen über den Vergleichs-Schreibweg, Messwerte nicht** (0.14.0 · F7,
+    Erweiterung von 52): `StateWrite.indicator` heißt jetzt `compare` und wird für Rolle
+    `indicator` UND Rolle `date` gesetzt. Die Trennlinie ist Messwert gegen Ankündigung: ein
+    Prozentwert, ein Zähler, ein Geldbetrag tragen im Zeitstempel Information („gerade wieder so
+    gemessen"), ein Fensterende, der nächste Gutschein-Verfall und die Guthaben-Obergrenze nicht —
+    die ändern sich höchstens einmal je Fenster oder Plan. Gezählt auf dem Fixture-Baum aller sieben
+    Kontoarten: 11 von 50 unbedingten Schreibvorgängen je Konto-Runde waren solche Fakten.
+    `credits.limit` trägt Rolle `value` und ist die EINE benannte Ausnahme (`compared(...)`, genau
+    einmal benutzt) — eine Ausnahme ist besser als ein zweiter Mechanismus. `info.connection` in
+    `main.ts` (zwei Einmal-Pfade) folgt endlich Entscheidung 13.
+61. **Ein Abmelden löscht die ALARME des Kontos, nicht seine Werte** (0.14.0 · F8): gemessen — ein
+    bei 100 % abgemeldetes Konto hielt `warning`, `limitReached`, `total.warningsActive`,
+    `total.maxLimitPercent` und `total.limitReached`, bis sich jemand neu anmeldete; eine
+    Automatisierung darauf blieb stehen. Beim ÜBERGANG nach `not-signed-in` (und nur dort) wird
+    `status.snapshot` verworfen und `warning`/`limitReached` per Vergleichs-Schreibweg auf `false`
+    gesetzt; `computeTotals` überspringt schnappschusslose Konten ohnehin. Die WERTE bleiben stehen
+    (Entscheidung 6/15), `total.accounts` zählt weiter mit (Entscheidung 40). Für `auth`,
+    `service-down` und `no-connection` gilt das NICHT — das sind Aussetzer, keine Abmeldung.
+62. **`resets_at` kommt aus dem `limits[]`-Eintrag ODER dem flachen Block** (0.14.0 · F9): beide im
+    Repo liegenden Ableitungen der Live-Antwort vom 2026-09-06 führen im Sitzungs-Eintrag KEIN
+    `resets_at`, während `five_hour`/`seven_day` es tragen — der Adapter schrieb
+    `claude.limits.session.resetAt` leer, obwohl die Zeit bekannt war. Die Zuordnung
+    `session → five_hour` / `weekly_all → seven_day` wird jetzt EINMAL als `flatKey` berechnet und
+    für beide Felder benutzt (`locked_reason` fuhr sie schon, als eigenes Ternär) — dass sie zweimal
+    dastand, ist der Grund, warum die zweite vergessen wurde.
+63. **Prototyp-Schlüssel sind keine Anbieter** (0.14.0 · F4): die Anbieter-Tabellen entstehen über
+    `Object.fromEntries` und tragen damit `Object.prototype` — `SIGN_IN_FLOWS["constructor"]` ist
+    wahr. Die Nachrichtenbox prüfte auf Wahrheitswert, also nahm sie das Wort an, der Anmelde-
+    Verwalter fand keinen passenden Fluss und fiel auf den ChatGPT-Gerätecode-Zweig durch: eine
+    echte Anfrage an OpenAI, ausgelöst von einem Wort. Jetzt `Object.hasOwn` an der API-Grenze.
+    Zweite Hälfte: `parseAccounts` rief `accountId` VOR der Anbieter-Prüfung, also war `id` auf dem
+    Weg in die Verwerfungs-Meldung kurz eine Funktion.
+64. **„delivering again" erst ab der ZWEITEN Runde eines Prozesses** (0.14.0 · F10): jedes Konto
+    startet als `no-connection` (Entscheidung 19c), also sah jede erste Antwort wie eine Erholung
+    aus — sieben `info`-Zeilen bei jedem Neustart, über einen Fehler, den nie jemand gemeldet hatte.
+    Dieselbe Schranke, die die `locked`-Flanke schon benutzt (Entscheidung 50).
+65. **Der Anbieter darf seinen eigenen Grund sagen** (0.14.0 · O2): bei 401/403/429/5xx wurde der
+    Antwortkörper verworfen, `info.error` sagte nur „HTTP 401". OpenRouter, OpenAI und Anthropic
+    antworten mit `{ error: { message } }` — das steht jetzt im Text („invalid API key"). Strikt
+    best effort: der STATUS entscheidet die Fehlerklasse, der Körper schmückt nur, ein unlesbarer
+    oder langer Körper (HTML-Fehlerseite eines Proxys) ändert nichts und wirft nie.
+66. **Bei `auth` auf der Verbrauchsabfrage wird EINMAL aufgefrischt und wiederholt** (0.14.0 · O4):
+    ein serverseitig entwertetes Zugangs-Token vor seinem Ablauf meldete bis zum Ablauf (Claude
+    ~8 h) eine abgelehnte Anmeldung samt Benachrichtigung und erholte sich danach von selbst. Genau
+    ein Versuch, und nur für `auth` — die zweite Ablehnung ist die echte Antwort. Gemeinsame Naht
+    `withAuthRetry` für alle drei Abos; sie ist nur zusammen mit Entscheidung 56 vertretbar, weil
+    die zusätzliche Rotation dort abgesichert ist.
+67. **`windowEnd` rundet zur NÄCHSTEN Minute, NICHT auf** (0.14.0, geprüft und VERWORFEN): der
+    Audit-Vorschlag „aufrunden, damit `resetAt` nie vor dem echten Ende liegt" klingt richtig und
+    zerstört genau die Stabilisierung, für die Entscheidung 37 gebaut wurde — der Jitter des
+    Anbieters liegt auf der Minutengrenze (…09:59.898 und …10:00.364 sind dasselbe Fensterende,
+    gemessen), `ceil` bildet sie auf 14:10 und 14:11 ab und das Flattern ist zurück. Die halbe
+    Minute, die der Wert zu früh stehen kann, liegt innerhalb der Genauigkeit, die die Minute
+    ohnehin ankündigt. **Nicht erneut vorschlagen** — die drei echten Messwerte stehen im Test.
+
 ## Tests
 
 ```

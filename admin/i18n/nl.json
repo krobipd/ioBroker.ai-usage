@@ -51,7 +51,6 @@
   "nameModels": "Verbruik per model",
   "nameModel": "Model %s",
   "nameModelTokens": "%s tokens vandaag",
-  "nameModelCosts": "%s kosten vandaag",
   "nameAvailable": "Tegoed voldoende voor aanvragen",
   "nameWindowSession": "Sessie (5 u)",
   "nameWindowWeek": "Week (alle modellen)",

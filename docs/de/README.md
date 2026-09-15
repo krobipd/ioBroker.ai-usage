@@ -70,7 +70,7 @@ ai-usage.0
 ├─ <konto>                    z. B. claude, chatgpt, gemini, <name>-api
 │  ├─ info.unreach            das Offline-Kennzeichen; steuert das Symbol im Objektbaum
 │  ├─ info.error              der Grund im Klartext; leer, solange alles läuft
-│  ├─ info.lastUpdate         letzte erfolgreiche Abfrage
+│  ├─ info.lastUpdate         wann die aktuellen Werte geholt wurden
 │  ├─ warning                 über der Warnschwelle des Kontos
 │  ├─ limitReached            bei 100 %
 │  ├─ limits.<fenster>.percent     Auslastung eines Limit-Fensters
@@ -119,14 +119,19 @@ gibt der Warnung ihre Beschriftung.
 `info.unreach` heißt **„dieses Konto liefert nicht"** und steuert das Verbindungssymbol
 neben dem Konto im Objektbaum:
 
-| Lage                                                    | Symbol                                 | `info.error`                         |
-| ------------------------------------------------------- | -------------------------------------- | ------------------------------------ |
-| Alles läuft                                             | grün                                   | leer                                 |
-| Vom Anbieter gedrosselt                                 | grün — die letzten Werte gelten weiter | sagt es, mit der Wartezeit           |
-| Anmeldung abgelehnt                                     | rot                                    | „Sign-in rejected — …"               |
-| Der Dienst meldet einen Defekt                          | rot                                    | „The AI service reports a fault — …" |
-| Gar nicht erreichbar                                    | rot, nach drei Versuchen               | „Not reachable after N attempts — …" |
-| Instanz gestoppt, oder gestartet und noch nicht gefragt | rot                                    | `Unknown`                            |
+| Lage                                                    | Symbol                                 | `info.error`                            |
+| ------------------------------------------------------- | -------------------------------------- | --------------------------------------- |
+| Alles läuft                                             | grün                                   | leer                                    |
+| Vom Anbieter gedrosselt                                 | grün — die letzten Werte gelten weiter | sagt es, mit der Wartezeit              |
+| Anmeldung abgelehnt                                     | rot                                    | „Sign-in rejected — …"                  |
+| Der Dienst meldet einen Defekt                          | rot                                    | „The AI service reports a fault — …"    |
+| Die Antwort ist nicht verwertbar                        | rot, sofort                            | „The answer could not be processed — …" |
+| Gar nicht erreichbar                                    | rot, nach drei Versuchen               | „Not reachable after N attempts — …"    |
+| Abgemeldet, oder kein Schlüssel hinterlegt              | rot, keine Alarme dieses Kontos        | „Not signed in — …"                     |
+| Instanz gestoppt, oder gestartet und noch nicht gefragt | rot                                    | `Unknown`                               |
+
+Wo der Anbieter einen eigenen Grund mitschickt („invalid API key", „rate limit exceeded"), steht
+dieser in `info.error` statt einer nackten Statusnummer.
 
 ---
 

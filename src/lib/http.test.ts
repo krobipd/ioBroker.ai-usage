@@ -26,10 +26,28 @@ function respondWith(status: number, body: unknown = {}): ReturnType<typeof vi.f
       status,
       ok: status >= 200 && status < 300,
       json: () => Promise.resolve(body),
+      // A real Response has both; the failure path reads `text()` to carry the
+      // provider's own words into the error message.
+      text: () => Promise.resolve(JSON.stringify(body)),
     } as unknown as Response),
   );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+/**
+ * The message of a rejected call.
+ *
+ * @param call the call to run
+ * @returns the FetchError message, or "resolved"
+ */
+async function messageOf(call: () => Promise<unknown>): Promise<string> {
+  try {
+    await call();
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+  return "resolved";
 }
 
 /**
@@ -201,5 +219,56 @@ describe("request shape", () => {
       originator: "Codex Desktop",
     });
     expect(init.body as string).toBe("code=c&state=s");
+  });
+});
+
+describe("the provider's own words reach the error text", () => {
+  test("a rejected key says WHY, not just HTTP 401", async () => {
+    // `info.error` is what a user reads. "HTTP 401" tells them nothing they can act
+    // on; OpenRouter, OpenAI and Anthropic all answer with { error: { message } }.
+    respondWith(401, { error: { message: "No auth credentials found" } });
+    expect(await messageOf(() => getJson("https://x/y", {}))).toBe("HTTP 401 — No auth credentials found");
+  });
+
+  test("the status still decides the class — the body only decorates", async () => {
+    respondWith(429, { error: { message: "rate limit exceeded" } });
+    expect(await kindOf(() => getJson("https://x/y", {}))).toBe("rate-limit");
+    respondWith(503, { message: "upstream unavailable" });
+    expect(await kindOf(() => getJson("https://x/y", {}))).toBe("service");
+    expect(await messageOf(() => getJson("https://x/y", {}))).toBe("HTTP 503 — upstream unavailable");
+  });
+
+  test("an unreadable body changes nothing and never throws on its own", async () => {
+    // Best effort in the strict sense: a body that is missing, not JSON or shaped
+    // differently must leave the bare status standing.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          status: 500,
+          ok: false,
+          json: () => Promise.reject(new Error("no body")),
+          text: () => Promise.reject(new Error("stream already consumed")),
+        } as unknown as Response),
+      ),
+    );
+    expect(await messageOf(() => getJson("https://x/y", {}))).toBe("HTTP 500");
+    expect(await kindOf(() => getJson("https://x/y", {}))).toBe("service");
+  });
+
+  test("an HTML error page from a proxy is noise and stays out", async () => {
+    const html = `<html><body>${"x".repeat(500)}</body></html>`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          status: 502,
+          ok: false,
+          json: () => Promise.reject(new Error("not json")),
+          text: () => Promise.resolve(html),
+        } as unknown as Response),
+      ),
+    );
+    expect(await messageOf(() => getJson("https://x/y", {}))).toBe("HTTP 502");
   });
 });

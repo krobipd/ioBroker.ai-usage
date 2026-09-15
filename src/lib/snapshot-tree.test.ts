@@ -43,8 +43,14 @@ describe("mapSnapshot", () => {
     // Deleting it on a momentary omission made the datapoint come and go with the
     // provider's mood (krobi, live 2026-09-01).
     expect(ids).toContain("claude.limits.week.resetAt");
-    expect(writes).toContainEqual({ id: "claude.limits.week.resetAt", value: "" });
-    expect(writes).toContainEqual({ id: "claude.limits.session.resetAt", value: "2026-08-25T14:00:00Z" });
+    // Announced facts, not measurements: the window's end goes through the
+    // comparing write, so an unchanged reset time stops re-dating itself every cycle.
+    expect(writes).toContainEqual({ id: "claude.limits.week.resetAt", value: "", compare: true });
+    expect(writes).toContainEqual({
+      id: "claude.limits.session.resetAt",
+      value: "2026-08-25T14:00:00Z",
+      compare: true,
+    });
     expect(writes).toContainEqual({ id: "claude.limits.session.percent", value: 34 });
     // Everything is read-only.
     for (const object of objects.filter(o => o.type === "state")) {
@@ -125,11 +131,12 @@ describe("mapSnapshot", () => {
     expect(withVoucher.writes).toContainEqual({
       id: "gpt.credits.resetCreditsNextExpiry",
       value: "2026-10-01T00:00:00Z",
+      compare: true,
     });
     // No voucher held: the count says 0 and the companion empties — neither leaves.
     const without = mapSnapshot("gpt", { credits: { remaining: 4, currency: "USD", resetCredits: 0 } });
     expect(without.writes).toContainEqual({ id: "gpt.credits.resetCredits", value: 0 });
-    expect(without.writes).toContainEqual({ id: "gpt.credits.resetCreditsNextExpiry", value: "" });
+    expect(without.writes).toContainEqual({ id: "gpt.credits.resetCreditsNextExpiry", value: "", compare: true });
   });
 
   test("the DeepSeek availability flag becomes a read-only indicator", () => {
@@ -300,9 +307,9 @@ describe("which window is in force", () => {
         },
       ],
     });
-    expect(writes).toContainEqual({ id: "claude.limits.session.active", value: false, indicator: true });
-    expect(writes).toContainEqual({ id: "claude.limits.week.active", value: false, indicator: true });
-    expect(writes).toContainEqual({ id: "claude.limits.weekly_scoped-Fable.active", value: true, indicator: true });
+    expect(writes).toContainEqual({ id: "claude.limits.session.active", value: false, compare: true });
+    expect(writes).toContainEqual({ id: "claude.limits.week.active", value: false, compare: true });
+    expect(writes).toContainEqual({ id: "claude.limits.weekly_scoped-Fable.active", value: true, compare: true });
   });
 
   test("without a mark the window that speaks for the account is the one in force", () => {
@@ -314,8 +321,8 @@ describe("which window is in force", () => {
         { name: "week", label: "Week", labelKey: "nameWindowWeekShort", percent: 61 },
       ],
     });
-    expect(writes).toContainEqual({ id: "chatgpt.limits.session.active", value: false, indicator: true });
-    expect(writes).toContainEqual({ id: "chatgpt.limits.week.active", value: true, indicator: true });
+    expect(writes).toContainEqual({ id: "chatgpt.limits.session.active", value: false, compare: true });
+    expect(writes).toContainEqual({ id: "chatgpt.limits.week.active", value: true, compare: true });
   });
 
   test("a model window is never in force while a plan-wide one exists", () => {
@@ -325,8 +332,8 @@ describe("which window is in force", () => {
         { name: "pro", label: "pro", labelKey: "nameWindowQuota", percent: 100, scoped: true },
       ],
     });
-    expect(writes).toContainEqual({ id: "gemini.limits.pro.active", value: false, indicator: true });
-    expect(writes).toContainEqual({ id: "gemini.limits.week.active", value: true, indicator: true });
+    expect(writes).toContainEqual({ id: "gemini.limits.pro.active", value: false, compare: true });
+    expect(writes).toContainEqual({ id: "gemini.limits.week.active", value: true, compare: true });
   });
 
   test("the flag is a read-only indicator", () => {
@@ -369,7 +376,7 @@ describe("windowEnd", () => {
         },
       ],
     });
-    expect(writes).toContainEqual({ id: "a.limits.w.resetAt", value: "2026-09-06T14:10:00Z" });
+    expect(writes).toContainEqual({ id: "a.limits.w.resetAt", value: "2026-09-06T14:10:00Z", compare: true });
   });
 });
 
@@ -411,5 +418,56 @@ describe("lockedWindows", () => {
 
   test("nothing locked, nothing reported", () => {
     expect(lockedWindows({ limits: [{ name: "w", label: "W", labelKey: "nameWindowWeek", percent: 99 }] })).toEqual([]);
+  });
+});
+
+describe("announced facts versus measurements", () => {
+  // Measured on the fixture tree of all seven account kinds: 50 unconditional
+  // writes per account round, eleven of which are facts the provider ANNOUNCES and
+  // that change at most once per window or per plan. Written unconditionally they
+  // put a fresh timestamp on an unchanged value every single cycle.
+  const snapshot = {
+    limits: [
+      {
+        name: "session",
+        labelKey: "nameWindowSession",
+        label: "Session",
+        percent: 42,
+        resetAt: "2026-09-06T14:09:59.898660+00:00",
+      },
+    ],
+    credits: { used: 7, limit: 100, remaining: 93, currency: "USD", resetCredits: 2, resetCreditsNextExpiry: "" },
+    costs: { today: 1.5, month: 12, currency: "USD" },
+  };
+
+  test("the reset times and the credit ceiling go through the comparing write", () => {
+    const { writes } = mapSnapshot("a", snapshot);
+    const compared = writes.filter(write => write.compare).map(write => write.id);
+    expect(compared).toEqual(
+      expect.arrayContaining([
+        "a.limits.session.resetAt",
+        "a.limits.session.active",
+        "a.credits.resetCreditsNextExpiry",
+        "a.credits.limit",
+      ]),
+    );
+  });
+
+  test("measurements keep the plain write — their timestamp carries information", () => {
+    const { writes } = mapSnapshot("a", snapshot);
+    const plain = writes.filter(write => !write.compare).map(write => write.id);
+    expect(plain).toEqual(
+      expect.arrayContaining([
+        "a.limits.session.percent",
+        "a.credits.used",
+        "a.credits.remaining",
+        "a.costs.today",
+        "a.costs.month",
+      ]),
+    );
+    // "measured again, same value" is a statement about now; only the announced
+    // facts are exempt.
+    expect(plain).not.toContain("a.limits.session.resetAt");
+    expect(plain).not.toContain("a.credits.limit");
   });
 });

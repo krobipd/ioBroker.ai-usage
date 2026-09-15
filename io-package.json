@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.13.0",
+    "version": "0.14.0",
     "news": {
+      "0.14.0": {
+        "en": "A failed write of the token file no longer costs the sign-in, signing out clears that account's alarms, and window reset times are written only when they change.",
+        "de": "Ein fehlgeschlagener Schreibvorgang der Token-Datei kostet nicht mehr die Anmeldung, ein Abmelden löscht die Alarme des Kontos, und Fenster-Enden werden nur bei Änderung geschrieben.",
+        "ru": "Неудачная запись файла токенов больше не стоит входа, выход из аккаунта сбрасывает его оповещения, а время сброса окон записывается только при изменении.",
+        "pt": "Uma escrita falhada do ficheiro de tokens já não custa a sessão, terminar sessão limpa os alarmes dessa conta, e os tempos de reposição só são escritos quando mudam.",
+        "nl": "Een mislukte schrijfactie van het tokenbestand kost de aanmelding niet meer, afmelden wist de alarmen van dat account, en resettijden worden alleen bij wijziging geschreven.",
+        "fr": "Une écriture échouée du fichier de jetons ne coûte plus la connexion, se déconnecter efface les alarmes du compte, et les heures de réinitialisation ne sont écrites qu'en cas de changement.",
+        "it": "Una scrittura fallita del file dei token non costa più l'accesso, disconnettersi azzera gli allarmi dell'account e gli orari di reset vengono scritti solo se cambiano.",
+        "es": "Un error al escribir el archivo de tokens ya no cuesta el inicio de sesión, cerrar sesión borra las alarmas de esa cuenta y los tiempos de reinicio solo se escriben al cambiar.",
+        "pl": "Nieudany zapis pliku tokenów nie kosztuje już logowania, wylogowanie kasuje alarmy tego konta, a czasy resetu są zapisywane tylko przy zmianie.",
+        "uk": "Невдалий запис файлу токенів більше не коштує входу, вихід з облікового запису очищає його сповіщення, а час скидання записується лише при зміні.",
+        "zh-cn": "令牌文件写入失败不再导致登录丢失，退出登录会清除该账户的告警，窗口重置时间仅在变化时写入。"
+      },
       "0.13.0": {
         "en": "Costs of an Anthropic organisation account were a hundred times too high, an account whose values cannot be stored no longer claims to deliver, and an empty answer no longer deletes datapoints.",
         "de": "Anthropic-Organisationskosten waren hundertfach zu hoch, ein Konto ohne speicherbare Werte meldet sich nicht mehr als liefernd, und eine leere Antwort löscht keine Datenpunkte mehr.",
@@ -80,19 +93,6 @@
         "pl": "Pierwszy start po aktualizacji nie zostawia już ostrzeżenia w dzienniku",
         "uk": "Перший запуск після оновлення більше не залишає попередження в журналі",
         "zh-cn": "更新后的首次启动不再在日志中留下警告"
-      },
-      "0.9.2": {
-        "en": "Stopping the instance now marks the accounts as offline on updated installations too, not only on fresh ones — before, they kept showing as online",
-        "de": "Das Stoppen der Instanz kennzeichnet die Konten jetzt auch auf aktualisierten Installationen als offline, nicht nur auf frischen — vorher blieben sie auf online stehen",
-        "ru": "Остановка экземпляра теперь помечает аккаунты офлайн и на обновлённых установках, а не только на новых — раньше они оставались онлайн",
-        "pt": "Parar a instância passa a marcar as contas como offline também em instalações atualizadas, não só em novas — antes continuavam a aparecer online",
-        "nl": "Het stoppen van de instantie markeert de accounts nu ook op bijgewerkte installaties als offline, niet alleen op nieuwe — eerder bleven ze online staan",
-        "fr": "L'arrêt de l'instance marque désormais les comptes hors ligne sur les installations mises à jour aussi, pas seulement sur les neuves — auparavant ils restaient en ligne",
-        "it": "L'arresto dell'istanza contrassegna ora gli account come offline anche sulle installazioni aggiornate, non solo su quelle nuove — prima restavano online",
-        "es": "Detener la instancia ahora marca las cuentas sin conexión también en instalaciones actualizadas, no solo en nuevas — antes seguían apareciendo en línea",
-        "pl": "Zatrzymanie instancji oznacza teraz konta jako offline także na zaktualizowanych instalacjach, nie tylko na nowych — wcześniej pozostawały online",
-        "uk": "Зупинка екземпляра тепер позначає облікові записи офлайн і на оновлених інсталяціях, а не лише на нових — раніше вони лишалися онлайн",
-        "zh-cn": "停止实例现在在已更新的安装上也会把账户标记为离线，而不只是全新安装——此前它们仍显示为在线"
       }
     },
     "plugins": {

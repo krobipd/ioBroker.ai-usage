@@ -12,12 +12,27 @@ import { chatgptSubProvider, parseChatgptResetCredits, parseChatgptUsage } from 
 function memoryStore(initial: TokenSet | null): TokenStore & { saved: TokenSet[] } {
   const store = {
     saved: [] as TokenSet[],
-    load: () => Promise.resolve(initial),
+    current: initial,
+    load: () => Promise.resolve(store.current),
     save: (tokens: TokenSet) => {
+      store.current = tokens;
       store.saved.push(tokens);
       return Promise.resolve();
     },
-    clear: () => Promise.resolve(),
+    // Mirrors the real store: the compare-and-swap comes FIRST, so a sign-out that
+    // landed during the refresh is not undone by the write that follows it.
+    replace: (previous: TokenSet, next: TokenSet) => {
+      if (store.current !== previous) {
+        return Promise.resolve();
+      }
+      store.current = next;
+      store.saved.push(next);
+      return Promise.resolve();
+    },
+    clear: () => {
+      store.current = null;
+      return Promise.resolve();
+    },
   };
   return store;
 }
@@ -104,7 +119,7 @@ describe("parseChatgptUsage", () => {
   });
 
   test("a body carrying NONE of the known fields is a service fault", () => {
-    expect(() => parseChatgptUsage({ something_new: 1 })).toThrow(FetchError);
+    expect(() => parseChatgptUsage({ something_new: 1 })).toThrow(expect.objectContaining({ kind: "service" }));
   });
 
   test("an account with nothing used yet stays a valid empty snapshot", () => {
@@ -113,8 +128,9 @@ describe("parseChatgptUsage", () => {
     expect(snapshot.credits).toBeUndefined();
   });
 
-  test("a non-object answer is a network failure, not a silent empty snapshot", () => {
-    expect(() => parseChatgptUsage("nope")).toThrow(FetchError);
+  test("a non-object answer is a SERVICE fault, not a silent empty snapshot", () => {
+    // Decision 21: it answered, we cannot read it.
+    expect(() => parseChatgptUsage("nope")).toThrow(expect.objectContaining({ kind: "service" }));
   });
 });
 
@@ -137,8 +153,8 @@ describe("device-code sign-in", () => {
 
   test("a transport failure is NOT swallowed as waiting", async () => {
     const handle: DeviceCodeStart = { userCode: "A", deviceAuthId: "d", intervalSec: 5, expiresAt: 0 };
-    await expect(pollDeviceCode(handle, () => Promise.reject(new FetchError("network", "boom")))).rejects.toThrow(
-      "boom",
+    await expect(pollDeviceCode(handle, () => Promise.reject(new FetchError("network", "boom")))).rejects.toMatchObject(
+      { kind: "network", message: "boom" },
     );
   });
 });
@@ -151,7 +167,7 @@ describe("chatgptSubProvider", () => {
       () => Promise.resolve({}),
       () => 0,
     );
-    await expect(provider.fetch()).rejects.toThrow(FetchError);
+    await expect(provider.fetch()).rejects.toMatchObject({ kind: "no-credentials" });
   });
 
   test("the account id is sent as a header, and only when known", async () => {

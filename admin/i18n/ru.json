@@ -51,7 +51,6 @@
   "nameModels": "Использование по моделям",
   "nameModel": "Модель %s",
   "nameModelTokens": "%s токенов сегодня",
-  "nameModelCosts": "%s расходы сегодня",
   "nameAvailable": "Баланса хватает для запросов",
   "nameWindowSession": "Сессия (5 ч)",
   "nameWindowWeek": "Неделя (все модели)",

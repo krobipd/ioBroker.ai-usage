@@ -1,4 +1,5 @@
 import { getJson, type JsonFetch, type JsonPost } from "../http";
+import { withAuthRetry } from "./auth-retry";
 import {
   FetchError,
   type LimitWindow,
@@ -227,22 +228,33 @@ export function chatgptSubProvider(
         throw new FetchError("no-credentials", "Not signed in — start the ChatGPT sign-in in the instance settings");
       }
       if (now() >= tokens.expiresAt - 60_000) {
+        const previous = tokens;
         tokens = await refreshChatgptTokens(tokens, postJson, now());
-        await store.save(tokens);
+        await store.replace(previous, tokens);
       }
-      const headers: Record<string, string> = {
-        Authorization: `Bearer ${tokens.accessToken}`,
-        // The Codex identity, NOT our own name — see CHATGPT_IDENTITY: the backend
-        // gates these routes on the originator, and the second call below already
-        // announced itself as a Codex client while this one did not.
-        "User-Agent": CHATGPT_IDENTITY.userAgent,
-        originator: CHATGPT_IDENTITY.originator,
+      const usageHeaders = (current: TokenSet): Record<string, string> => {
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${current.accessToken}`,
+          // The Codex identity, NOT our own name — see CHATGPT_IDENTITY: the backend
+          // gates these routes on the originator, and the second call below already
+          // announced itself as a Codex client while this one did not.
+          "User-Agent": CHATGPT_IDENTITY.userAgent,
+          originator: CHATGPT_IDENTITY.originator,
+        };
+        // Only send the account id when we have one — an empty header is rejected.
+        if (current.accountRef) {
+          headers["ChatGPT-Account-Id"] = current.accountRef;
+        }
+        return headers;
       };
-      // Only send the account id when we have one — an empty header is rejected.
-      if (tokens.accountRef) {
-        headers["ChatGPT-Account-Id"] = tokens.accountRef;
-      }
-      const snapshot = parseChatgptUsage(await fetchJson(CHATGPT_USAGE_URL, headers));
+      const snapshot = parseChatgptUsage(
+        await withAuthRetry(
+          tokens,
+          store,
+          current => refreshChatgptTokens(current, postJson, now()),
+          current => fetchJson(CHATGPT_USAGE_URL, usageHeaders(current)),
+        ),
+      );
       // Reset-voucher inventory — best-effort second call: its failure must not
       // discard the usage snapshot that already succeeded. The datapoints keep
       // their last value in that case (the orphan sweep no longer touches
@@ -263,7 +275,10 @@ export function chatgptSubProvider(
       try {
         const vouchers = parseChatgptResetCredits(
           await fetchJson(CHATGPT_RESET_CREDITS_URL, {
-            ...headers,
+            // From the STORE, not from the local variable: the usage call above may
+            // have rotated the tokens on a rejected access token, and the store is
+            // the single place that knows which pair is current (decision 16).
+            ...usageHeaders((await store.load()) ?? tokens),
             // Route-specific extra on top of the shared identity (CodexBar-verified).
             "OpenAI-Beta": "codex-1",
           }),

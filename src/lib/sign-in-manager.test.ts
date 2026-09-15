@@ -17,6 +17,14 @@ function memoryStore(initial: TokenSet | null = null): TokenStore & { value: Tok
       store.value = tokens;
       return Promise.resolve();
     },
+    // Mirrors the real store: nothing is written when the cache has moved on.
+    replace: (previous: TokenSet, next: TokenSet): Promise<void> => {
+      if (store.value !== previous) {
+        return Promise.resolve();
+      }
+      store.value = next;
+      return Promise.resolve();
+    },
     clear: (): Promise<void> => {
       store.value = null;
       return Promise.resolve();

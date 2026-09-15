@@ -73,19 +73,66 @@ describe("catalogue completeness", () => {
     }
   });
 
-  test("every i18n key the source asks for actually exists", () => {
-    // The catalogue and the call sites are two places that must agree; a typo in a
-    // key would otherwise surface as an object literally named "nameCostsTodya".
-    const sources = ["poll-engine.ts", "snapshot-tree.ts"].map(file => readFileSync(join(__dirname, file), "utf8"));
-    sources.push(readFileSync(join(__dirname, "..", "main.ts"), "utf8"));
+  /**
+   * Every catalogue key the source asks for, from wherever it asks.
+   *
+   * `tName("…")` is only half of it: a limit window carries its key as `labelKey`
+   * and the tree builder resolves it through a VARIABLE, so the six window keys
+   * live as plain string literals in the provider modules. Scanning only the three
+   * modules that call `tName` directly left them unguarded.
+   *
+   * @returns the set of keys the source uses
+   */
+  function keysUsedInSource(): Set<string> {
+    const files = [
+      join(__dirname, "poll-engine.ts"),
+      join(__dirname, "snapshot-tree.ts"),
+      join(__dirname, "..", "main.ts"),
+      ...readdirSync(join(__dirname, "providers"))
+        .filter(name => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+        .map(name => join(__dirname, "providers", name)),
+    ];
     const used = new Set<string>();
-    for (const source of sources) {
-      for (const match of source.matchAll(/tName\("([^"]+)"/g)) {
+    for (const file of files) {
+      const source = readFileSync(file, "utf8");
+      // Any catalogue-shaped string literal, not just the `tName("…")` call: a
+      // window's key travels as data (`labelKey`) through a ternary and is resolved
+      // through a variable, so matching the call site alone sees none of them.
+      for (const match of source.matchAll(/"((?:name|desc)[A-Z][A-Za-z0-9]*)"/g)) {
         used.add(match[1]);
       }
     }
+    return used;
+  }
+
+  test("every i18n key the source asks for actually exists", () => {
+    // The catalogue and the call sites are two places that must agree; a typo in a
+    // key would otherwise surface as an object literally named "nameCostsTodya".
+    const used = keysUsedInSource();
     expect(used.size).toBeGreaterThan(30);
     expect([...used].filter(key => !(key in en))).toEqual([]);
+    // The window keys reached only through `labelKey` — the half the scan used to
+    // miss entirely.
+    for (const key of ["nameWindowSession", "nameWindowWeek", "nameWindowModelWeek", "nameWindowQuota"]) {
+      expect(used.has(key)).toBe(true);
+    }
+  });
+
+  test("every catalogue key is actually used somewhere", () => {
+    // The direction nobody checked. `nameModelCosts` sat in all eleven languages
+    // for months without a single reader: translated, maintained, dead. Only the
+    // object-name keys are covered here — the jsonConfig strings of the settings
+    // page live in the same file and are read by the admin, not by this code.
+    const used = keysUsedInSource();
+    const manifestKeys = new Set(
+      Object.values(JSON.parse(readFileSync(join(__dirname, "..", "..", "fleet.json"), "utf8")).manifestI18n).flatMap(
+        entry => Object.values(entry as Record<string, string>),
+      ),
+    );
+    const dead = Object.keys(en)
+      .filter(key => key.startsWith("name") || key.startsWith("desc"))
+      .filter(key => !used.has(key) && !manifestKeys.has(key));
+    expect(dead).toEqual([]);
   });
 
   test("io-package instanceObjects carry the same texts as the catalogue", () => {

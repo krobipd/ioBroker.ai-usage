@@ -11,12 +11,27 @@ import { GEMINI_IDENTITY, geminiSubProvider, parseCodeAssist, parseGeminiQuota }
 function memoryStore(initial: TokenSet | null): TokenStore & { saved: TokenSet[] } {
   const store = {
     saved: [] as TokenSet[],
-    load: () => Promise.resolve(initial),
+    current: initial,
+    load: () => Promise.resolve(store.current),
     save: (tokens: TokenSet) => {
+      store.current = tokens;
       store.saved.push(tokens);
       return Promise.resolve();
     },
-    clear: () => Promise.resolve(),
+    // Mirrors the real store: the compare-and-swap comes FIRST, so a sign-out that
+    // landed during the refresh is not undone by the write that follows it.
+    replace: (previous: TokenSet, next: TokenSet) => {
+      if (store.current !== previous) {
+        return Promise.resolve();
+      }
+      store.current = next;
+      store.saved.push(next);
+      return Promise.resolve();
+    },
+    clear: () => {
+      store.current = null;
+      return Promise.resolve();
+    },
   };
   return store;
 }
@@ -39,7 +54,9 @@ describe("gemini sign-in", () => {
   });
 
   test("an address from a different attempt is refused (cross-site check)", () => {
-    expect(() => extractGeminiCode("http://x/?code=4/abc&state=other", "s1")).toThrow(FetchError);
+    expect(() => extractGeminiCode("http://x/?code=4/abc&state=other", "s1")).toThrow(
+      expect.objectContaining({ kind: "auth" }),
+    );
   });
 
   test("an address carrying Google's error is reported with that reason", () => {
@@ -88,8 +105,9 @@ describe("parseGeminiQuota", () => {
     expect(snapshot.limits).toBeUndefined();
   });
 
-  test("a non-object answer is a network failure", () => {
-    expect(() => parseGeminiQuota(42)).toThrow(FetchError);
+  test("a non-object answer is a SERVICE fault, not a network failure", () => {
+    // Decision 21 — Google answered, the shape is not ours.
+    expect(() => parseGeminiQuota(42)).toThrow(expect.objectContaining({ kind: "service" }));
   });
 });
 
@@ -136,7 +154,9 @@ describe("geminiSubProvider", () => {
       () => Promise.resolve({}),
       () => 0,
     );
-    await expect(provider.fetch()).rejects.toThrow(/subscription/);
+    // NOT `auth`: the sign-in worked, the account simply has no Code-Assist project
+    // — sending the user through a sign-in cannot change that answer.
+    await expect(provider.fetch()).rejects.toMatchObject({ kind: "service", message: /subscription/ });
   });
 
   test("the second host is tried when the first one fails on transport", async () => {

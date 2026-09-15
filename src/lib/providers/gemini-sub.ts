@@ -1,3 +1,4 @@
+import { withAuthRetry } from "./auth-retry";
 import {
   FetchError,
   type LimitWindow,
@@ -168,8 +169,9 @@ export function geminiSubProvider(
         throw new FetchError("no-credentials", "Not signed in — start the Google sign-in in the instance settings");
       }
       if (now() >= tokens.expiresAt - 60_000) {
+        const previous = tokens;
         tokens = await refreshGeminiTokens(tokens, postForm, now());
-        await store.save(tokens);
+        await store.replace(previous, tokens);
       }
       // The project id is stable per account — look it up once, then reuse it. It
       // is stored with the tokens, so the store's cache keeps it for us.
@@ -191,11 +193,18 @@ export function geminiSubProvider(
             "Google returned no project for this account — a Google AI subscription (Pro/Ultra) is required",
           );
         }
+        const previous = tokens;
         tokens = { ...tokens, accountRef: info.project };
-        await store.save(tokens);
+        // Same gate: a sign-out during the lookup must not write the file back.
+        await store.replace(previous, tokens);
       }
       return parseGeminiQuota(
-        await callCodeAssist("retrieveUserQuota", { project: tokens.accountRef }, tokens.accessToken, post),
+        await withAuthRetry(
+          tokens,
+          store,
+          current => refreshGeminiTokens(current, postForm, now()),
+          current => callCodeAssist("retrieveUserQuota", { project: current.accountRef }, current.accessToken, post),
+        ),
       );
     },
   };

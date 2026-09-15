@@ -1,4 +1,5 @@
 import { getJson, type JsonFetch, type JsonPost } from "../http";
+import { withAuthRetry } from "./auth-retry";
 import {
   FetchError,
   type LimitWindow,
@@ -87,12 +88,14 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
     limits.push(window);
   };
 
-  // The plan-wide blocks carry one thing the limits[] entries do not: the reason
-  // the provider CLOSED a window. Read it here and hand it to the matching bucket
-  // — measured 2026-09-06, `locked_reason` sits on five_hour/seven_day only.
-  const lockedReasonOf = (key: string): unknown => {
-    const block = raw[key];
-    return typeof block === "object" && block !== null ? (block as Record<string, unknown>).locked_reason : undefined;
+  // The plan-wide blocks carry things the limits[] entries do not always carry:
+  // the reason the provider CLOSED a window (measured 2026-09-06, `locked_reason`
+  // sits on five_hour/seven_day only), and — in both recordings we hold of that
+  // same answer — the session window's `resets_at`. Read from here and hand to the
+  // matching bucket.
+  const flatField = (key: string | undefined, field: string): unknown => {
+    const block = key === undefined ? undefined : raw[key];
+    return typeof block === "object" && block !== null ? (block as Record<string, unknown>)[field] : undefined;
   };
 
   // The live meters: limits[] — buckets keyed by kind + model + surface.
@@ -133,22 +136,25 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
         .join(" ");
       const labelKey =
         kind === "session" ? "nameWindowSession" : kind === "weekly_all" ? "nameWindowWeek" : "nameWindowModelWeek";
+      // Which flat block speaks for this bucket. Computed ONCE: `locked_reason` and
+      // `resets_at` both come from it, and spelling the mapping out twice is how
+      // the second one was missed.
+      const flatKey = kind === "session" ? "five_hour" : kind === "weekly_all" ? "seven_day" : undefined;
       push(
         nameParts.join("-"),
         labelParts.join(" "),
         limit.percent,
-        limit.resets_at,
+        // Both recordings we hold of the 2026-09-06 answer carry no `resets_at` on
+        // the session entry while the flat block has it — the window's end was
+        // known and the datapoint stayed empty. The entry wins where it has one.
+        limit.resets_at ?? flatField(flatKey, "resets_at"),
         scoped,
         labelKey,
         labelKey === "nameWindowModelWeek" ? foreign || kind.replace(/_/g, " ") : undefined,
         // The provider names the window that is in force right now — no guessing
         // needed for the account that has the flag.
         limit.is_active,
-        kind === "session"
-          ? lockedReasonOf("five_hour")
-          : kind === "weekly_all"
-            ? lockedReasonOf("seven_day")
-            : undefined,
+        flatField(flatKey, "locked_reason"),
       );
     }
   }
@@ -261,17 +267,24 @@ export function claudeSubProvider(
         throw new FetchError("no-credentials", "Not signed in — start the Claude sign-in in the instance settings");
       }
       if (now() >= tokens.expiresAt - 60_000) {
+        const previous = tokens;
         tokens = await refreshTokens(tokens, postJson, now());
-        await store.save(tokens);
+        await store.replace(previous, tokens);
       }
-      const body = await fetchJson(CLAUDE_OAUTH.usageUrl, {
-        Authorization: `Bearer ${tokens.accessToken}`,
-        "anthropic-beta": CLAUDE_OAUTH.betaHeader,
-        // The claude-code identity, NOT our own name: the endpoint's throttle
-        // bucket keys on this header, and our previous "ioBroker.ai-usage"
-        // identity sat in the aggressive bucket — see CLAUDE_OAUTH.userAgent.
-        "User-Agent": CLAUDE_OAUTH.userAgent,
-      });
+      const body = await withAuthRetry(
+        tokens,
+        store,
+        current => refreshTokens(current, postJson, now()),
+        current =>
+          fetchJson(CLAUDE_OAUTH.usageUrl, {
+            Authorization: `Bearer ${current.accessToken}`,
+            "anthropic-beta": CLAUDE_OAUTH.betaHeader,
+            // The claude-code identity, NOT our own name: the endpoint's throttle
+            // bucket keys on this header, and our previous "ioBroker.ai-usage"
+            // identity sat in the aggressive bucket — see CLAUDE_OAUTH.userAgent.
+            "User-Agent": CLAUDE_OAUTH.userAgent,
+          }),
+      );
       return parseClaudeUsage(body);
     },
   };

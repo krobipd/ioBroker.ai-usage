@@ -153,6 +153,12 @@ interface AccountRuntime {
    * fleet keys such a guard on the CATEGORY, not on the message).
    */
   storageFailed: boolean;
+  /**
+   * Whether the last orphan sweep was rejected by the object database — its own
+   * de-duplication, because it is a different category than a failed value write:
+   * the values DID reach the tree, only the cleanup did not run.
+   */
+  sweepFailed: boolean;
   /** Whether the last query was rejected as unauthorized — reported to the sign-in card. */
   authRejected: boolean;
   /** Whether a plan-wide window was reported as CLOSED by the provider on the last answer. */
@@ -230,6 +236,7 @@ export class PollEngine {
         authNotified: false,
         authRejected: false,
         storageFailed: false,
+        sweepFailed: false,
         serviceOnline: false,
         state: provider ? "no-connection" : "not-signed-in",
         // Nothing known until the service says something; the skeleton writes
@@ -388,6 +395,11 @@ export class PollEngine {
       return;
     }
     const wasFailing = runtime.state !== "ok";
+    // Did THIS round bring values into the tree? The retained `state` cannot answer
+    // that: a tolerated network failure leaves it on "ok" until the third strike,
+    // so the stamp used to move for a round that fetched nothing (decision 43, the
+    // half that was still open).
+    let delivered = false;
     let fetched: UsageSnapshot | undefined;
     try {
       fetched = await (runtime.provider as UsageProvider).fetch();
@@ -428,11 +440,15 @@ export class PollEngine {
         // Only now: the totals must not run ahead of the tree they claim to sum.
         runtime.status.snapshot = fetched;
         runtime.storageFailed = false;
-        if (wasFailing) {
+        delivered = true;
+        if (wasFailing && runtime.firstPollDone) {
           // The failure said so in the log; the recovery has to as well, or the
           // last word on this account stays a warning that is no longer true.
           // It belongs here, not next to the fetch: "delivering again" means the
-          // values reached the tree, not that the request came back.
+          // values reached the tree, not that the request came back. Only from the
+          // SECOND round of this process on: the skeleton starts every account as
+          // "no-connection" (decision 19c), so without the guard every start
+          // announced a recovery from a failure nobody had been told about.
           this.deps.log.info(`${config.name}: delivering again`);
         }
       } catch (e) {
@@ -443,7 +459,7 @@ export class PollEngine {
       }
     }
     runtime.status.reachable = isDelivering(runtime.state);
-    this.writeAccountInfo(runtime);
+    this.writeAccountInfo(runtime, delivered);
     this.writeTotals();
     runtime.firstPollDone = true;
     this.reportFirstRoundOnce();
@@ -483,18 +499,28 @@ export class PollEngine {
       return;
     }
     for (const write of writes) {
-      // Indicators through the comparing write, measurements through the plain one
-      // — the fleet rule, decided at the ROLE the tree builder already carries.
-      if (write.indicator) {
+      // Announced facts through the comparing write, measurements through the plain
+      // one — the fleet rule, decided at the ROLE the tree builder already carries.
+      if (write.compare) {
         void this.deps.setStateChanged(write.id, write.value);
       } else {
         this.deps.setState(write.id, write.value);
       }
     }
-    await this.removeVanished(
-      runtime,
-      writes.map(write => write.id),
-    );
+    // The sweep is MAINTENANCE, not storage. Letting its failure reject the whole
+    // round made the account report "values fetched but not stored" while the
+    // values were demonstrably in the tree — and `status.snapshot` stayed on the
+    // previous answer, so `total.*` froze while the account's own datapoints moved
+    // on. Two datapoints of one adapter contradicting each other about one fact.
+    try {
+      await this.removeVanished(
+        runtime,
+        writes.map(write => write.id),
+      );
+      runtime.sweepFailed = false;
+    } catch (e) {
+      this.handleSweepFailure(runtime, e);
+    }
     if (this.stopped) {
       return;
     }
@@ -580,6 +606,30 @@ export class PollEngine {
   }
 
   /**
+   * The values are in the tree, the cleanup did not run.
+   *
+   * Not a storage failure: nothing the provider delivered was lost, so the round
+   * counts as delivered and the snapshot is adopted. What did not happen is the
+   * removal of a window or model the provider no longer reports — it retries next
+   * round, because `deliveredIds` is left untouched and the first round after a
+   * start compares against the DATABASE by design.
+   *
+   * @param runtime the account's runtime
+   * @param error the thrown error
+   */
+  private handleSweepFailure(runtime: AccountRuntime, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    if (runtime.sweepFailed) {
+      this.deps.log.debug(`${runtime.config.name}: the cleanup of vanished entries still fails (${message})`);
+      return;
+    }
+    runtime.sweepFailed = true;
+    this.deps.log.warn(
+      `${runtime.config.name}: the values were stored, but vanished entries could not be cleaned up (${message})`,
+    );
+  }
+
+  /**
    * Classify a fetch failure.
    *
    * The split matters for the online indicator: with `auth` and `rate-limit` the AI
@@ -599,7 +649,25 @@ export class PollEngine {
       // Nobody has signed in yet, or the key is gone. That is not a rejected
       // sign-in: no notification, no warning, and the settings page keeps
       // offering the sign-in button instead of an error.
+      // The service answered us in the sense that matters here — nothing about the
+      // connection is broken — so the network strike counter starts over.
+      runtime.failCount = 0;
       runtime.serviceOnline = true;
+      if (runtime.state !== "not-signed-in") {
+        // ON THE TRANSITION only. A deliberate sign-out (or a key that vanished
+        // from the credential store) means the account is no longer watched: its
+        // VALUES stay (decision 6/15), but its ALARMS must not. Measured: an
+        // account signed out at 100 % held `warning`, `limitReached`,
+        // `total.warningsActive`, `total.maxLimitPercent` and `total.limitReached`
+        // until someone signed in again — an automation waiting on them never
+        // moved. `computeTotals` skips an account without a snapshot, so dropping
+        // it here removes the account from every sum at once.
+        runtime.status.snapshot = undefined;
+        runtime.status.warning = false;
+        runtime.locked = false;
+        void this.deps.setStateChanged(`${config.id}.warning`, false);
+        void this.deps.setStateChanged(`${config.id}.limitReached`, false);
+      }
       runtime.state = "not-signed-in";
       runtime.error = message;
       if (!runtime.authNotified) {
@@ -609,6 +677,9 @@ export class PollEngine {
       return;
     }
     if (error instanceof FetchError && error.kind === "auth") {
+      // The service ANSWERED — it only said no. Whatever network strikes stood
+      // before are stale (decision 11).
+      runtime.failCount = 0;
       runtime.serviceOnline = true;
       runtime.state = "unauthorized";
       runtime.error = `Sign-in rejected — ${message}`;
@@ -626,6 +697,8 @@ export class PollEngine {
     }
 
     if (error instanceof FetchError && error.kind === "rate-limit") {
+      // Answered as well — a throttle is a reply, not a lost connection.
+      runtime.failCount = 0;
       runtime.serviceOnline = true;
       runtime.state = "rate-limited";
       runtime.error = `Throttled by the provider — retrying in ${Math.round(runtime.backoffMs / 60000)} min, last values kept`;
@@ -644,6 +717,20 @@ export class PollEngine {
       runtime.serviceOnline = false;
       runtime.state = "service-down";
       runtime.error = `The AI service reports a fault — ${message}`;
+      return;
+    }
+    if (!(error instanceof FetchError)) {
+      // Decision 21 one level down: an answer that arrived but could not be turned
+      // into a snapshot is a fault, not a lost connection. Filed as a network
+      // failure it spent two rounds in `debug` and then claimed "not reachable" —
+      // the one thing that was certainly not the case.
+      runtime.failCount = 0;
+      if (runtime.serviceOnline) {
+        this.deps.log.warn(`${config.name}: the answer could not be processed (${message}) — values kept`);
+      }
+      runtime.serviceOnline = false;
+      runtime.state = "service-down";
+      runtime.error = `The answer could not be processed — ${message}`;
       return;
     }
     runtime.failCount++;
@@ -668,12 +755,18 @@ export class PollEngine {
    * called "last successful update" must never do (measured 2026-09-07 while
    * writing its description).
    *
+   * It hung on `runtime.state === "ok"` alone, and the network branch only sets the
+   * state on the THIRD strike — so the first two tolerated failures left the state
+   * on "ok" and re-dated values the round had never fetched. The caller now says
+   * whether this round actually brought a snapshot into the tree.
+   *
    * @param runtime the account's runtime
+   * @param delivered whether this round wrote a fetched snapshot
    */
-  private writeAccountInfo(runtime: AccountRuntime): void {
+  private writeAccountInfo(runtime: AccountRuntime, delivered: boolean): void {
     const { config } = runtime;
     void this.writeAccountStatus(runtime);
-    if (runtime.state === "ok") {
+    if (delivered) {
       this.deps.setState(`${config.id}.info.lastUpdate`, new Date(this.deps.now()).toISOString());
     }
   }
