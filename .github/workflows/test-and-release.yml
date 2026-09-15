@@ -185,8 +185,50 @@ jobs:
           os: ${{ matrix.os }}
           build: true
 
+  adapter-inventory:
+    # The adapter's own start proof, on every push: it runs against its fixture server
+    # (test/inventory.js) and, with a previous release tag, proves that an update reaches
+    # every existing object (upgrade suite). Locally the same run is release gate D06.
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tags: the upgrade suite seeds the previous release's inventory
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Export the previous release's inventory for the upgrade suite
+        run: |
+          set -euo pipefail
+          tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude "$GITHUB_REF_NAME" 2>/dev/null || true)
+          if [ -n "$tag" ] && git show "$tag:test/objects.inventory.json" > /tmp/inventory-previous.json 2>/dev/null; then
+            echo "INVENTORY_PREVIOUS=/tmp/inventory-previous.json" >> "$GITHUB_ENV"
+            echo "previous inventory: $tag"
+          else
+            echo "no previous release — upgrade suite not applicable"
+          fi
+      - name: Start the adapter against its fixture server
+        run: |
+          set -euo pipefail
+          npm run test:inventory 2>&1 | tee /tmp/inventory.log
+          if [ -n "${INVENTORY_PREVIOUS:-}" ] && ! grep -q "upgrade from the previous release" /tmp/inventory.log; then
+            echo "::error ::the upgrade suite did not run although a previous inventory exists"
+            exit 1
+          fi
+      - name: Report when the committed inventory lags behind the code
+        run: |
+          if ! git diff --quiet -- test/objects.inventory.json; then
+            echo "::warning ::test/objects.inventory.json differs from what the adapter produces — the release run regenerates it"
+            git diff --stat -- test/objects.inventory.json
+          fi
+
   deploy:
-    needs: [check-and-lint, admin-check-and-lint, adapter-tests, repochecker-version-gate, workflow-lint]
+    needs:
+      [check-and-lint, admin-check-and-lint, adapter-tests, repochecker-version-gate, workflow-lint, adapter-inventory]
     if: |
       contains(github.event.head_commit.message, '[skip ci]') == false &&
       github.event_name == 'push' &&
