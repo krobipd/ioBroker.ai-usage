@@ -24,6 +24,14 @@ updates:
       - dependency-name: 'typescript'
         update-types:
           - 'version-update:semver-major'
+      # TEMPORARY (2026-09-15): @iobroker/testing 6.2.2 rejects the WIP changelog block `news.NEXT`
+      # (js-controller master schema). A green update on a released tree would auto-merge and turn every
+      # following WIP commit red in `test:package`. Remove this entry as soon as a testing release carries
+      # the NEXT fix (PR ioBroker/testing #737).
+      - dependency-name: '@iobroker/testing'
+        update-types:
+          - 'version-update:semver-minor'
+          - 'version-update:semver-patch'
 
   # src-admin (Module-Federation admin component): hand-pinned compatibility matrix
   # (React / MUI / @module-federation/vite — the versions the component was built against);
