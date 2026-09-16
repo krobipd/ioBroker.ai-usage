@@ -19,6 +19,10 @@ on:
       - ".gitattributes"
       - ".editorconfig"
       - "LICENSE"
+      # No job reads the Dependabot configuration; the pre-push guard rightly refuses a
+      # skip-CI marker for it, so the filter is the only thing that keeps a config
+      # change from running the full matrix (seven such runs on 2026-09-15).
+      - ".github/dependabot.yml"
   pull_request:
     branches:
       - main
@@ -144,10 +148,16 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npm ci --prefix src-admin
-      # Der Compiler der KOMPONENTE, nicht irgendeiner aus dem Pfad: `npx tsc` wollte
-      # beim ersten Lauf dieses Jobs ein fremdes `tsc@2.0.4` nachladen (2026-09-05).
+      # Built before it is checked: `buildReact({vite:true})` calls vite directly, and
+      # what no script runs, no type check sees either.
+      - name: Build the admin custom component (Vite / Module Federation)
+        run: npm run build:admin
+      # Through the SCRIPT, not as a command line of its own: a copy of the call in the
+      # CI can drift away from the script without any gate noticing. The script names
+      # the COMPONENT's compiler, not whichever one is on the PATH — `npx tsc` wanted to
+      # pull a foreign `tsc@2.0.4` on this job's first run (2026-09-05).
       - name: Type-check the admin component
-        run: ./src-admin/node_modules/.bin/tsc --noEmit -p src-admin/tsconfig.json
+        run: npm run check:admin
       - name: Lint the admin component
         run: npm --prefix src-admin run lint
       # Die Vitest-Konfig liegt ausserhalb des tsconfig-include und wurde von keinem
