@@ -2,6 +2,7 @@ import * as utils from "@iobroker/adapter-core";
 import { Credentials } from "@iobroker/adapter-core";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { errorText } from "./lib/error-text";
 import { getJson, postForm, postJson } from "./lib/http";
 import { loadCatalogue, tName } from "./lib/i18n";
 import { PollEngine } from "./lib/poll-engine";
@@ -80,6 +81,17 @@ export class AiUsageAdapter extends utils.Adapter {
   private balanceLogged = false;
 
   /**
+   * Set the moment the host asks us to stop — the startup path's half of decision 32.
+   *
+   * `stop()` reaches the poll engine, but only once the engine EXISTS. A shutdown
+   * that lands in the startup's own waits had nothing to look at, so `onReady` ran
+   * on to its end afterwards: it deleted stale objects after the host had been told
+   * we were done, and wrote `info.connection = true` over the offline stamp
+   * `onUnload` had just set — the same damage decision 47 removed from the poll path.
+   */
+  private unloading = false;
+
+  /**
    * @param options the adapter options
    */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -101,7 +113,7 @@ export class AiUsageAdapter extends utils.Adapter {
         // and a first query that has to wait for a provider can take up to the full
         // request timeout. The values arrive a moment later on their own.
         void this.engine?.pollNow(id).catch(e => {
-          this.log.debug(`First query after sign-in failed: ${e instanceof Error ? e.message : String(e)}`);
+          this.log.debug(`First query after sign-in failed: ${errorText(e)}`);
         });
       },
     });
@@ -136,7 +148,7 @@ export class AiUsageAdapter extends utils.Adapter {
           this.respond(obj, { error: `Unknown command: ${obj.command}` });
       }
     } catch (e) {
-      this.log.error(`onMessage failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.error(`onMessage failed: ${errorText(e)}`);
       this.respond(obj, { error: "internal error — see log" });
     }
   }
@@ -280,7 +292,7 @@ export class AiUsageAdapter extends utils.Adapter {
         } catch (e) {
           // Best effort by design: the fresh tokens are usable, the next refresh
           // writes again. De-duplicated on the CATEGORY, not on the message.
-          const message = e instanceof Error ? e.message : String(e);
+          const message = errorText(e);
           const label = PROVIDER_LABELS[provider] ?? provider;
           if (writeFailed) {
             this.log.debug(`${label}: the refreshed tokens still cannot be stored (${message})`);
@@ -338,9 +350,9 @@ export class AiUsageAdapter extends utils.Adapter {
       };
     } catch (e) {
       this.log.warn(
-        `${PROVIDER_LABELS[provider] ?? provider}: the stored sign-in cannot be read (${
-          e instanceof Error ? e.message : String(e)
-        }) — sign in again in the instance settings`,
+        `${PROVIDER_LABELS[provider] ?? provider}: the stored sign-in cannot be read (${errorText(
+          e,
+        )}) — sign in again in the instance settings`,
       );
       return null;
     }
@@ -404,7 +416,7 @@ export class AiUsageAdapter extends utils.Adapter {
       await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (e) {
-      this.log.debug(`Could not check the instance object: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.debug(`Could not check the instance object: ${errorText(e)}`);
       return false;
     }
   }
@@ -430,11 +442,7 @@ export class AiUsageAdapter extends utils.Adapter {
       const count = loadCatalogue(this.i18nRoot());
       this.log.debug(`Object name catalogue loaded (${count} entries)`);
     } catch (e) {
-      this.log.warn(
-        `Object names fall back to their keys — the translations could not be read (${
-          e instanceof Error ? e.message : String(e)
-        })`,
-      );
+      this.log.warn(`Object names fall back to their keys — the translations could not be read (${errorText(e)})`);
     }
   }
 
@@ -470,7 +478,7 @@ export class AiUsageAdapter extends utils.Adapter {
       });
     } catch (e) {
       // A failure here costs a name, never the startup.
-      this.log.debug(`Could not refresh the manifest objects: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.debug(`Could not refresh the manifest objects: ${errorText(e)}`);
     }
   }
 
@@ -485,6 +493,9 @@ export class AiUsageAdapter extends utils.Adapter {
       // Before anything creates an object — every name below comes from here.
       this.loadTranslations();
       await this.refreshManifestObjects();
+      if (this.unloading) {
+        return;
+      }
       // Parsed ONCE and handed on: the cleanup used to parse the same table a second
       // time, so a change in the parser could have been applied to one and not the
       // other.
@@ -498,8 +509,14 @@ export class AiUsageAdapter extends utils.Adapter {
       // Baseline first: the cleanup deletes and the engine creates, both are counted
       // against this snapshot.
       await this.snapshotExistingStates();
+      if (this.unloading) {
+        return;
+      }
       await this.cleanupStaleObjects(accounts);
       await this.removeMovedStates(accounts);
+      if (this.unloading) {
+        return;
+      }
       if (accounts.length === 0) {
         this.log.info("No AI accounts configured — add accounts in the instance settings");
         await this.setStateChangedAsync("info.connection", { val: false, ack: true });
@@ -511,6 +528,9 @@ export class AiUsageAdapter extends utils.Adapter {
         if (provider) {
           providers.set(account.id, provider);
         }
+      }
+      if (this.unloading) {
+        return;
       }
       this.engine = new PollEngine(accounts, providers, interval, {
         upsertObject: async def => {
@@ -537,7 +557,7 @@ export class AiUsageAdapter extends utils.Adapter {
               this.removedStates++;
             }
           } catch (e) {
-            this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
+            this.log.debug(`Could not remove ${id}: ${errorText(e)}`);
           }
         },
         readState: async id => {
@@ -579,14 +599,14 @@ export class AiUsageAdapter extends utils.Adapter {
         notify: this.config.notifications
           ? (_account, message) =>
               void this.registerNotification("ai-usage", "userActionRequired", message).catch(e =>
-                this.log.debug(`Could not raise notification: ${e instanceof Error ? e.message : String(e)}`),
+                this.log.debug(`Could not raise notification: ${errorText(e)}`),
               )
           : undefined,
       });
       await this.engine.start();
       this.log.info(`Monitoring ${providers.size} of ${accounts.length} AI account(s), polling every ${interval} s`);
     } catch (e) {
-      this.log.error(`Startup failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.error(`Startup failed: ${errorText(e)}`);
     }
   }
 
@@ -610,7 +630,7 @@ export class AiUsageAdapter extends utils.Adapter {
         }
       }
     } catch (e) {
-      this.log.debug(`Could not snapshot existing objects: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.debug(`Could not snapshot existing objects: ${errorText(e)}`);
     }
   }
 
@@ -702,9 +722,7 @@ export class AiUsageAdapter extends utils.Adapter {
       }
       return key;
     } catch (e) {
-      this.log.warn(
-        `${account.name}: cannot read credential ${account.credentialId} (${e instanceof Error ? e.message : String(e)})`,
-      );
+      this.log.warn(`${account.name}: cannot read credential ${account.credentialId} (${errorText(e)})`);
       return undefined;
     }
   }
@@ -741,7 +759,7 @@ export class AiUsageAdapter extends utils.Adapter {
           this.knownStateIds.delete(id);
           this.removedStates++;
         } catch (e) {
-          this.log.debug(`Could not remove ${id}: ${e instanceof Error ? e.message : String(e)}`);
+          this.log.debug(`Could not remove ${id}: ${errorText(e)}`);
         }
       }
     }
@@ -780,7 +798,7 @@ export class AiUsageAdapter extends utils.Adapter {
         await this.delObjectAsync(root, { recursive: true });
       }
     } catch (e) {
-      this.log.warn(`Cleanup of stale objects failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.warn(`Cleanup of stale objects failed: ${errorText(e)}`);
     }
   }
 
@@ -806,13 +824,15 @@ export class AiUsageAdapter extends utils.Adapter {
    */
   private onUnload(callback: () => void): void {
     try {
+      // Before anything else: a startup still running has to see this.
+      this.unloading = true;
       this.signIn.stopAll();
       const engine = this.engine;
       this.engine?.stop();
       this.engine = null;
       void (engine?.markAllOffline() ?? this.setStateChangedAsync("info.connection", { val: false, ack: true }))
         .then(() => this.log.debug("Shutdown: final states written"))
-        .catch(e => this.log.debug(`Shutdown: final states rejected — ${e instanceof Error ? e.message : String(e)}`))
+        .catch(e => this.log.debug(`Shutdown: final states rejected — ${errorText(e)}`))
         .finally(callback);
     } catch {
       callback();

@@ -1,3 +1,4 @@
+import { errorText } from "./error-text";
 import type { FormPost, JsonPost } from "./http";
 import { PROVIDER_LABELS, SIGN_IN_FLOWS, SIGN_IN_WINDOW_MS, attemptExpired, type SignInState } from "./sign-in";
 import type { TokenSet, TokenStore } from "./provider";
@@ -129,7 +130,7 @@ export class SignInManager {
         expiresAt: start.expiresAt,
       };
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = errorText(e);
       this.failures.set(provider, reason);
       return { status: "failed", reason };
     }
@@ -171,7 +172,7 @@ export class SignInManager {
       await this.finish(provider, tokens);
       return { status: "signed-in" };
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = errorText(e);
       this.failures.set(provider, reason);
       return { status: "failed", reason };
     }
@@ -292,7 +293,7 @@ export class SignInManager {
       } catch (e) {
         this.stopPoller(provider);
         this.attempts.delete(provider);
-        this.failures.set(provider, e instanceof Error ? e.message : String(e));
+        this.failures.set(provider, errorText(e));
       } finally {
         this.polling.delete(provider);
       }

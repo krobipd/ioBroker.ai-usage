@@ -1324,3 +1324,61 @@ describe("what the audit of 2026-09-15 found", () => {
     expect(h.infos.filter(line => line.includes("delivering again"))).toHaveLength(1);
   });
 });
+
+describe("what the fleet sweep of 2026-09-16 found", () => {
+  test("a model the report skips keeps its channel and gets a 0", async () => {
+    const h = makeHarness();
+    // The month boundary. An OpenAI organisation report is fetched from the 1st, so
+    // on the 1st it lists only what has already run this month — and decision 49
+    // made that list the WHOLE month precisely to stop UTC midnight emptying it.
+    // The month rollover was the half left open: the moment the first model of the
+    // new month reported usage, every other model's channel was swept away.
+    const provider = scriptedProvider([
+      {
+        tokens: {
+          inputToday: 10,
+          outputToday: 5,
+          perModel: [
+            { model: "gpt-5", tokens: 7 },
+            { model: "o3", tokens: 3 },
+          ],
+        },
+      },
+      { tokens: { inputToday: 2, outputToday: 1, perModel: [{ model: "gpt-5", tokens: 3 }] } },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("a.models.o3.tokensToday")).toBe(3);
+    h.deleted.length = 0;
+    await h.tick();
+    // The channel is still there…
+    expect(h.deleted).toEqual([]);
+    // …and it says what is true, rather than freezing on yesterday's 3 under a name
+    // that says "today".
+    expect(h.states.get("a.models.o3.tokensToday")).toBe(0);
+    expect(h.states.get("a.models.gpt-5.tokensToday")).toBe(3);
+  });
+
+  test("a limit window that falls out is still swept — only models changed", async () => {
+    const h = makeHarness();
+    // The counter-test, so the fix cannot be "never delete anything": for `limits.*`
+    // the provider reports the PLAN, not usage, so a window that stops appearing
+    // really is gone and decision 15 still applies to it unchanged.
+    const provider = scriptedProvider([
+      {
+        limits: [
+          { name: "session", labelKey: "nameWindowSession", label: "Session", percent: 42 },
+          { name: "week", labelKey: "nameWindowWeek", label: "Week", percent: 10 },
+        ],
+      },
+      { limits: [{ name: "session", labelKey: "nameWindowSession", label: "Session", percent: 50 }] },
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    h.deleted.length = 0;
+    await h.tick();
+    expect(h.deleted.some(id => id.startsWith("a.limits.week"))).toBe(true);
+  });
+});

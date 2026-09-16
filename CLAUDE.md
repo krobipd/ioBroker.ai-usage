@@ -574,6 +574,48 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
     gemessen), `ceil` bildet sie auf 14:10 und 14:11 ab und das Flattern ist zurück. Die halbe
     Minute, die der Wert zu früh stehen kann, liegt innerhalb der Genauigkeit, die die Minute
     ohnehin ankündigt. **Nicht erneut vorschlagen** — die drei echten Messwerte stehen im Test.
+68. **Ein Modell ohne Verbrauch bekommt seine 0, statt gefegt zu werden** (0.15.0 · B1, die zweite
+    Hälfte von Entscheidung 49): Der Verbrauchsbericht ist eine Aussage über einen ZEITRAUM, kein
+    Bestandsverzeichnis — ein Modell fehlt darin, weil nichts darauf lief, nicht weil der Anbieter
+    es abgeschafft hat. Entscheidung 49 schloss die TAGES-Hälfte (die OpenAI-Modellliste kommt aus
+    dem ganzen Monat, also leert UTC-Mitternacht sie nicht mehr). Offen blieb der MONATSwechsel: der
+    Bericht beginnt am 1. neu, und sobald das erste Modell des neuen Monats Verbrauch meldet, sprach
+    die Runde wieder über den `models`-Zweig — der Waisen-Aufräufer löschte jeden anderen
+    Modell-Kanal samt Historie und Enum-Zugehörigkeit und legte ihn bei der nächsten Nutzung neu an.
+    `zeroUnusedModels` schreibt jetzt die 0 und nimmt die Id in die gelieferte Menge, womit beide
+    Hälften zugleich fallen: der Kanal bleibt, UND er friert nicht auf dem letzten Wert unter einem
+    Namen ein, der „heute" sagt. **`limits.*` bleibt unverändert** — dort meldet der Anbieter den
+    PLAN, ein Fenster, das verschwindet, ist wirklich weg (Entscheidung 15 gilt dort weiter, per
+    Gegentest festgenagelt). Nadel A43.
+69. **Die Stopp-Prüfung gilt auch im STARTpfad** (0.15.0 · B3, die dritte Hälfte von 32/47):
+    `stop()` erreicht nur eine Engine, die schon existiert — ein Abschalten, das in die Wartezeiten
+    des Starts fiel, sah niemand. `onReady` lief danach zu Ende: es löschte veraltete Objekte,
+    NACHDEM dem Host „fertig" gemeldet war, und schrieb `info.connection = true` über den
+    Offline-Stempel, den `onUnload` gerade gesetzt hatte — derselbe Schaden, den Entscheidung 47 aus
+    dem Abfragepfad entfernt hat. `onUnload` setzt jetzt als ERSTES `unloading`, und `onReady` prüft
+    es nach jedem `await` (vor allem VOR den beiden löschenden Schritten). Nadel A44.
+    **Geprüft und NICHT gebaut:** ein `catch` um `pollOnce` in `pollAccount`. Dort steht `try/finally`
+    ohne `catch`, und die Flotten-Regel „oberstes try/catch" klingt zuständig — sie gilt aber dem
+    Ereignis-HANDLER, dessen unbehandelte Ablehnung den Prozess nimmt. `pollOnce` fängt Abruf und
+    Schreibweg je selbst, die fünf Anweisungen danach rufen nur Nähte, die in `main.ts` ein `.catch()`
+    tragen: der Wächter hätte nichts bewacht.
+70. **Der Antwortkörper hat eine Obergrenze, nicht nur eine Frist** (0.15.0 · B4): `AbortSignal.timeout`
+    begrenzt, wie LANGE eine Antwort dauern darf, nicht wie GROSS sie werden kann — auf einer schnellen
+    Leitung sind 15 s sehr viel Speicher, in einem Prozess, der monatelang läuft. `readCappedText`
+    liest den Körper als Strom und zählt mit (8 MiB); darüber ist es ein `service`-Fehler. Gezählt wird
+    beim LESEN, nicht an `Content-Length`: eine gestückelte Antwort trägt gar keine Länge, und eine
+    angegebene ist die Behauptung des Servers, keine Messung. Nadel A45.
+    ⚠️ Die Attrappe der http-Tests war ein Objekt mit `json()`/`text()` und hatte gar keinen `body` —
+    sie hätte die Kappe nie erreicht und trotzdem grün gemeldet. Sie baut jetzt echte `Response`-Objekte.
+71. **Ein Fehlertext hat EINE Quelle** (0.15.0 · F1, Flotten-Klasse 1 seit 2026-09-02): 25 Stellen
+    trugen `e instanceof Error ? e.message : String(e)` von Hand. Richtig für Fehler und Zeichenketten,
+    falsch für alles andere: ein geworfenes einfaches Objekt (`{ code: "ECONNRESET" }`, das Fehlerobjekt
+    eines HTTP-Baukastens) erreichte Protokoll, `info.error` und Sentry als `[object Object]`.
+    `errorText()` in `src/lib/error-text.ts` — bewusst OHNE Importe, weil `http.ts` unter den
+    Helfer-Modulen sitzt. `JSON.stringify` ist im Objekt-Zweig doppelt abgesichert, weil es genau hier
+    feindselig ist: es WIRFT bei einer zyklischen Struktur (ein Fehler, der seine Antwort mitführt) und
+    LIEFERT `undefined`, wenn ein `toJSON` nichts hergibt. Nicht ersetzt wurde
+    `gemini-sub.ts` — dort entscheidet das Ternär, WAS geworfen wird, es ist kein Text.
 
 ## Tests
 

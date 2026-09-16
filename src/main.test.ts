@@ -107,6 +107,7 @@ interface Internals {
   engine: { deps?: unknown } | null;
   signIn: { state(provider: string): Promise<{ status: string; reason?: string }> };
   onUnload(cb: () => void): void;
+  onReady(): Promise<void>;
 }
 
 const internals = (adapter: AiUsageAdapter): Internals => adapter as unknown as Internals;
@@ -742,5 +743,49 @@ describe("discarded account rows reach the log", () => {
     const wired = (internals(withNotifications).engine as unknown as { deps: { notify?: unknown } }).deps;
     expect(typeof wired.notify).toBe("function");
     internals(withNotifications).onUnload(() => undefined);
+  });
+});
+
+describe("a shutdown that lands inside the startup", () => {
+  test("the startup stops instead of deleting and starting up after the host was told we are done", async () => {
+    // Decisions 32/47 guard every `await` of the POLL path — the startup path had
+    // no such check, because `stop()` can only reach an engine that already exists.
+    // A shutdown during the startup's own database waits therefore let `onReady`
+    // run on: it deleted stale objects after the host had been told the adapter was
+    // finished, and started an engine nobody would stop.
+    const adapter = makeAdapter();
+    adapter.config = {
+      accounts: [{ name: "OR", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 }],
+      pollInterval: 300,
+    } as unknown as ioBroker.AdapterConfig;
+    // The host asks us to stop while the startup snapshot is being read — and the
+    // snapshot hands back an object the cleanup WOULD delete, so this test can only
+    // pass because the guard ran, not because there was nothing to do.
+    adapter.getAdapterObjectsAsync = vi.fn(() => {
+      internals(adapter).onUnload(() => {});
+      return Promise.resolve({ "ai-usage.0.old-api": { type: "state" } });
+    }) as unknown as typeof adapter.getAdapterObjectsAsync;
+
+    await internals(adapter).onReady();
+
+    expect(adapter.delObjectAsync).not.toHaveBeenCalled();
+    expect(internals(adapter).engine).toBeNull();
+  });
+
+  test("without the shutdown the same startup does delete and does start", async () => {
+    // The counter-test: the guard must stop a SHUTDOWN, not the startup itself.
+    const adapter = makeAdapter();
+    adapter.config = {
+      accounts: [{ name: "OR", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 }],
+      pollInterval: 300,
+    } as unknown as ioBroker.AdapterConfig;
+    adapter.getAdapterObjectsAsync = vi.fn(() =>
+      Promise.resolve({ "ai-usage.0.old-api": { type: "state" } }),
+    ) as unknown as typeof adapter.getAdapterObjectsAsync;
+
+    await internals(adapter).onReady();
+
+    expect(adapter.delObjectAsync).toHaveBeenCalledWith("old-api", { recursive: true });
+    expect(internals(adapter).engine).not.toBeNull();
   });
 });

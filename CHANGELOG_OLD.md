@@ -1,6 +1,18 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.11.0 (2026-09-05)
+
+- Fixed: Signing in from the instance settings works again — a leftover setting from an earlier version had silently closed the adapter's message channel, so none of the three flows reached it
+- Fixed: A subscription whose stored sign-in was rejected no longer claims to be signed in — the row now offers the sign-in again instead of showing a green check next to an error
+- Fixed: The status badge of an account no longer blanks out for a moment when a single status read is missed — a hiccup in the settings page is not an account without a status
+- Fixed: A stored credential whose name sorts high in the alphabet is no longer missing from the account list in the instance settings
+- Fixed: The settings page falls back to English for a browser language the adapter does not ship, instead of passing that language on unchecked
+- Improved: All object names are now available in eleven languages instead of English only, and a renamed object reaches installations that already exist
+- Improved: ChatGPT usage is read with the identity that endpoint expects, the way the Claude query already did — fewer rejected requests on that account
+- Improved: Monthly cost reports can no longer be cut short in silence — a report that does not fit is reported in the log instead of producing a figure that is too low
+- Changed: "Highest account utilisation" says what it always measured — the fullest limit window **or** the account's remaining budget
+
 ## 0.10.0 (2026-09-01)
 
 - Fixed: The reset-time datapoint of a limit window no longer disappears and reappears — it stays and simply empties while no window is running

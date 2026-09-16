@@ -21,10 +21,9 @@ globalThis.fetch = function fixtureFetch(input) {
     return Promise.reject(new Error(`inventory fixture: no route for ${url}`));
   }
   const body = JSON.stringify(route.body);
-  return Promise.resolve({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve(JSON.parse(body)),
-    text: () => Promise.resolve(body),
-  });
+  // A REAL Response, not an object with `json()`/`text()`. `lib/http.ts` reads the
+  // body as a stream to hold it under a size cap, and a stand-in without `body`
+  // answered every provider with an empty string — every account came back as
+  // "invalid JSON" while the fixture looked perfectly fine.
+  return Promise.resolve(new Response(body, { status: 200 }));
 };

@@ -1,3 +1,4 @@
+import { errorText } from "./error-text";
 import { tName } from "./i18n";
 import type { AccountConfig } from "./pure-helpers";
 import { PROVIDER_LABELS } from "./sign-in";
@@ -569,12 +570,56 @@ export class PollEngine {
    */
   private async removeVanished(runtime: AccountRuntime, delivered: string[]): Promise<void> {
     const known = runtime.deliveredIds ?? (await this.deps.listStateIds(runtime.config.id));
-    for (const id of orphanObjectIds(known, delivered, runtime.staticIds)) {
+    const reported = this.zeroUnusedModels(known, delivered);
+    for (const id of orphanObjectIds(known, reported, runtime.staticIds)) {
       await this.deps.deleteObject(id);
       runtime.createdObjects.delete(id);
       this.deps.log.info(`${runtime.config.name}: removed "${id}" — the provider no longer reports it`);
     }
-    runtime.deliveredIds = delivered;
+    runtime.deliveredIds = reported;
+  }
+
+  /**
+   * A model the report does not mention this round is IDLE, not gone — write its 0.
+   *
+   * The usage report is a statement about a PERIOD, not an inventory: a model is
+   * missing from it because nothing ran on it, not because the provider dropped it.
+   * The sweep cannot tell those apart, so it used to delete on the weaker reading.
+   *
+   * Decision 49 closed the daily half of this — the OpenAI model list is built from
+   * the whole month, so UTC midnight no longer empties it. The MONTH boundary was
+   * the half left open: the report starts over on the 1st, and the moment the first
+   * model of the new month reports usage, every other model's channel was swept —
+   * history, enum membership and all — and re-created on its next use.
+   *
+   * Writing the 0 fixes both halves at once. The channel stays (it is in the
+   * delivered set, so {@link orphanObjectIds} leaves it alone) and it stops lying:
+   * without this, an unreported model would simply freeze on its last count under a
+   * name that says "today" — the exact lie decision 49 removed from the block as a
+   * whole. `limits.*` keeps the old reading, and rightly so: there the provider
+   * reports the PLAN, so a window that stops appearing really is gone.
+   *
+   * @param known every state id the account had before
+   * @param delivered the state ids this snapshot wrote
+   * @returns `delivered` plus the idle model states, which now carry a written 0
+   */
+  private zeroUnusedModels(known: readonly string[], delivered: string[]): string[] {
+    const delivering = new Set(delivered);
+    const idle: string[] = [];
+    for (const id of known) {
+      if (delivering.has(id)) {
+        continue;
+      }
+      // `<account>.models.<model>.tokensToday` — the only state a model channel
+      // carries. Named explicitly rather than zeroing everything under `models.`:
+      // a future non-numeric state there must not silently receive a 0.
+      const parts = id.split(".");
+      if (parts.length === 4 && parts[1] === "models" && parts[3] === "tokensToday") {
+        this.deps.setState(id, 0);
+        idle.push(id);
+      }
+    }
+    return idle.length > 0 ? [...delivered, ...idle] : delivered;
   }
 
   /**
@@ -592,7 +637,7 @@ export class PollEngine {
    * @param error the thrown error
    */
   private handleStorageFailure(runtime: AccountRuntime, error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     runtime.state = "storage-error";
     runtime.error = `Values fetched but not stored — the object database rejected the write (${message})`;
     if (runtime.storageFailed) {
@@ -618,7 +663,7 @@ export class PollEngine {
    * @param error the thrown error
    */
   private handleSweepFailure(runtime: AccountRuntime, error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     if (runtime.sweepFailed) {
       this.deps.log.debug(`${runtime.config.name}: the cleanup of vanished entries still fails (${message})`);
       return;
@@ -644,7 +689,7 @@ export class PollEngine {
    */
   private handleFailure(runtime: AccountRuntime, error: unknown): void {
     const { config } = runtime;
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     if (error instanceof FetchError && error.kind === "no-credentials") {
       // Nobody has signed in yet, or the key is gone. That is not a rejected
       // sign-in: no notification, no warning, and the settings page keeps
@@ -943,9 +988,7 @@ export class PollEngine {
     try {
       runtime.status.warning = (await this.deps.readState(`${config.id}.warning`)) === true;
     } catch (e) {
-      this.deps.log.debug(
-        `${config.name}: could not read the previous warning state (${e instanceof Error ? e.message : String(e)})`,
-      );
+      this.deps.log.debug(`${config.name}: could not read the previous warning state (${errorText(e)})`);
     }
   }
 

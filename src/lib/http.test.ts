@@ -16,20 +16,50 @@ import { getJson, postForm, postJson } from "./http";
 /**
  * A stubbed `fetch` that answers with one canned response.
  *
+ * A REAL `Response`, not an object carrying `json()`/`text()`: those two are the
+ * only members a hand-built fake used to have, and `http.ts` reads the body as a
+ * STREAM to keep it under a size cap. A fake without `body` cannot exercise that
+ * path at all — it would have reported the cap as covered while never reaching it.
+ *
  * @param status the HTTP status to answer with
- * @param body the body `response.json()` resolves to
+ * @param body the JSON body to answer with
  * @returns the mock function, so a test can inspect the call
  */
 function respondWith(status: number, body: unknown = {}): ReturnType<typeof vi.fn> {
+  return respondWithText(status, JSON.stringify(body));
+}
+
+/**
+ * A stubbed `fetch` answering with a raw text body — for the non-JSON cases.
+ *
+ * @param status the HTTP status to answer with
+ * @param text the exact body bytes
+ * @returns the mock function, so a test can inspect the call
+ */
+function respondWithText(status: number, text: string): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn(() => Promise.resolve(new Response(text, { status })));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+/**
+ * A stubbed `fetch` whose body fails while it is being read.
+ *
+ * @param status the HTTP status to answer with
+ * @returns the mock function
+ */
+function respondWithBrokenBody(status: number): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn(() =>
-    Promise.resolve({
-      status,
-      ok: status >= 200 && status < 300,
-      json: () => Promise.resolve(body),
-      // A real Response has both; the failure path reads `text()` to carry the
-      // provider's own words into the error message.
-      text: () => Promise.resolve(JSON.stringify(body)),
-    } as unknown as Response),
+    Promise.resolve(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error("stream already consumed"));
+          },
+        }),
+        { status },
+      ),
+    ),
   );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -100,16 +130,7 @@ describe("failure classification", () => {
   });
 
   test("a body that is not JSON is a service fault", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve({
-          status: 200,
-          ok: true,
-          json: () => Promise.reject(new SyntaxError("Unexpected token <")),
-        } as unknown as Response),
-      ),
-    );
+    respondWithText(200, "<html>not json at all</html>");
     expect(await kindOf(() => getJson("https://example.invalid/x", {}))).toBe("service");
   });
 
@@ -241,34 +262,33 @@ describe("the provider's own words reach the error text", () => {
   test("an unreadable body changes nothing and never throws on its own", async () => {
     // Best effort in the strict sense: a body that is missing, not JSON or shaped
     // differently must leave the bare status standing.
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve({
-          status: 500,
-          ok: false,
-          json: () => Promise.reject(new Error("no body")),
-          text: () => Promise.reject(new Error("stream already consumed")),
-        } as unknown as Response),
-      ),
-    );
+    respondWithBrokenBody(500);
     expect(await messageOf(() => getJson("https://x/y", {}))).toBe("HTTP 500");
+    respondWithBrokenBody(500);
     expect(await kindOf(() => getJson("https://x/y", {}))).toBe("service");
   });
 
   test("an HTML error page from a proxy is noise and stays out", async () => {
     const html = `<html><body>${"x".repeat(500)}</body></html>`;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve({
-          status: 502,
-          ok: false,
-          json: () => Promise.reject(new Error("not json")),
-          text: () => Promise.resolve(html),
-        } as unknown as Response),
-      ),
-    );
+    respondWithText(502, html);
     expect(await messageOf(() => getJson("https://x/y", {}))).toBe("HTTP 502");
+  });
+
+  test("a body past the size cap is refused instead of held in memory", async () => {
+    // The request timeout bounds how LONG a body may take, never how BIG it gets.
+    // 9 MiB against an 8 MiB cap — one chunk past the limit is enough to prove the
+    // counter stops the read; the adapter must not grow with whatever it is sent.
+    respondWithText(200, "x".repeat(9 * 1024 * 1024));
+    expect(await kindOf(() => getJson("https://x/y", {}))).toBe("service");
+    respondWithText(200, "x".repeat(9 * 1024 * 1024));
+    expect(await messageOf(() => getJson("https://x/y", {}))).toContain("exceeds");
+  });
+
+  test("a body just under the cap still parses", async () => {
+    // The neighbouring case, so the cap cannot be "fixed" by refusing everything:
+    // a large but legitimate report — a month of buckets — must still come through.
+    const padding = "y".repeat(1024 * 1024);
+    respondWithText(200, JSON.stringify({ padding }));
+    expect(await getJson("https://x/y", {})).toEqual({ padding });
   });
 });

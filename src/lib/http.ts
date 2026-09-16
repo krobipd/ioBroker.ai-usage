@@ -1,7 +1,61 @@
+import { errorText } from "./error-text";
 import { FetchError } from "./provider";
 
 /** Per-request timeout (ms). */
 const REQUEST_TIMEOUT_MS = 15000;
+
+/**
+ * Largest response body this adapter will hold in memory (bytes).
+ *
+ * Generous on purpose: the biggest answer any provider sends is a month of daily
+ * cost buckets grouped by model, which is orders of magnitude below this. The cap
+ * is not a budget, it is a backstop.
+ */
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Read a response body as text, refusing to grow past {@link MAX_BODY_BYTES}.
+ *
+ * The request timeout bounds how LONG a body may take, not how BIG it may get — on
+ * a fast link fifteen seconds is a lot of memory, and this runs in a process that
+ * stays up for months. Counted while reading rather than from `Content-Length`: a
+ * chunked answer carries no length at all, and a declared one is the server's claim,
+ * not a measurement.
+ *
+ * @param response the response to read
+ * @returns the decoded body
+ * @throws {FetchError} `service` once the body passes the cap
+ */
+async function readCappedText(response: Response): Promise<string> {
+  if (!response.body) {
+    return "";
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value) {
+        continue;
+      }
+      bytes += value.byteLength;
+      if (bytes > MAX_BODY_BYTES) {
+        // Stop the transfer instead of draining a body we have already refused.
+        await reader.cancel();
+        throw new FetchError("service", `response body exceeds ${MAX_BODY_BYTES} bytes`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return text + decoder.decode();
+}
 
 /** The JSON-GET seam the provider modules use — injectable for tests. */
 export type JsonFetch = (url: string, headers: Record<string, string>) => Promise<unknown>;
@@ -47,7 +101,7 @@ async function request(url: string, init: RequestInit, authOn400 = false): Promi
   try {
     response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (e) {
-    throw new FetchError("network", e instanceof Error ? e.message : String(e));
+    throw new FetchError("network", errorText(e));
   }
   if (!response.ok) {
     // The status alone reaches the user as `info.error`, and "HTTP 401" tells them
@@ -67,10 +121,19 @@ async function request(url: string, init: RequestInit, authOn400 = false): Promi
     // never reached it.
     throw new FetchError("service", `HTTP ${response.status}${detail}`);
   }
+  let text: string;
   try {
-    return await response.json();
+    text = await readCappedText(response);
   } catch (e) {
-    throw new FetchError("service", `invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+    // The cap's own verdict passes through unchanged; anything else here is a
+    // connection that died mid-body, which counts as a service fault exactly as an
+    // unreadable body always did.
+    throw e instanceof FetchError ? e : new FetchError("service", `unreadable body: ${errorText(e)}`);
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (e) {
+    throw new FetchError("service", `invalid JSON: ${errorText(e)}`);
   }
 }
 
@@ -92,8 +155,9 @@ const MAX_DETAIL_CHARS = 200;
 async function errorDetail(response: Response): Promise<string> {
   let text: string;
   try {
-    text = await response.text();
+    text = await readCappedText(response);
   } catch {
+    // Unreadable, or an error page past the cap — the caller keeps the bare status.
     return "";
   }
   let message: unknown;

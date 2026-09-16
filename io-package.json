@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.14.0",
+    "version": "0.15.0",
     "news": {
+      "0.15.0": {
+        "en": "Model channels survive the turn of a month, a shutdown during startup no longer deletes objects afterwards, and error texts name the actual failure.",
+        "de": "Modell-Kanäle überstehen den Monatswechsel, ein Abschalten während des Starts löscht danach keine Objekte mehr, und Fehlertexte nennen den echten Fehler.",
+        "ru": "Каналы моделей переживают смену месяца, остановка во время запуска больше не удаляет объекты после неё, а тексты ошибок называют настоящую причину.",
+        "pt": "Os canais de modelo sobrevivem à mudança de mês, uma paragem durante o arranque já não apaga objetos depois disso, e os textos de erro nomeiam a falha real.",
+        "nl": "Modelkanalen overleven de maandwisseling, een afsluiting tijdens het opstarten verwijdert daarna geen objecten meer, en foutteksten noemen de echte fout.",
+        "fr": "Les canaux de modèle survivent au changement de mois, un arrêt pendant le démarrage ne supprime plus d'objets ensuite, et les textes d'erreur nomment la panne réelle.",
+        "it": "I canali dei modelli sopravvivono al cambio di mese, un arresto durante l'avvio non elimina più oggetti in seguito e i testi di errore indicano il guasto reale.",
+        "es": "Los canales de modelo sobreviven al cambio de mes, una parada durante el arranque ya no borra objetos después, y los textos de error nombran el fallo real.",
+        "pl": "Kanały modeli przetrwają zmianę miesiąca, zatrzymanie podczas uruchamiania nie usuwa już potem obiektów, a teksty błędów nazywają rzeczywistą awarię.",
+        "uk": "Канали моделей переживають зміну місяця, зупинка під час запуску більше не видаляє об'єкти після неї, а тексти помилок називають справжню причину.",
+        "zh-cn": "模型通道可跨月保留，启动期间的停止不再在之后删除对象，错误文本会说明真正的故障。"
+      },
       "0.14.0": {
         "en": "A failed write of the token file no longer costs the sign-in, signing out clears that account's alarms, and window reset times are written only when they change.",
         "de": "Ein fehlgeschlagener Schreibvorgang der Token-Datei kostet nicht mehr die Anmeldung, ein Abmelden löscht die Alarme des Kontos, und Fenster-Enden werden nur bei Änderung geschrieben.",
@@ -80,19 +93,6 @@
         "pl": "Czas resetu już nie znika. Claude jest odczytywany ze znacznie mniejszą liczbą odrzuceń, nowe logowania proszą tylko o prawo profilu, a ChatGPT pokazuje swoje kredyty resetu.",
         "uk": "Час скидання більше не зникає. Claude опитується зі значно меншою кількістю відмов, нові входи запитують лише право профілю, ChatGPT показує кредити скидання ліміту.",
         "zh-cn": "重置时间数据点不再时隐时现。Claude 的读取被拒次数大幅减少，新登录只请求个人资料权限，ChatGPT 会显示其限额重置额度。"
-      },
-      "0.9.3": {
-        "en": "The first start after updating no longer leaves a warning in the log",
-        "de": "Der erste Start nach einem Update hinterlässt keine Warnung mehr im Protokoll",
-        "ru": "Первый запуск после обновления больше не оставляет предупреждение в журнале",
-        "pt": "O primeiro arranque após a atualização deixa de deixar um aviso no registo",
-        "nl": "De eerste start na een update laat geen waarschuwing meer achter in het logboek",
-        "fr": "Le premier démarrage après une mise à jour ne laisse plus d'avertissement dans le journal",
-        "it": "Il primo avvio dopo un aggiornamento non lascia più un avviso nel log",
-        "es": "El primer inicio tras la actualización ya no deja un aviso en el registro",
-        "pl": "Pierwszy start po aktualizacji nie zostawia już ostrzeżenia w dzienniku",
-        "uk": "Перший запуск після оновлення більше не залишає попередження в журналі",
-        "zh-cn": "更新后的首次启动不再在日志中留下警告"
       }
     },
     "plugins": {
