@@ -69,553 +69,82 @@ die Engine ist ohne ioBroker voll testbar (injizierte Uhr/Zeitgeber/IO).
 
 ## Design-Entscheidungen
 
-1. **Admin-8-only** (krobi 2026-08-25): Schlüssel-Konten über den zentralen Zugangsdaten-Speicher
-   (`system.credentials.*`, Lese-Helfer in adapter-core) — keine eigenen Schlüsselfelder.
-   `globalDependencies admin >= 8.0.11` (folgt dem ioBroker-Stable-Stand).
-2. **DREI Zugangs-Wege, weil die Anbieter drei verschiedene erzwingen** (Recherche 2026-08-26,
-   Belege in `Ressourcen/ai-usage/`): Claude = Code einfügen · ChatGPT = Geräte-Code eintippen,
-   Adapter pollt selbst · Gemini = Adresszeile der Fehlerseite einfügen (GEMESSEN: Googles
-   Geräte-Fluss ist für beide Zugänge gesperrt, die Anzeige-Seite abgelehnt, nur die
-   localhost-Rückleitung wird angenommen). Der Fluss je Anbieter steht in `lib/sign-in.ts`,
-   die Karte rendert genau die passende Anleitung.
-3. **Zugangs-Daten der Abos gehören dem Adapter allein** — eigene Anmeldung, eigene Datei
-   `tokens-<anbieter>.json` im Instanz-Datenverzeichnis. NIEMALS die Datei des Nutzer-Programms
-   (`~/.codex/auth.json`, `oauth_creds.json`) lesen oder schreiben: die Auffrisch-Token rotieren
-   und sind einmalig — zwei Erneuerer melden sich gegenseitig ab.
-4. **Konto-Kennungen sind fest und deterministisch** (`accountId`): Abos `claude`/`chatgpt`/
-   `gemini`, Schlüssel-Konten `<speichername>-api`. Nie aus dem Anzeigenamen abgeleitet, sonst
-   wandert ein ganzer Objektbaum, wenn der Nutzer umbenennt oder später einen Speicher-Eintrag
-   anlegt. Anmelde-Status liegt IM Konto (`<konto>.info.signedIn`) — der frühere zweite Zweig
-   `auth.<name>` zeigte jedes Abo doppelt (krobi-Fund 2026-08-26).
-5. **Harte Intervall-Untergrenze 60 s + Backoff** — die Claude-Drossel wirkt nach neuerer
-   Community-Messung (2026-09, Usage-Monitor #202) PRO ZUGANGS-TOKEN und hängt am Absender-Namen
-   (s. Entscheidung 20); die früher berichtete ~24-h-KONTO-Sperre ist damit relativiert, bleibt
-   aber der Vorsichtsgrund für die Untergrenze. Für ChatGPT ist keine Kontosperre belegt, der
-   Endpunkt ist IP-gedrosselt; für Google gibt es keinen belegten sicheren Takt (einziger Anker:
-   deren eigenes Programm cacht 30 s).
-6. **Nur Geliefertes anlegen — aber einmal Angelegtes bleibt** (capability-driven); gleiche Sache =
-   gleicher Pfad über alle Anbieter. Ein Kontingent ohne brauchbaren Wert wird NICHT als 0 % erfunden.
-   ⚠️ Seit 0.10.0 gilt die zweite Hälfte hart (krobi-Fund live 2026-09-01, Klassenfehler wie
-   homeconnect-childLock): Anbieter lassen optionale Felder ZUSTANDSABHÄNGIG weg (Anthropic liefert
-   `resets_at: null`, solange kein Fenster läuft — gemessen genau in der Drossel-Situation). Ein
-   Datenpunkt darf mit dieser Laune nicht kommen und gehen. Deshalb: `resetAt` (und
-   `resetCreditsNextExpiry`) sind FESTER Teil ihres Fensters/Kanals — immer angelegt, aktiv mit ""
-   geschrieben, wenn gerade nichts läuft (das alte Datum stehen zu lassen wäre eine Lüge).
-7. **Gemini: Kennung ist Pflichtteil der Abfrage** — mit der falschen Kennung (User-Agent +
-   `ideType`) antwortet Google trotzdem, liefert aber den stillgelegten Gratis-Satz mit dauerhaft
-   100 %. Ein Zähler, der nie fällt, ist schlimmer als ein Fehler → beide Aufrufe tragen dieselbe
-   Kennung, Wirt-Kette `daily-` vor `prod`.
-8. **total.costs summiert nur echtes Geld gleicher Währung** — Stück-Guthaben und Fremdwährungen
-   bleiben draußen.
-9. **Nach erfolgreicher Anmeldung sofort abfragen** (`engine.pollNow`) — sonst wirkt ein
-   erfolgreicher Login bis zu 5 Minuten lang wie ein Fehlschlag (krobi-Fund 2026-08-26).
-10. **Nur PLAN-WEITE Fenster sprechen fürs Konto** (`LimitWindow.scoped`, krobi-Fund 2026-08-26:
-    „das betrifft nur Fable, nicht allgemein"): Modell-Kontingente bekommen eigene Datenpunkte,
-    lösen aber nie `warning`/`limitReached` aus — ein Modell, das der Nutzer nie anfasst, kann
-    dauerhaft auf 100 % stehen, und ein Alarm, der nie ausgeht, ist schlimmer als keiner
-    (dieselbe Regel wie bei der Gemini-Kennung). Wer scoped setzt, entscheidet der Anbieter-Parser:
-    Claude alles außer `session`/`weekly_all`, ChatGPT die `additional_rate_limits`, **Google seit
-    0.8.0 ALLE** — Google liefert überhaupt kein plan-weites Fenster, deshalb greift dort die
-    Ausnahme in `limitingWindow`: hat ein Konto NUR Modell-Fenster, spricht das vollste von ihnen
-    fürs Konto (vorher sprach jedes einzelne, also wieder der Fable-Fall). Jede Warnmeldung nennt
-    das Fenster, bei Google also das Modell.
-11. **Vier Fehlerklassen, damit „offline" etwas bedeutet**: `auth` und `rate-limit` heißen, der
-    Dienst hat GEANTWORTET (er ist online, er sagt nur nein), `service` = er meldet eigenen Defekt
-    (sofort offline, er hat es uns ja gesagt), `network` = nie erreicht (erst nach 3 Versuchen,
-    sonst flattert die Anzeige).
-12. **Das Verbindungs-Symbol im Objektbaum kommt AUSSCHLIESSLICH aus `common.statusStates`**
-    am Geräte-Objekt (`{ offlineId: "info.unreach" }`, relative Id wird zu `<gerät>.<id>`
-    ergänzt) — verifiziert in `adapter-react-v5/src/Components/ObjectBrowser/renderLeaf.tsx`.
-    Weder eine Rolle noch der Typ-Erkenner erzeugen es. govee, beszel, homewizard und nut2
-    setzen es alle; ai-usage war der einzige ohne, deshalb blieb der Konto-Knoten symbollos
-    (krobi-Fund 2026-08-26, drei Anläufe — ich habe am Typ-Erkenner statt an den eigenen
-    Adaptern gemessen). `info.unreach` bedeutet deshalb „liefert NICHT": eine Drosselung hält
-    die Werte gültig und bleibt grün, abgelehnte Anmeldung/Dienst-Defekt/keine Verbindung nicht.
-    Ein Test pinnt die Verknüpfung (nut2-Vorbild).
-13. **ZWEI Status-Datenpunkte je Konto, an ioBrokers eigenen Plätzen** (krobi 2026-08-26, nachdem
-    ich sechs angelegt hatte, von denen zwei etwas sagten): `info.unreach` (Ja/Nein) ist das
-    Offline-Kennzeichen, das der Typ-Erkenner kennt — `indicator.reachable` ist dort ausdrücklich
-    VERALTET, deshalb sah man von den alten Datenpunkten nirgends ein Symbol. `info.error` trägt
-    den Grund im Klartext. **Nicht** mit der Rolle `indicator.error`: die zwei offiziellen Quellen
-    widersprechen sich (Typ-Erkenner: Text, Gültigkeits-Liste des Prüfbots: nur Ja/Nein → E1009) —
-    Gültigkeit gewinnt, der Text läuft auf `text`. Beide nur bei ÄNDERUNG geschrieben — seit 0.7.0 gilt das auch für `warning`, `limitReached`,
-    `total.limitReached` und `info.connection` (govee-Lehre, Muster in `CLAUDE_PATTERNS.md`).
-    Entfallen: `provider`, `reachable`, `serviceOnline`, `state`, `signedIn` (0.5.0). Die
-    Einmal-Löschung beim Start ist seit 2026-09-06 ausgebaut (krobi: „natürlich aufräumen") — ebenso
-    die Token-Datei-Übernahme aus dem 0.2.0-Layout und der Sonderfall für den alten `auth`-Zweig:
-    alle drei betrafen nur Versionen VOR der Aufnahme ins Latest-Verzeichnis (2026-08-30, ab 0.6.0),
-    und krobis Anlage war live geprüft bereits bereinigt.
-    ⚠️ **0.8.0 hatte hier „vor der ersten Antwort wird KEIN Status geschrieben" — das war mein
-    Fehler und ist in 0.9.0 zurückgenommen** (siehe Punkt 19): der Weglassen-Ansatz lässt nach
-    einem Absturz ein totes Konto grün stehen. Der Start-Stempel ist wieder drin.
-14. **Datenpunkt-Bilanz beim Start** (Flotten-Standard, beszel-Vorbild): EINE `info`-Zeile
-    „Object tree updated: created N, removed M datapoint(s)", still bei 0/0. Damit sie nicht nach
-    jedem Neustart alles als neu meldet, wird VOR Aufräumen und Engine ein Schnappschuss aller
-    vorhandenen Zustands-Ids gezogen — der Anlege-Pfad läuft pro Prozess einmal über JEDEN
-    Datenpunkt, auch über bestehende. Ausgelöst wird die Zeile, wenn das LETZTE Konto
-    seine erste Abfrage hinter sich hat (`afterFirstRound`) — die erste Runde ist bewusst versetzt,
-    und ein Konfig-Wechsel startet die Instanz ohnehin neu.
-15. **Der Waisen-Aufräumer entfernt nur STRUKTUR, nie Einzelwerte** (0.8.0, geschärft 0.10.0):
-    Gelöscht wird ein ganzer `limits.<fenster>`- oder `models.<modell>`-Teilbaum, dessen
-    Fenster/Modell die Antwort gar nicht mehr führt (umbenanntes Modell, weggefallenes Fenster) —
-    das stünde sonst für immer mit seinem letzten Prozentwert im Baum. Ein EINZELNER Wert in einem
-    weiterhin gelieferten Fenster ist NIE eine Waise (0.10.0, krobi-Fund: das Reset-Datum wurde
-    mitten in der Drossel gelöscht und nach dem Reset wieder angelegt — s. Entscheidung 6). Werte
-    unter credits/costs/tokens bleiben, einmal angelegt, grundsätzlich stehen. Die ERSTE Runde
-    vergleicht gegen die Datenbank (`listStateIds`), damit auch zählt, was im Stillstand verschwand;
-    danach gegen den vorherigen Schnappschuss. Kinder vor Eltern (`orphanObjectIds`).
-16. **Zugangsdaten liegen NUR in der Ablage, nie im Anbieter-Modul** (0.8.0): `tokenStore(provider)`
-    gibt pro Anbieter dieselbe Instanz zurück, die den Speicher-Zwischenstand hält. Vorher hatte
-    jedes Anbieter-Modul seine eigene Kopie — Abmelden löschte die Datei, der Adapter fragte mit der
-    Kopie munter weiter, und die nächste Ticket-Erneuerung schrieb die gelöschte Datei zurück.
-17. **Eine Abfrage pro Konto, nie zwei gleichzeitig** (0.8.0): eine Anmeldung stößt sofort eine
-    Abfrage an und kann auf eine laufende treffen — zwei Ticket-Erneuerungen parallel melden sich
-    auf einem rotierenden Schlüssel gegenseitig ab (Punkt 3). Wer während einer laufenden Abfrage
-    anklopft, wird gemerkt und läuft direkt danach.
-18. **Der wiederkehrende Takt wird IN der versetzten Erstabfrage scharfgeschaltet** (0.8.0), nicht
-    daneben: nebeneinander angelegt zählen alle Konten ab derselben Sekunde und feuern ab der
-    zweiten Runde gemeinsam — genau das Bündel, gegen das die Entzerrung und die Mindestwartezeit
-    aus Punkt 5 gebaut sind.
-19. **Offline-Kennzeichnung an DREI Stellen** (0.9.0, live gemessen — allgemeine Regel jetzt in
-    `Entwicklung/CLAUDE_CODING.md`):
-    a) **Kein `supportedMessages.stopInstance` im Manifest.** Mit dem Eintrag beendet der Host den
-    Prozess bedingungslos hart, `onUnload` läuft NIE — jeder Abschalt-Schreibvorgang war toter
-    Code, auch das `info.connection` seit 0.1.0. Ein Test nagelt fest, dass der Eintrag draußen
-    bleibt; es ist eine Manifest-Eigenschaft, die kein Code verteidigen kann.
-    a2) **`clearStopInstanceFlag()` ganz am Anfang von `onReady`** (0.9.2/0.9.3): der Eintrag lebt
-    als Kopie im Instanzobjekt weiter und überlebt jedes Update — ohne diese Einmal-Korrektur
-    war (a) auf bestehenden Installationen wirkungslos. Nur bei gesetztem Feld schreiben (sonst
-    Neustart-Schleife, jede Objekt-Änderung startet die Instanz neu) und den Start danach SOFORT
-    verlassen (sonst Zeitgeber-Warnung im Protokoll). Vorbild: public-holidays.
-    b) **`onUnload` meldet erst nach den Schreibvorgängen fertig** (`.finally(callback)`) —
-    fire-and-forget kommt nicht an. `markAllOffline()` schreibt `info.unreach`, `info.error`,
-    `total.accountsReachable` und `info.connection`; dauert ~100 ms, Frist des Hosts ist 1 s.
-    Keine eigene Notbremse: die Adapter-Zeitschaltung verweigert beim Beenden, eine nackte
-    meldet der Prüfbot (E5005).
-    c) **Start-Stempel im Skelett-Aufbau** — jedes Konto steht auf „liefert nicht", bis die erste
-    Antwort da ist. Der tragende Teil: Absturz, Stromausfall und harter Abschuss lassen keinen
-    Abschalt-Code laufen. nut2 macht dasselbe mit `markAllUnreachable()`.
-    d) **Der Grund-Text ist `REASON_UNKNOWN` = `Unknown`** (0.9.1, krobi-Vorgabe: „da muss eine rote
-    linie her in allen adaptern") — an EINER Stelle definiert, benutzt beim Start und beim
-    Beenden. Leer im Normalbetrieb, sonst der Text des Anbieters. Vorher stand dort ein Satz,
-    den ich mir ausgedacht hatte („The adapter is stopped — nothing is being read"); der
-    angehängte Halbsatz war die Rechtfertigung, an der krobi sich gestoßen hat. Ein Gate im
-    Konsistenz-Audit fängt jeden adapter-eigenen Wortlaut.
-20. **Die Claude-Abfrage meldet sich als claude-code** (0.10.0): der Drossel-Eimer des
-    Abfrage-Endpunkts hängt an der Absender-Kennung — dreifach community-gemessen
-    (Claude-Code-Usage-Monitor #202, claude-code #31021/#31637): claude-code-Kennung = großzügiger
-    Eimer (sicher bei 3-Minuten-Takt), jede fremde Kennung — auch unser früheres
-    „ioBroker.ai-usage" — = aggressiver Eimer mit dauerhaften Ablehnungen. Versionsnummer =
-    npm-Stand zum Bau-Zeitpunkt; der Eimer hängt am Produktnamen, nicht an der exakten Nummer.
-    Gleiches Vorgehen wie govee-smart (Govee-App-Kennung). Die Drossel wirkt PRO Zugangs-Token,
-    nicht pro Konto (gleiche Quellen) — die 60-s-Untergrenze aus Entscheidung 5 bleibt trotzdem.
-21. **Fehlerklasse einer unlesbaren Antwort ist `service`, nicht `network`** (0.10.0): eine Antwort,
-    die ankam, aber nicht unserem Schema entspricht, heißt „der Dienst hat geantwortet und ist
-    defekt" — vorher lief sie als „keine Verbindung" mit drei tolerierten Versuchen und versteckte
-    einen echten Dienst-Defekt hinter der falschen Anzeige (alle fünf Parser betroffen).
-22. **`supportedMessages` wird GELÖSCHT, ausgelöst vom bloßen Vorhandensein des Schlüssels**
-    (0.11.0, Audit 2026-09-04 — am Live-Objekt gemessen). Die Korrektur aus 0.9.2 schrieb
-    `{ stopInstance: false }` und ihr Wächter prüfte `?.stopInstance`: sie sah ihren eigenen
-    Zustand nie wieder, und der Schlüssel ist eine **Positivliste** — steht dort ein Objekt ohne
-    einen Wert ungleich `false`, sieht der Host `common.messagebox` nicht mehr an, `subscribeMessage`
-    unterbleibt, und KEIN `sendTo` erreicht den Adapter, ohne eine Logzeile. Damit waren alle drei
-    Anmelde-Flüsse der Konfigseite tot (`ConfigPanel.ask()`). Richtig ist
-    `extendForeignObject(id, { common: { supportedMessages: null } })`, ausgelöst von
-    `supported === undefined || supported === null`. Polling und `onUnload` waren nie betroffen —
-    ohne stopInstance-Unterstützung nimmt der Host den normalen Entlade-Weg. Zwei Mutationen
-    verteidigen beide Hälften.
-    **Der zweite Fall ist im Flotten-Gate erledigt, nichts offen** (nachgeprüft 2026-09-06 in
-    `audit-krobi-consistency.py`): das Gate fährt ZWEI Regime, und das MANIFEST entscheidet, welches
-    gilt. Regime A — kein `supportedMessages` im Manifest oder nur `false`-Werte — ist der Regelfall
-    und verlangt genau diese Korrektur. Regime B gilt für einen Adapter, der die Positivliste
-    legitim führt (`deviceManager: true`); dort prüft das Gate das Gegenteil, weil ein `null` die
-    Liste löschen und die Box abschalten würde. **ai-usage ist Regime A** und darf den Schlüssel nie
-    deklarieren (Entscheidung 19a, per Test festgenagelt) — die 2026-09-04 gebaute und wieder
-    zurückgenommene gehärtete Fassung im Adapter war deshalb richtig zurückgenommen: die
-    Fallunterscheidung gehört der Flotte, und dort steht sie.
-23. **Objektnamen kommen aus `admin/i18n`, gelesen OHNE adapter-core** (0.11.0): der Flotten-Standard
-    verlangt das volle Übersetzungsobjekt in `common.name`/`desc` für JEDEN Objekttyp (Kernteam,
-    nut2 #15) — der Adapter darf nicht selbst in die Systemsprache auflösen, weil das Objekt die
-    Sprache überlebt, die beim Anlegen galt. `I18n` aus adapter-core kommt dafür NICHT in Frage:
-    schon der Import ruft `process.exit`, wenn kein js-controller danebensteht, und der Baumbauer
-    und die Engine sind reine Module, die die Tests ohne all das fahren. `src/lib/i18n.ts` liest die
-    elf Dateien deshalb selbst; sein einziger Mehrwert wäre die Sprachwahl gewesen — genau der
-    Schritt, der hier nicht passieren darf. Fehlt ein Schlüssel, steht er als Name im Baum: sichtbar
-    und greppbar, statt leer. Umfang: 81 Schlüssel × 11 Sprachen (49 Namen zum Zeitpunkt von
-    0.11.0, dazu die `desc`-Schlüssel der D08-Welle — die Zahl wächst mit dem Baum, maßgeblich ist
-    `admin/i18n/en.json`), gegengeprüft von `i18n.test.ts` (jede Sprache dieselben Schlüssel, `%s`
-    überall gleich oft, und jeder im Quelltext benutzte Schlüssel existiert).
-24. **Die drei Manifest-Objekte werden im `onReady` per `extendObject` erneuert** (0.11.0):
-    js-controller wendet `instanceObjects` selbst an, aber mit `preserve` auf `common.name` — eine
-    UMBENENNUNG erreicht sonst nur neue Anlagen, während Manifest und Namens-Gate grün aussehen.
-    Ausgeschrieben mit festen Ids, nicht als Schleife über eine Tabelle: ein Leser und das
-    Konsistenz-Gate sollen sehen, welche Objekte abgedeckt sind.
-25. **Die ChatGPT-Abfrage meldet sich als Codex** (0.11.0, dieselbe Regel wie Entscheidung 20):
-    quellverifiziert in openai/codex, `codex-rs/login/src/auth/default_client.rs` —
-    `DEFAULT_ORIGINATOR = "codex_cli_rs"`, und `default_headers()` setzt `originator` UND einen
-    User-Agent auf JEDER Anfrage; der Backend-Zugang hängt an dieser Kennung (Whitelist
-    `codex_cli_rs`/`codex_vscode`/`codex_sdk_ts`/alles mit `Codex`, sonst 403). Vorher schickte der
-    Verbrauchs-Aufruf `ioBroker.ai-usage` und gar keinen originator, während der Gutschein-Aufruf auf
-    DERSELBEN Route `Codex Desktop` behauptete. Nie an einem echten Konto geprüft — steht so im
-    Changelog.
-26. **Eine gekappte Seitenwanderung sagt es** (0.11.0): `fetchAllPages` brach nach 12 Seiten ab,
-    während der Kommentar mit 31 Tages-Eimern argumentierte, und gab das Teilergebnis wortlos als
-    vollständig zurück — bei kleiner Server-Seitengröße wären `costs.month`/`projectedMonth` still
-    zu niedrig gewesen. Schranke jetzt 32 (ein Monat plus eins), und wer sie erreicht, meldet es ins
-    Protokoll. Beide Report-Anbieter schicken ein explizites `limit=31`; bei Anthropic fehlte es.
-27. **Der Name eines Limit-Fensters ist ein SCHLÜSSEL, nicht der Anbieter-Text** (0.11.0):
-    `LimitWindow.label` bleibt die ENGLISCHE Fassung für Logzeilen und Warnmeldungen
-    (flottenweit englisch), der Objektname kommt aus `labelKey` (+ `labelArg` für den Teil, den
-    der Anbieter benannt hat). Claude `session`/`weekly_all` haben feste Schlüssel, ein
-    Modell-Fenster wird `nameWindowModelWeek` mit dem Modell als `%s` → im Baum steht
-    „Woche (Fable)"; ChatGPT-Zusatzfenster und Googles Modell-Kontingente analog. Deshalb nimmt
-    `tName(key, arg)` als Argument auch ein ÜBERSETZUNGSOBJEKT: sonst stünde in der deutschen
-    „%s used"-Zeile der englische Fenstername.
-    ⚠️ **Gefunden hat das erst das live-tree-Gate NACH dem Deploy** — das statische Rollen-Gate
-    sieht diese Namen nicht, weil sie über einen Laufzeitwert (`limit.label`) liefen. Ein
-    Adapter, dessen Namen aus Parser-Werten kommen, ist für den statischen Namens-Check blind.
-28. **Datei-Existenz ist keine Lebendigkeit** (0.11.0): `signInState` meldete `signed-in`, sobald die
-    Token-Datei etwas hergab — ein vom Anbieter abgelehntes Auffrisch-Token ließ also einen grünen
-    Haken neben einem gelben „Sign-in rejected" stehen, die exakte Umkehrung von krobis Fund vom
-    2026-09-01. Die Engine meldet den `auth`-Zustand jetzt bei jedem Wechsel über `authState` an den
-    Adapter (`rejectedTokens`), und die Karte zeigt wieder den Anmelde-Weg. Die Datei bleibt liegen:
-    ein Anbieter-Aussetzer darf den Nutzer nicht hinter seinem Rücken abmelden. Nur `auth` zählt —
-    Drossel, Dienst-Defekt und Netzfehler nicht.
+_Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen wörtlich in `.claude/dev-history.md`, Eintrag „2026-09-21 — Design-Entscheidungen: Belege aus CLAUDE.md verlegt“ (lokal, gitignored)._
 
-29. **Der Anbieter-Katalog ist EINE Tabelle** (0.12.0): `PROVIDERS` in `provider.ts` trägt Kennung,
-    Anzeigename, Anmelde-Fluss, feste Konto-Id und „braucht Admin-Schlüssel". Vorher lagen dieselben
-    Angaben an fünf Stellen (Typ-Union, Kennungs-Liste, Id-Tabelle, Fluss- und Label-Tabelle) — für
-    einen neuen Anbieter fünf Änderungen, ohne dass etwas ein Vergessen gefangen hätte. `ProviderKind`
-    wird aus der Tabelle abgeleitet, damit `makeProvider` ohne `default`-Zweig vollständig ist. Die
-    Kopie im Konfig-Panel bleibt (eigenes Bündel, kein Import möglich), ist aber per Test an die
-    Tabelle genagelt: gleiche Anbieter, gleiche Namen, gleiches Admin-Schlüssel-Kennzeichen.
-30. **„Nicht angemeldet" ist eine EIGENE Fehlerklasse** (0.12.0, fünfte neben Entscheidung 11):
-    `no-credentials` heißt, es liegt keine Anmeldung/kein Schlüssel vor — `auth` heißt, der Anbieter
-    hat eine ABGELEHNT. Zusammengeworfen empfing ein neuer Nutzer vor seiner ersten Anmeldung eine
-    Warnung, eine ioBroker-Benachrichtigung und ein rotes „the stored sign-in was rejected"; nach
-    jedem bewussten Abmelden dasselbe binnen fünf Minuten. Die neue Klasse meldet still (info),
-    benachrichtigt nicht und lässt die Karte den Anmelde-Knopf zeigen.
-31. **Ein Konto ohne brauchbaren Zugang bekommt trotzdem sein Skelett** (0.12.0): vorher wurde es im
-    Engine-Konstruktor übersprungen — kein Objekt, kein Start-Stempel. Ein Konto, dessen Schlüssel
-    aus dem Admin-Speicher verschwand, blieb mit altem Wert UND altem (grünem) Status stehen.
-    Entscheidung 19c gilt für JEDES Konto, nicht nur für abfragbare: Skelett + `unreach=true` +
-    Grundtext, nie eine Abfrage.
-32. **Nach jedem `await` im Abfragepfad wird der Stopp erneut geprüft** (0.12.0): `stop()` bricht
-    Zeitgeber ab, keine laufende Anfrage. Die späte Antwort schrieb nach `markAllOffline()` wieder
-    „online" — genau der Zustand, gegen den Entscheidung 19 gebaut ist. Fenster: bis zu 15 s.
-33. **EINE Antwort auf „liefert das Konto"** (0.12.0): `isDelivering(state)`. Symbol und Fehlertext
-    lasen den Konto-Zustand, Totals und `info.connection` ein zweites Flag — eine erste Abfrage in
-    der Drossel ließ das Konto grün stehen und meldete daneben „0 Konten erreichbar".
-34. **`authOn400` steht am AUFRUF, nicht im Helfer** (0.12.0): richtig für die Token-Endpunkte, falsch
-    überall sonst. Der ChatGPT-Gerätecode las einen 400 als „noch nicht bestätigt" und wartete sein
-    ganzes Fenster ab, Googles Code-Assist-Aufruf verzichtete deshalb auf seinen Zweit-Host.
-35. **`is_active` wird angezeigt, entscheidet aber nichts** (0.12.0, Rohantwort gemessen 2026-09-06):
-    Anthropic markiert das Fenster, das gerade gilt (Fable 97 % aktiv, Sitzung 8 % und Woche 54 %
-    nicht). Der Baum trägt es als `limits.<fenster>.active`; wo ein Anbieter es nicht liefert
-    (ChatGPT, Google), markiert der Baumbauer das Fenster, das fürs Konto spricht — gleiche Bedeutung
-    überall. **Die Warnung bleibt an den plan-weiten Fenstern** (krobi 2026-09-06: „fable 100% ist das
-    fable limit, aber weder das 5h stunden limit noch das wochenlimit").
-36. **`locked_reason` ist das echte Gesperrt-Signal** (0.12.0): es sitzt nur an `five_hour`/`seven_day`
-    und sagt, dass der Anbieter das Fenster geschlossen hat. `limitReached` hing bis dahin allein an
-    `percent >= 100`. Kein eigener Datenpunkt (krobi 2026-09-06) — es speist `limitReached` und eine
-    Protokollzeile beim Übergang.
-37. **Fenster-Enden werden auf die MINUTE geschrieben** (0.12.0): Anthropic rechnet den Zeitpunkt je
-    Anfrage neu (…59.898Z / …00.364Z / …59.539Z). Unverändert übernommen zählte JEDE Abfrage als
-    Änderung — 952 Historien-Einträge in fünf Tagen für 17 echte Fenster (am Server gemessen).
-38. **`available` liegt unter `credits`** (0.12.0): „reicht das Guthaben noch für Aufrufe" ist eine
-    Aussage über das Guthaben; an der Konto-Wurzel stand sie neben `warning`/`limitReached` und las
-    sich wie ein dritter konto-weiter Alarm. Der alte Datenpunkt wird beim Start gelöscht
-    (`MOVED_STATES`) — der Adapter räumt seinen Bestand selbst auf.
-39. **Das Objekt-Inventar kommt aus einem ECHTEN Lauf, ohne Test-Naht im Produktivcode** (0.12.0):
-    ai-usage spricht sieben feste Fremd-Adressen — die Flotten-Vorlage füttert ihre Fixtures aber in
-    den laufenden Adapter. Lösung: `test/inventory.js` startet den Adapter im Wegwerf-Controller mit
-    `NODE_OPTIONS=--require test/fixtures/inventory/fetch-hook.cjs`; der Haken ersetzt im
-    ADAPTER-Prozess das globale `fetch` durch die Fixture-Tabelle und WEIST alles andere ab (kein
-    Aufruf verlässt die Maschine). Die vier Schlüssel-Konten bekommen echte
-    `system.credentials.*`-Objekte — unverschlüsselt, weil `getCredentials` nur entschlüsselt, was in
-    `native.encryptedFields` steht. Die drei Abos melden sich über die echte Nachrichtenbox an
-    (`sendTo`), der Adapter schreibt seine Token selbst: damit sind der Gerätecode- und der
-    Google-Fluss zum ersten Mal automatisiert abgedeckt. Gewartet wird auf
-    `total.accountsReachable == 7`, nicht auf „der Baum wächst nicht mehr" — beim ersten Lauf
-    schrieb genau das ein Skelett für vier von sieben Konten. Ergebnis: 137 Objekte, zwei Läufe
-    byte-gleich. **Der erste Lauf fand sofort einen Fehler:** die Modell-Kanäle trugen den
-    Anbieter-Namen als festen String (`nameModel`-Rahmen statt `model.model`) — für das statische
-    Namens-Gate unsichtbar, weil Laufzeitwert.
-40. **Jeder Datenpunkt ist ENTSCHIEDEN: erklärt oder als selbsterklärend deklariert** (Flotten-Gate
-    D08, `check-object-inventory.py`, seit 2026-09-07). 21 `desc`-Schlüssel × 11 Sprachen decken
-    76 der 96 Datenpunkte; die restlichen 20 stehen mit Begründung in `test/self-explaining.json`
-    (8 Muster — `limits.*.percent`, die fünf `credits.*`-Zahlen, `costs.total`,
-    `total.warningsActive`). Erklärt wird, wo der Name Kontext offenlässt: `costs.today`/`tokens.*`
-    zählen den **UTC**-Tag (der Zähler springt vor der lokalen Mitternacht), `models.*.tokensToday`
-    ist Ein- **und** Ausgabe zusammen (die Zähler unter `tokens` trennen sie), `costs.month` enthält
-    NIE den Abo-Preis, `credits.granted`/`toppedUp` sind die zwei Teile von `credits.remaining`,
-    `total.costs.*` summiert NUR USD-Konten (der Name sagt „alle Konten", die Summe nicht), und
-    `total.accounts` zählt auch Konten ohne brauchbaren Zugang mit. Deklariert wird nur, wo Name,
-    Rolle und Einheit die ganze Aussage sind. Ein Satz, der den Namen wiederholt, bleibt schlechter
-    als keiner — die Deklaration ist der zweite richtige Ausgang, nicht der bequeme.
-41. **Die Konfigseite ABONNIERT die Statuswerte** (0.12.0): vorher fragte sie alle vier Sekunden je
-    Abo eine Nachricht und je Konto zwei Zustände ab, solange sie offen war. `subscribeState` liefert
-    den aktuellen Wert beim Abonnieren gleich mit; gepollt wird nur noch der Anmelde-Status — alle
-    vier Sekunden ausschließlich während eines laufenden Gerätecode-Flusses, sonst alle 30 s.
-42. **Der Konto-Knoten heißt IMMER „<Name> (<Anbieter>)" — auch wenn beides gleich ist** (krobi
-    2026-09-06, nach dem 0.12.0-Deploy entschieden): live liest sich das als „Claude (Claude)", und
-    das Inventar zeigt, dass die Dopplung der NORMALFALL ist — die Konfigseite setzt bei den drei
-    Abos den Namen fest auf den Anbieter-Namen, und ein Schlüssel-Konto trägt den Namen des
-    Admin-Speicher-Eintrags, den man üblicherweise nach dem Anbieter benennt. Ich hatte vorgeschlagen,
-    die Klammer wegzulassen, sobald Name == Label; krobi hat sich die vier Möglichkeiten angesehen und
-    entschieden: **so lassen** („dann macht es auch durchaus sinn"). Der Anbieter steht damit ausnahmslos
-    im Namen — auch bei einem frei benannten Zugang („Arbeitskonto (OpenRouter)"). Nicht erneut vorschlagen.
-43. **`info.lastUpdate` datiert die WERTE, nicht den Abfrageversuch** (2026-09-07, beim Schreiben
-    seiner Beschreibung gemessen): der Stempel hing an `reachable`, und `isDelivering()` zählt
-    `rate-limited` absichtlich dazu — jede gedrosselte Abfrage datierte damit Werte neu, die sie gar
-    nicht geholt hatte. Nach einem Tag Drosselung stand „vor einer Stunde" neben tagesalten Zahlen.
-    Er hängt jetzt an `state === "ok"`. `info.unreach` bleibt unverändert falsch, solange nur
-    gedrosselt wird — die beiden Aussagen gehören auseinander, und genau das prüft der Test
-    „a throttled poll leaves the last-update stamp where it was".
-44. **`tokens.inputToday` bleibt EIN Name für zwei Anbieter-Wahrheiten** (2026-09-07, krobi hat die
-    Entscheidung mir überlassen): Anthropic liefert `uncached_input_tokens`, OpenAI `input_tokens` —
-    der Anthropic-Wert lässt Cache-Treffer also weg und meldet bei cache-lastiger Nutzung zu wenig.
-    **Weder umbenannt noch im Parser ergänzt.** Der Feldname steht im Repo (Parser, Test, Fixture);
-    über `cache_creation`/`cache_read_input_tokens` steht NICHTS, und messen kann es hier niemand —
-    der Report braucht einen Organisations-Admin-Schlüssel, den ein Privatkonto nicht erzeugen kann.
-    Ein Parser für nie gesehene Felder wäre derselbe Fehler wie das aus der Doku gebaute
-    Copilot-Modul. Getrennte Namen wären außerdem die erste Stelle, an der der harmonisierte Baum
-    zwei Bedeutungen für EINEN Datenpunkt trüge, und bräuchten ein Kennzeichen im
-    transport-neutralen `TokenInfo`. **Der Name ist unvollständig, nicht falsch** (anders als
-    beszels `info.os_name`, das den Distributionsnamen unter „OS Version" trug) — deshalb sagt
-    `descTokensToday` nur „was der Tagesbericht des Anbieters gezählt hat" und behauptet nichts über
-    Cache-Treffer, und der anbieter-spezifische Vorbehalt steht in der Anbietertabelle von
-    `docs/{de,en}/README.md`. Nicht erneut vorschlagen.
+1. **Admin-8-only** — (krobi 2026-08-25): Schlüssel-Konten über den zentralen Zugangsdaten-Speicher (`system.credentials.*`, Lese-Helfer in adapter-core) — keine eigenen Schlüsselfelder.
+2. **DREI Zugangs-Wege, weil die Anbieter drei verschiedene erzwingen** — (Recherche 2026-08-26, Belege in `Ressourcen/ai-usage/`): Claude = Code einfügen · ChatGPT = Geräte-Code eintippen, Adapter pollt selbst · Gemini = Adresszeile der Fehlerseite einfügen (GEMESSEN: Googles Geräte-Fluss …
+3. **Zugangs-Daten der Abos gehören dem Adapter allein** — eigene Anmeldung, eigene Datei `tokens-<anbieter>.json` im Instanz-Datenverzeichnis.
+4. **Konto-Kennungen sind fest und deterministisch** — (`accountId`): Abos `claude`/`chatgpt`/ `gemini`, Schlüssel-Konten `<speichername>-api`.
+5. **Harte Intervall-Untergrenze 60 s + Backoff** — die Claude-Drossel wirkt nach neuerer Community-Messung (2026-09, Usage-Monitor #202) PRO ZUGANGS-TOKEN und hängt am Absender-Namen (s. Entscheidung 20); die früher berichtete ~24-h-KONTO-Sperre ist damit relativiert, …
+6. **Nur Geliefertes anlegen — aber einmal Angelegtes bleibt** — (capability-driven); gleiche Sache = gleicher Pfad über alle Anbieter.
+7. **Gemini: Kennung ist Pflichtteil der Abfrage** — mit der falschen Kennung (User-Agent + `ideType`) antwortet Google trotzdem, liefert aber den stillgelegten Gratis-Satz mit dauerhaft 100 %. Ein Zähler, der nie fällt, ist schlimmer als ein Fehler → beide Aufrufe tragen …
+8. **total.costs summiert nur echtes Geld gleicher Währung** — Stück-Guthaben und Fremdwährungen bleiben draußen.
+9. **Nach erfolgreicher Anmeldung sofort abfragen** — (`engine.pollNow`) — sonst wirkt ein erfolgreicher Login bis zu 5 Minuten lang wie ein Fehlschlag (krobi-Fund 2026-08-26).
+10. **Nur PLAN-WEITE Fenster sprechen fürs Konto** — (`LimitWindow.scoped`, krobi-Fund 2026-08-26: „das betrifft nur Fable, nicht allgemein"): Modell-Kontingente bekommen eigene Datenpunkte, lösen aber nie `warning`/`limitReached` aus — ein Modell, das der Nutzer nie …
+11. **Vier Fehlerklassen, damit „offline" etwas bedeutet** — `auth` und `rate-limit` heißen, der Dienst hat GEANTWORTET (er ist online, er sagt nur nein), `service` = er meldet eigenen Defekt (sofort offline, er hat es uns ja gesagt), `network` = nie erreicht (erst nach 3 …
+12. **Das Verbindungs-Symbol im Objektbaum kommt AUSSCHLIESSLICH aus `common.statusStates`** — am Geräte-Objekt (`{ offlineId: "info.unreach" }`, relative Id wird zu `<gerät>.<id>` ergänzt) — verifiziert in `adapter-react-v5/src/Components/ObjectBrowser/renderLeaf.tsx`.
+13. **ZWEI Status-Datenpunkte je Konto, an ioBrokers eigenen Plätzen** — (krobi 2026-08-26, nachdem ich sechs angelegt hatte, von denen zwei etwas sagten): `info.unreach` (Ja/Nein) ist das Offline-Kennzeichen, das der Typ-Erkenner kennt — `indicator.reachable` ist dort ausdrücklich VERALTET, …
+14. **Datenpunkt-Bilanz beim Start** — (Flotten-Standard, beszel-Vorbild): EINE `info`-Zeile „Object tree updated: created N, removed M datapoint(s)", still bei 0/0.
+15. **Der Waisen-Aufräumer entfernt nur STRUKTUR, nie Einzelwerte** — (0.8.0, geschärft 0.10.0): Gelöscht wird ein ganzer `limits.<fenster>`- oder `models.<modell>`-Teilbaum, dessen Fenster/Modell die Antwort gar nicht mehr führt (umbenanntes Modell, weggefallenes Fenster) — das stünde …
+16. **Zugangsdaten liegen NUR in der Ablage, nie im Anbieter-Modul** — (0.8.0): `tokenStore(provider)` gibt pro Anbieter dieselbe Instanz zurück, die den Speicher-Zwischenstand hält.
+17. **Eine Abfrage pro Konto, nie zwei gleichzeitig** — (0.8.0): eine Anmeldung stößt sofort eine Abfrage an und kann auf eine laufende treffen — zwei Ticket-Erneuerungen parallel melden sich auf einem rotierenden Schlüssel gegenseitig ab (Punkt 3). Wer während einer …
+18. **Der wiederkehrende Takt wird IN der versetzten Erstabfrage scharfgeschaltet** — (0.8.0), nicht daneben: nebeneinander angelegt zählen alle Konten ab derselben Sekunde und feuern ab der zweiten Runde gemeinsam — genau das Bündel, gegen das die Entzerrung und die Mindestwartezeit aus Punkt 5 gebaut …
+19. **Offline-Kennzeichnung an DREI Stellen** — (0.9.0, live gemessen — allgemeine Regel jetzt in `Entwicklung/CLAUDE_CODING.md`): a) **Kein `supportedMessages.stopInstance` im Manifest.** Mit dem Eintrag beendet der Host den Prozess bedingungslos hart, `onUnload` …
+20. **Die Claude-Abfrage meldet sich als claude-code** — (0.10.0): der Drossel-Eimer des Abfrage-Endpunkts hängt an der Absender-Kennung — dreifach community-gemessen (Claude-Code-Usage-Monitor #202, claude-code #31021/#31637): claude-code-Kennung = großzügiger Eimer (sicher …
+21. **Fehlerklasse einer unlesbaren Antwort ist `service`, nicht `network`** — (0.10.0): eine Antwort, die ankam, aber nicht unserem Schema entspricht, heißt „der Dienst hat geantwortet und ist defekt" — vorher lief sie als „keine Verbindung" mit drei tolerierten Versuchen und versteckte einen …
+22. **`supportedMessages` wird GELÖSCHT, ausgelöst vom bloßen Vorhandensein des Schlüssels** — (0.11.0, Audit 2026-09-04 — am Live-Objekt gemessen).
+23. **Objektnamen kommen aus `admin/i18n`, gelesen OHNE adapter-core** — (0.11.0): der Flotten-Standard verlangt das volle Übersetzungsobjekt in `common.name`/`desc` für JEDEN Objekttyp (Kernteam, nut2 #15) — der Adapter darf nicht selbst in die Systemsprache auflösen, weil das Objekt die …
+24. **Die drei Manifest-Objekte werden im `onReady` per `extendObject` erneuert** — (0.11.0): js-controller wendet `instanceObjects` selbst an, aber mit `preserve` auf `common.name` — eine UMBENENNUNG erreicht sonst nur neue Anlagen, während Manifest und Namens-Gate grün aussehen.
+25. **Die ChatGPT-Abfrage meldet sich als Codex** — (0.11.0, dieselbe Regel wie Entscheidung 20): quellverifiziert in openai/codex, `codex-rs/login/src/auth/default_client.rs` — `DEFAULT_ORIGINATOR = "codex_cli_rs"`, und `default_headers()` setzt `originator` UND einen …
+26. **Eine gekappte Seitenwanderung sagt es** — (0.11.0): `fetchAllPages` brach nach 12 Seiten ab, während der Kommentar mit 31 Tages-Eimern argumentierte, und gab das Teilergebnis wortlos als vollständig zurück — bei kleiner Server-Seitengröße wären …
+27. **Der Name eines Limit-Fensters ist ein SCHLÜSSEL, nicht der Anbieter-Text** — (0.11.0): `LimitWindow.label` bleibt die ENGLISCHE Fassung für Logzeilen und Warnmeldungen (flottenweit englisch), der Objektname kommt aus `labelKey` (+ `labelArg` für den Teil, den der Anbieter benannt hat).
+28. **Datei-Existenz ist keine Lebendigkeit** — (0.11.0): `signInState` meldete `signed-in`, sobald die Token-Datei etwas hergab — ein vom Anbieter abgelehntes Auffrisch-Token ließ also einen grünen Haken neben einem gelben „Sign-in rejected" stehen, die exakte …
 
-45. **Anthropic rechnet in CENT** (0.13.0, Nachrecherche zur Audit-Welle): die Referenz des
-    Kosten-Berichts sagt zum Feld `amount` wörtlich „Cost amount in lowest currency units (e.g.
-    cents) as a decimal string. For example, `"123.45"` in `"USD"` represents `$1.23`" — bestätigt
-    in der Anleitungsseite („All costs in USD, reported as decimal strings in lowest units
-    (cents)"). Der Parser summierte und schrieb als USD: **jede Kostenzahl eines
-    Organisationskontos war hundertfach zu hoch**, und über `computeTotals` auch `total.costs.*`.
-    Umgerechnet wird EINMAL auf die Summe, nicht je Posten. **OpenAI ist gegengeprüft und NICHT
-    betroffen** (`amount.value` ist das Geld selbst). Der bestehende Test bestätigte den Fehler —
-    er fütterte Dollar und erwartete Dollar; er füttert jetzt Cent und erwartet dieselben Dollar.
-    Nie an einem echten Organisationskonto geprüft (krobis Prüffläche ist das Claude-Abo) — das
-    steht so im Changelog und in der Anbietertabelle.
-    **Gegenprobe an fremden Implementierungen (2026-09-12), weil die Doku-Zeile allein den Fix
-    trägt:** zwei unabhängige Leser desselben Endpunkts teilen ebenfalls durch 100 —
-    `akitaonrails/ai-usagebar` (`src/anthropic_api/types.rs`: `Ok(cents / 100.0)`, mit Test
-    „100,0 + 34,5 Cent = $1,345") und `openclaw/openclaw` (`extensions/anthropic/usage.ts`:
-    `(parseProviderUsageNumber(result?.amount) ?? 0) / 100`). Keine Implementierung liest das
-    Feld als Dollar.
-    **Dieselbe Doku-Seite nennt eine ECHTE Unvollständigkeit der Zahl** (Warnkasten + FAQ):
-    „Priority Tier costs use a different billing model and are not included in the cost
-    endpoint." Eine Organisation auf dieser Abrechnungsstufe gibt also mehr aus, als
-    `costs.month`/`costs.today` melden — der Adapter kann das nicht sehen und sagt es deshalb in
-    der Anbietertabelle von `docs/{de,en}/README.md`. Dort bestätigt sich auch Entscheidung 26:
-    `1d` hat „Default limit 7 buckets, Maximum limit 31 buckets".
-46. **Ein SCHREIB-Fehler ist kein Anbieter-Fehler** (0.13.0): `applySnapshot` lag im selben `try`
-    wie der Abruf, also landete ein abgelehntes `extendObject`/`getObjectViewAsync` in
-    `handleFailure` und wurde `network`. Nur: `failCount` wird vor jedem Abruf genullt, die dritte
-    Strafe kam also nie — das Konto blieb dauerhaft grün, `info.error` leer, der
-    `lastUpdate`-Stempel rückte weiter, und die einzige Spur war eine `debug`-Zeile. Eigener
-    `try/catch`, eigener Zustand `storage-error` (zählt nicht als liefernd), Dedup auf der
-    KATEGORIE (einmal `warn`, danach `debug` — `CLAUDE_CODING.md`). `runtime.status.snapshot` wird
-    erst NACH dem Schreiben gesetzt, sonst rechnen die Summen mit Zahlen, die nie im Baum ankamen.
-    Der Schreibpfad fasst die Datenbank nur an, wenn ein Objekt entstehen muss — neues Fenster,
-    neues Modell, oder die erste Runde nach einem Neustart.
-47. **Entscheidung 32 gilt für JEDEN `await` des Abfragepfads** (0.13.0, die fehlende Hälfte): die
-    Stopp-Prüfung stand nur hinter `provider.fetch()`. Objekte anlegen und Zustands-Ids lesen warten
-    ebenfalls auf die Datenbank, und ein Abschalten, das in dieses Warten fällt, ließ die Runde
-    danach zu Ende laufen — sie schrieb Werte und dann `unreach = false` über den Offline-Stempel,
-    den `markAllOffline()` gerade gesetzt hatte, nachdem der Host schon „fertig" gehört hatte.
-    Geprüft wird jetzt nach der Objekt-Schleife, nach dem Waisen-Aufräumer und nach der Rückkehr
-    aus `applySnapshot`. Die erste der drei verhindert, dass der Aufräumer beim Beenden noch
-    LÖSCHT — das fand erst der Mutationslauf (Nadel A15 überlebte den ersten Durchgang).
-48. **Eine leere Antwort ist kein Aufräum-Auslöser** (0.13.0, Flotten-Regel „Leere API-Listen NICHT
-    als Cleanup-Trigger"): Der Waisen-Aufräumer las „diese Runde lieferte nichts unter `limits`" als
-    „die Fenster sind weg". Gemessen: eine wohlgeformte Antwort ohne bekanntes Feld löschte alle
-    neun Limit-Objekte, setzte `warning`/`limitReached` zurück, `total.maxLimitPercent` von 95 auf
-    0 — und meldete das Konto dabei als einwandfrei. Ein Teilbaum wird jetzt nur gefegt, wenn die
-    Runde über SEINEN Zweig etwas sagt; Entscheidung 15 bleibt sonst unverändert. Die andere Hälfte
-    liegt im Parser: ein Rumpf ohne einen einzigen bekannten Schlüssel ist Drift und damit
-    `service` (Entscheidung 21). Geprüft werden die SCHLÜSSEL, nicht das Ergebnis — ein Konto ohne
-    Nutzung schickt dieselben Schlüssel mit `null`, und das bleibt ein gültiger leerer Schnappschuss.
-    **Ausgenommen:** Gemini (ein leeres `buckets` ist dort nicht eindeutig), OpenRouter und DeepSeek
-    (werfen schon bei fehlender Struktur).
-49. **Der Tagesbericht liefert IMMER** (0.13.0): `snapshot.tokens` wurde nur bei Nutzung gebaut,
-    `snapshot.costs` dagegen immer. Nach UTC-Mitternacht führte der Bericht noch keinen Eimer für
-    heute → der ganze `tokens`/`models`-Block fiel aus der Antwort, die Zähler behielten die Zahl
-    von GESTERN unter einem Namen, der „heute" sagt, und der Waisen-Aufräumer löschte jede Nacht die
-    Modell-Kanäle (drei INFO-Zeilen, danach neu angelegt). Der Block wird jetzt unbedingt gebaut, mit
-    0; die OpenAI-Modellliste kommt aus dem GANZEN Monat (die Abfrage holt ihn ohnehin mit
-    `group_by=model`), der Wert bleibt der von heute. **Das ist NICHT Entscheidung 44** — die hat den
-    NAMEN geschlossen, hier geht es um den WERT.
-50. **Ein Übergang wird nur behauptet, wenn er beobachtet wurde** (0.13.0): Warnschwelle und
-    Sperr-Meldung sind Flanken, und die vorherige Seite lag nur im Speicher. Gemessen mit zwei
-    Engines gegen denselben Zustandsspeicher: ein Konto unverändert bei 85 % erzeugte beim zweiten
-    Start dieselbe Warnung UND dieselbe `userActionRequired`-Benachrichtigung, obwohl sein eigener
-    `warning`-Datenpunkt schon `true` sagte — und ein Konfig-Wechsel startet die Instanz. Der
-    Ausgangswert kommt jetzt aus `<konto>.warning` (ein `getStateAsync` je Konto beim Start; fehlt
-    der Wert, ist er `false` wie bisher). Für `locked` gibt es keine Quelle (Entscheidung 36 gab ihm
-    bewusst keinen Datenpunkt, und `limitReached` ist mehrdeutig) — dort schweigt die erste Runde
-    eines Prozesses, der Zustand selbst stimmt ab der ersten Runde.
-51. **Die Summe kennt das gesperrte Fenster** (0.13.0, Erweiterung von 36): `computeTotals` las nur
-    den Prozentwert, also sagte `total.limitReached` „nein", während das Konto bei 42 % mit
-    `locked_reason` „ja" sagte — zwei Datenpunkte desselben Adapters im Widerspruch. Ausgewertet wird
-    dieselbe `lockedWindows()`, die die Engine benutzt; ein gesperrtes MODELL-Fenster hebt die Summe
-    weiterhin nicht, es sprach nie fürs Konto.
-52. **Indikatoren aus dem Baumbauer gehen über den Vergleichs-Schreibweg** (0.13.0, Erweiterung von
-    13): Die Flotten-Regel („jedes `indicator.*` mit `setStateChangedAsync`") galt überall außer im
-    Baumbauer, der alle seine Writes gleich behandelte — `limits.<fenster>.active` und
-    `credits.available` bekamen in jedem Zyklus einen neuen Zeitstempel auf einem unveränderten
-    Wahrheitswert. Entschieden wird an der ROLLE, die das `ObjectDef` ohnehin trägt
-    (`StateWrite.indicator`). Die 16 Messwerte daneben bleiben beim normalen `setState`.
-53. **Eine verworfene Konto-Zeile wird benannt** (0.13.0): unbekannter Anbieter, keine bildbare Id
-    oder eine Id, die eine andere Zeile schon hat — die Zeile verschwand wortlos, und die Startzeile
-    zählt nur die Überlebenden. Zwei Speicher-Namen können auf dieselbe Id fallen („my key" und
-    „my.key" werden beide `my_key-api`), das sieht kein Nutzer kommen. `parseAccounts` gibt die
-    verworfenen Zeilen mit Grund zurück, `onReady` schreibt je eine `warn`-Zeile. Die
-    Reserve-Prüfung auf `info`/`total` ist mit dem heutigen Id-Schema **unerreichbar** (ein Abo hat
-    eine feste Id, ein Schlüssel-Konto endet immer auf `-api`) — sie bleibt als Wächter und ist im
-    Code als solcher benannt, statt einen Test zu bekommen, der etwas anderes behauptet.
-54. **Das Gutschein-Inventar wird stündlich geholt, nicht je Zyklus** (0.13.0): Gutscheine werden von
-    Hand gekauft und eingelöst, die Antwort ist also nahezu statisch — während `/wham/usage`
-    IP-gedrosselt ist und dieser zweite Aufruf in denselben Eimer auf demselben Host geht. Er lief
-    beim ersten Abruf des Prozesses und danach jeden n-ten, aus dem eingestellten Takt abgeleitet.
-    Bleibt „best effort": sein Fehlschlag verwirft die Hauptantwort weiterhin nicht.
-    ⚠️ **Nicht zu verwechseln mit dem verworfenen Monatsbericht-Puffer:** dort wäre die Anfragezahl
-    GLEICH geblieben (ein Tages-Abruf ist ebenfalls zwei Anfragen), hier wird wirklich eine Anfrage
-    je Zyklus gespart. `limit=31` ist bei beiden Berichts-Anbietern das dokumentierte Maximum für
-    Tages-Eimer, ein Monat passt also in EINE Seite — Entscheidung 26 ist damit mit den Zahlen des
-    Anbieters bestätigt, und Anthropic erlaubt ausdrücklich „polling once per minute for sustained
-    use". Der Puffer ist gemessen verworfen; nicht erneut vorschlagen.
+29. **Der Anbieter-Katalog ist EINE Tabelle** — (0.12.0): `PROVIDERS` in `provider.ts` trägt Kennung, Anzeigename, Anmelde-Fluss, feste Konto-Id und „braucht Admin-Schlüssel".
+30. **„Nicht angemeldet" ist eine EIGENE Fehlerklasse** — (0.12.0, fünfte neben Entscheidung 11): `no-credentials` heißt, es liegt keine Anmeldung/kein Schlüssel vor — `auth` heißt, der Anbieter hat eine ABGELEHNT.
+31. **Ein Konto ohne brauchbaren Zugang bekommt trotzdem sein Skelett** — (0.12.0): vorher wurde es im Engine-Konstruktor übersprungen — kein Objekt, kein Start-Stempel.
+32. **Nach jedem `await` im Abfragepfad wird der Stopp erneut geprüft** — (0.12.0): `stop()` bricht Zeitgeber ab, keine laufende Anfrage.
+33. **EINE Antwort auf „liefert das Konto"** — (0.12.0): `isDelivering(state)`.
+34. **`authOn400` steht am AUFRUF, nicht im Helfer** — (0.12.0): richtig für die Token-Endpunkte, falsch überall sonst.
+35. **`is_active` wird angezeigt, entscheidet aber nichts** — (0.12.0, Rohantwort gemessen 2026-09-06): Anthropic markiert das Fenster, das gerade gilt (Fable 97 % aktiv, Sitzung 8 % und Woche 54 % nicht).
+36. **`locked_reason` ist das echte Gesperrt-Signal** — (0.12.0): es sitzt nur an `five_hour`/`seven_day` und sagt, dass der Anbieter das Fenster geschlossen hat.
+37. **Fenster-Enden werden auf die MINUTE geschrieben** — (0.12.0): Anthropic rechnet den Zeitpunkt je Anfrage neu (…59.898Z / …00.364Z / …59.539Z).
+38. **`available` liegt unter `credits`** — (0.12.0): „reicht das Guthaben noch für Aufrufe" ist eine Aussage über das Guthaben; an der Konto-Wurzel stand sie neben `warning`/`limitReached` und las sich wie ein dritter konto-weiter Alarm.
+39. **Das Objekt-Inventar kommt aus einem ECHTEN Lauf, ohne Test-Naht im Produktivcode** — (0.12.0): ai-usage spricht sieben feste Fremd-Adressen — die Flotten-Vorlage füttert ihre Fixtures aber in den laufenden Adapter.
+40. **Jeder Datenpunkt ist ENTSCHIEDEN: erklärt oder als selbsterklärend deklariert** — (Flotten-Gate D08, `check-object-inventory.py`, seit 2026-09-07). 21 `desc`-Schlüssel × 11 Sprachen decken 76 der 96 Datenpunkte; die restlichen 20 stehen mit Begründung in `test/self-explaining.json` (8 Muster — …
+41. **Die Konfigseite ABONNIERT die Statuswerte** — (0.12.0): vorher fragte sie alle vier Sekunden je Abo eine Nachricht und je Konto zwei Zustände ab, solange sie offen war.
+42. **Der Konto-Knoten heißt IMMER „<Name> (<Anbieter>)" — auch wenn beides gleich ist** — (krobi 2026-09-06, nach dem 0.12.0-Deploy entschieden): live liest sich das als „Claude (Claude)", und das Inventar zeigt, dass die Dopplung der NORMALFALL ist — die Konfigseite setzt bei den drei Abos den Namen fest …
+43. **`info.lastUpdate` datiert die WERTE, nicht den Abfrageversuch** — (2026-09-07, beim Schreiben seiner Beschreibung gemessen): der Stempel hing an `reachable`, und `isDelivering()` zählt `rate-limited` absichtlich dazu — jede gedrosselte Abfrage datierte damit Werte neu, die sie gar …
+44. **`tokens.inputToday` bleibt EIN Name für zwei Anbieter-Wahrheiten** — (2026-09-07, krobi hat die Entscheidung mir überlassen): Anthropic liefert `uncached_input_tokens`, OpenAI `input_tokens` — der Anthropic-Wert lässt Cache-Treffer also weg und meldet bei cache-lastiger Nutzung zu wenig. …
 
-55. **`info.lastUpdate` datiert das ERGEBNIS DIESER RUNDE, nicht den gehaltenen Zustand** (0.14.0,
-    Audit 2026-09-15 · F1): Entscheidung 43 hat den Drossel-Fall geschlossen, der Netz-Fall blieb
-    offen. Der Netz-Zweig setzt `runtime.state` erst beim DRITTEN Streich — bei Versuch eins und
-    zwei stand dort weiter `"ok"`, und der Stempel hing daran. Eine Runde, die nichts geholt hat,
-    datierte damit die Werte neu. `pollOnce` führt jetzt eine lokale Wahrheit `delivered` (Abruf
-    gelungen UND Schreiben ohne Speicherfehler) und reicht sie an `writeAccountInfo`. Kein neues
-    Runtime-Feld: die Aussage gilt genau für diesen Durchlauf.
-56. **Die Token-Ablage folgt dem SERVER, nicht der Platte** (0.14.0 · F2 + F3, die zweite Hälfte von
-    Entscheidung 16): `TokenStore.replace(previous, next)` für den Auffrisch-Pfad, in genau dieser
-    Reihenfolge — (1) Tor: schreibt nichts, wenn der Zwischenspeicher nicht mehr `previous` hält
-    (ein Abmelden mitten in der Auffrischung hätte sonst die gerade gelöschte Datei wieder
-    angelegt), (2) Zwischenspeicher übernimmt die neuen Token, (3) Datei best effort, ein Fehler ist
-    eine `warn`-Zeile (Kategorie-Dedup), kein Wurf. **Die Reihenfolge IST der Fund** — lägen Tor und
-    Schreibvorgang andersherum, wäre der Fix wirkungslos. Gemessen an der ECHTEN `makeTokenStore`:
-    vorher kostete EIN `ENOSPC` die Anmeldung dauerhaft (nächster Poll `auth: HTTP 400`, weil der
-    Server längst rotiert hatte). `save()` bleibt für die ANMELDUNG streng: dort steht der Nutzer
-    daneben und soll den Fehler sehen.
-57. **Ein Nicht-`FetchError` ist ein Dienst-Defekt, kein Netzfehler** (0.14.0 · F2b, Entscheidung 21
-    eine Ebene tiefer): ein Parser-`TypeError` lief als Netzfehler mit drei tolerierten Versuchen —
-    zwei Runden still in `debug`, dann „nicht erreichbar" über einen Host, der geantwortet hatte.
-    Jetzt sofort `service-down` mit `warn` (Kategorie-Dedup, wie der `service`-Zweig).
-58. **Der Waisen-Abgleich ist WARTUNG, nicht Speichern** (0.14.0 · F5): er lief im selben
-    `try` wie die Wertschreibungen, also verwarf sein Fehlschlag eine Runde, deren Werte
-    nachweislich im Baum standen — das Konto meldete „fetched but not stored", während seine
-    Datenpunkte weiterliefen, und `total.*` fror auf dem vorherigen Schnappschuss ein. Eigener
-    `try/catch`, eigene `warn`-Dedup, `deliveredIds` bleibt unverändert (der Sweep MUSS in der
-    nächsten Runde erneut gegen die Datenbank vergleichen). Entscheidung 46 bleibt gewahrt: der
-    Schnappschuss wird erst übernommen, wenn die Werte geschrieben sind.
-59. **Eine beantwortete Ablehnung nullt den Netz-Strafzähler** (0.14.0 · F6): `failCount` wurde nur
-    bei Erfolg und im `service`-Zweig genullt. Zwei Netzfehler, dazwischen ein `auth`/`rate-limit`/
-    `no-credentials` — also ein BEWEIS, dass die Verbindung steht — und der nächste Netzfehler war
-    der dritte Streich. Der Zähler startet jetzt in allen drei Zweigen neu, mit derselben
-    Begründung, die im `service`-Zweig schon stand (Entscheidung 11).
-60. **Angekündigte FAKTEN gehen über den Vergleichs-Schreibweg, Messwerte nicht** (0.14.0 · F7,
-    Erweiterung von 52): `StateWrite.indicator` heißt jetzt `compare` und wird für Rolle
-    `indicator` UND Rolle `date` gesetzt. Die Trennlinie ist Messwert gegen Ankündigung: ein
-    Prozentwert, ein Zähler, ein Geldbetrag tragen im Zeitstempel Information („gerade wieder so
-    gemessen"), ein Fensterende, der nächste Gutschein-Verfall und die Guthaben-Obergrenze nicht —
-    die ändern sich höchstens einmal je Fenster oder Plan. Gezählt auf dem Fixture-Baum aller sieben
-    Kontoarten: 11 von 50 unbedingten Schreibvorgängen je Konto-Runde waren solche Fakten.
-    `credits.limit` trägt Rolle `value` und ist die EINE benannte Ausnahme (`compared(...)`, genau
-    einmal benutzt) — eine Ausnahme ist besser als ein zweiter Mechanismus. `info.connection` in
-    `main.ts` (zwei Einmal-Pfade) folgt endlich Entscheidung 13.
-61. **Ein Abmelden löscht die ALARME des Kontos, nicht seine Werte** (0.14.0 · F8): gemessen — ein
-    bei 100 % abgemeldetes Konto hielt `warning`, `limitReached`, `total.warningsActive`,
-    `total.maxLimitPercent` und `total.limitReached`, bis sich jemand neu anmeldete; eine
-    Automatisierung darauf blieb stehen. Beim ÜBERGANG nach `not-signed-in` (und nur dort) wird
-    `status.snapshot` verworfen und `warning`/`limitReached` per Vergleichs-Schreibweg auf `false`
-    gesetzt; `computeTotals` überspringt schnappschusslose Konten ohnehin. Die WERTE bleiben stehen
-    (Entscheidung 6/15), `total.accounts` zählt weiter mit (Entscheidung 40). Für `auth`,
-    `service-down` und `no-connection` gilt das NICHT — das sind Aussetzer, keine Abmeldung.
-62. **`resets_at` kommt aus dem `limits[]`-Eintrag ODER dem flachen Block** (0.14.0 · F9): beide im
-    Repo liegenden Ableitungen der Live-Antwort vom 2026-09-06 führen im Sitzungs-Eintrag KEIN
-    `resets_at`, während `five_hour`/`seven_day` es tragen — der Adapter schrieb
-    `claude.limits.session.resetAt` leer, obwohl die Zeit bekannt war. Die Zuordnung
-    `session → five_hour` / `weekly_all → seven_day` wird jetzt EINMAL als `flatKey` berechnet und
-    für beide Felder benutzt (`locked_reason` fuhr sie schon, als eigenes Ternär) — dass sie zweimal
-    dastand, ist der Grund, warum die zweite vergessen wurde.
-63. **Prototyp-Schlüssel sind keine Anbieter** (0.14.0 · F4): die Anbieter-Tabellen entstehen über
-    `Object.fromEntries` und tragen damit `Object.prototype` — `SIGN_IN_FLOWS["constructor"]` ist
-    wahr. Die Nachrichtenbox prüfte auf Wahrheitswert, also nahm sie das Wort an, der Anmelde-
-    Verwalter fand keinen passenden Fluss und fiel auf den ChatGPT-Gerätecode-Zweig durch: eine
-    echte Anfrage an OpenAI, ausgelöst von einem Wort. Jetzt `Object.hasOwn` an der API-Grenze.
-    Zweite Hälfte: `parseAccounts` rief `accountId` VOR der Anbieter-Prüfung, also war `id` auf dem
-    Weg in die Verwerfungs-Meldung kurz eine Funktion.
-64. **„delivering again" erst ab der ZWEITEN Runde eines Prozesses** (0.14.0 · F10): jedes Konto
-    startet als `no-connection` (Entscheidung 19c), also sah jede erste Antwort wie eine Erholung
-    aus — sieben `info`-Zeilen bei jedem Neustart, über einen Fehler, den nie jemand gemeldet hatte.
-    Dieselbe Schranke, die die `locked`-Flanke schon benutzt (Entscheidung 50).
-65. **Der Anbieter darf seinen eigenen Grund sagen** (0.14.0 · O2): bei 401/403/429/5xx wurde der
-    Antwortkörper verworfen, `info.error` sagte nur „HTTP 401". OpenRouter, OpenAI und Anthropic
-    antworten mit `{ error: { message } }` — das steht jetzt im Text („invalid API key"). Strikt
-    best effort: der STATUS entscheidet die Fehlerklasse, der Körper schmückt nur, ein unlesbarer
-    oder langer Körper (HTML-Fehlerseite eines Proxys) ändert nichts und wirft nie.
-66. **Bei `auth` auf der Verbrauchsabfrage wird EINMAL aufgefrischt und wiederholt** (0.14.0 · O4):
-    ein serverseitig entwertetes Zugangs-Token vor seinem Ablauf meldete bis zum Ablauf (Claude
-    ~8 h) eine abgelehnte Anmeldung samt Benachrichtigung und erholte sich danach von selbst. Genau
-    ein Versuch, und nur für `auth` — die zweite Ablehnung ist die echte Antwort. Gemeinsame Naht
-    `withAuthRetry` für alle drei Abos; sie ist nur zusammen mit Entscheidung 56 vertretbar, weil
-    die zusätzliche Rotation dort abgesichert ist.
-67. **`windowEnd` rundet zur NÄCHSTEN Minute, NICHT auf** (0.14.0, geprüft und VERWORFEN): der
-    Audit-Vorschlag „aufrunden, damit `resetAt` nie vor dem echten Ende liegt" klingt richtig und
-    zerstört genau die Stabilisierung, für die Entscheidung 37 gebaut wurde — der Jitter des
-    Anbieters liegt auf der Minutengrenze (…09:59.898 und …10:00.364 sind dasselbe Fensterende,
-    gemessen), `ceil` bildet sie auf 14:10 und 14:11 ab und das Flattern ist zurück. Die halbe
-    Minute, die der Wert zu früh stehen kann, liegt innerhalb der Genauigkeit, die die Minute
-    ohnehin ankündigt. **Nicht erneut vorschlagen** — die drei echten Messwerte stehen im Test.
-68. **Ein Modell ohne Verbrauch bekommt seine 0, statt gefegt zu werden** (0.15.0 · B1, die zweite
-    Hälfte von Entscheidung 49): Der Verbrauchsbericht ist eine Aussage über einen ZEITRAUM, kein
-    Bestandsverzeichnis — ein Modell fehlt darin, weil nichts darauf lief, nicht weil der Anbieter
-    es abgeschafft hat. Entscheidung 49 schloss die TAGES-Hälfte (die OpenAI-Modellliste kommt aus
-    dem ganzen Monat, also leert UTC-Mitternacht sie nicht mehr). Offen blieb der MONATSwechsel: der
-    Bericht beginnt am 1. neu, und sobald das erste Modell des neuen Monats Verbrauch meldet, sprach
-    die Runde wieder über den `models`-Zweig — der Waisen-Aufräufer löschte jeden anderen
-    Modell-Kanal samt Historie und Enum-Zugehörigkeit und legte ihn bei der nächsten Nutzung neu an.
-    `zeroUnusedModels` schreibt jetzt die 0 und nimmt die Id in die gelieferte Menge, womit beide
-    Hälften zugleich fallen: der Kanal bleibt, UND er friert nicht auf dem letzten Wert unter einem
-    Namen ein, der „heute" sagt. **`limits.*` bleibt unverändert** — dort meldet der Anbieter den
-    PLAN, ein Fenster, das verschwindet, ist wirklich weg (Entscheidung 15 gilt dort weiter, per
-    Gegentest festgenagelt). Nadel A43.
-69. **Die Stopp-Prüfung gilt auch im STARTpfad** (0.15.0 · B3, die dritte Hälfte von 32/47):
-    `stop()` erreicht nur eine Engine, die schon existiert — ein Abschalten, das in die Wartezeiten
-    des Starts fiel, sah niemand. `onReady` lief danach zu Ende: es löschte veraltete Objekte,
-    NACHDEM dem Host „fertig" gemeldet war, und schrieb `info.connection = true` über den
-    Offline-Stempel, den `onUnload` gerade gesetzt hatte — derselbe Schaden, den Entscheidung 47 aus
-    dem Abfragepfad entfernt hat. `onUnload` setzt jetzt als ERSTES `unloading`, und `onReady` prüft
-    es nach jedem `await` (vor allem VOR den beiden löschenden Schritten). Nadel A44.
-    **Geprüft und NICHT gebaut:** ein `catch` um `pollOnce` in `pollAccount`. Dort steht `try/finally`
-    ohne `catch`, und die Flotten-Regel „oberstes try/catch" klingt zuständig — sie gilt aber dem
-    Ereignis-HANDLER, dessen unbehandelte Ablehnung den Prozess nimmt. `pollOnce` fängt Abruf und
-    Schreibweg je selbst, die fünf Anweisungen danach rufen nur Nähte, die in `main.ts` ein `.catch()`
-    tragen: der Wächter hätte nichts bewacht.
-70. **Der Antwortkörper hat eine Obergrenze, nicht nur eine Frist** (0.15.0 · B4): `AbortSignal.timeout`
-    begrenzt, wie LANGE eine Antwort dauern darf, nicht wie GROSS sie werden kann — auf einer schnellen
-    Leitung sind 15 s sehr viel Speicher, in einem Prozess, der monatelang läuft. `readCappedText`
-    liest den Körper als Strom und zählt mit (8 MiB); darüber ist es ein `service`-Fehler. Gezählt wird
-    beim LESEN, nicht an `Content-Length`: eine gestückelte Antwort trägt gar keine Länge, und eine
-    angegebene ist die Behauptung des Servers, keine Messung. Nadel A45.
-    ⚠️ Die Attrappe der http-Tests war ein Objekt mit `json()`/`text()` und hatte gar keinen `body` —
-    sie hätte die Kappe nie erreicht und trotzdem grün gemeldet. Sie baut jetzt echte `Response`-Objekte.
-71. **Ein Fehlertext hat EINE Quelle** (0.15.0 · F1, Flotten-Klasse 1 seit 2026-09-02): 25 Stellen
-    trugen `e instanceof Error ? e.message : String(e)` von Hand. Richtig für Fehler und Zeichenketten,
-    falsch für alles andere: ein geworfenes einfaches Objekt (`{ code: "ECONNRESET" }`, das Fehlerobjekt
-    eines HTTP-Baukastens) erreichte Protokoll, `info.error` und Sentry als `[object Object]`.
-    `errorText()` in `src/lib/error-text.ts` — bewusst OHNE Importe, weil `http.ts` unter den
-    Helfer-Modulen sitzt. `JSON.stringify` ist im Objekt-Zweig doppelt abgesichert, weil es genau hier
-    feindselig ist: es WIRFT bei einer zyklischen Struktur (ein Fehler, der seine Antwort mitführt) und
-    LIEFERT `undefined`, wenn ein `toJSON` nichts hergibt. Nicht ersetzt wurde
-    `gemini-sub.ts` — dort entscheidet das Ternär, WAS geworfen wird, es ist kein Text.
+45. **Anthropic rechnet in CENT** — (0.13.0, Nachrecherche zur Audit-Welle): die Referenz des Kosten-Berichts sagt zum Feld `amount` wörtlich „Cost amount in lowest currency units (e.g. cents) as a decimal string.
+46. **Ein SCHREIB-Fehler ist kein Anbieter-Fehler** — (0.13.0): `applySnapshot` lag im selben `try` wie der Abruf, also landete ein abgelehntes `extendObject`/`getObjectViewAsync` in `handleFailure` und wurde `network`.
+47. **Entscheidung 32 gilt für JEDEN `await` des Abfragepfads** — (0.13.0, die fehlende Hälfte): die Stopp-Prüfung stand nur hinter `provider.fetch()`.
+48. **Eine leere Antwort ist kein Aufräum-Auslöser** — (0.13.0, Flotten-Regel „Leere API-Listen NICHT als Cleanup-Trigger"): Der Waisen-Aufräumer las „diese Runde lieferte nichts unter `limits`" als „die Fenster sind weg".
+49. **Der Tagesbericht liefert IMMER** — (0.13.0): `snapshot.tokens` wurde nur bei Nutzung gebaut, `snapshot.costs` dagegen immer.
+50. **Ein Übergang wird nur behauptet, wenn er beobachtet wurde** — (0.13.0): Warnschwelle und Sperr-Meldung sind Flanken, und die vorherige Seite lag nur im Speicher.
+51. **Die Summe kennt das gesperrte Fenster** — (0.13.0, Erweiterung von 36): `computeTotals` las nur den Prozentwert, also sagte `total.limitReached` „nein", während das Konto bei 42 % mit `locked_reason` „ja" sagte — zwei Datenpunkte desselben Adapters im …
+52. **Indikatoren aus dem Baumbauer gehen über den Vergleichs-Schreibweg** — (0.13.0, Erweiterung von 13): Die Flotten-Regel („jedes `indicator.*` mit `setStateChangedAsync`") galt überall außer im Baumbauer, der alle seine Writes gleich behandelte — `limits.<fenster>.active` und …
+53. **Eine verworfene Konto-Zeile wird benannt** — (0.13.0): unbekannter Anbieter, keine bildbare Id oder eine Id, die eine andere Zeile schon hat — die Zeile verschwand wortlos, und die Startzeile zählt nur die Überlebenden.
+54. **Das Gutschein-Inventar wird stündlich geholt, nicht je Zyklus** — (0.13.0): Gutscheine werden von Hand gekauft und eingelöst, die Antwort ist also nahezu statisch — während `/wham/usage` IP-gedrosselt ist und dieser zweite Aufruf in denselben Eimer auf demselben Host geht.
+
+55. **`info.lastUpdate` datiert das ERGEBNIS DIESER RUNDE, nicht den gehaltenen Zustand** — (0.14.0, Audit 2026-09-15 · F1): Entscheidung 43 hat den Drossel-Fall geschlossen, der Netz-Fall blieb offen.
+56. **Die Token-Ablage folgt dem SERVER, nicht der Platte** — (0.14.0 · F2 + F3, die zweite Hälfte von Entscheidung 16): `TokenStore.replace(previous, next)` für den Auffrisch-Pfad, in genau dieser Reihenfolge — (1) Tor: schreibt nichts, wenn der Zwischenspeicher nicht mehr …
+57. **Ein Nicht-`FetchError` ist ein Dienst-Defekt, kein Netzfehler** — (0.14.0 · F2b, Entscheidung 21 eine Ebene tiefer): ein Parser-`TypeError` lief als Netzfehler mit drei tolerierten Versuchen — zwei Runden still in `debug`, dann „nicht erreichbar" über einen Host, der geantwortet hatte.
+58. **Der Waisen-Abgleich ist WARTUNG, nicht Speichern** — (0.14.0 · F5): er lief im selben `try` wie die Wertschreibungen, also verwarf sein Fehlschlag eine Runde, deren Werte nachweislich im Baum standen — das Konto meldete „fetched but not stored", während seine Datenpunkte …
+59. **Eine beantwortete Ablehnung nullt den Netz-Strafzähler** — (0.14.0 · F6): `failCount` wurde nur bei Erfolg und im `service`-Zweig genullt.
+60. **Angekündigte FAKTEN gehen über den Vergleichs-Schreibweg, Messwerte nicht** — (0.14.0 · F7, Erweiterung von 52): `StateWrite.indicator` heißt jetzt `compare` und wird für Rolle `indicator` UND Rolle `date` gesetzt.
+61. **Ein Abmelden löscht die ALARME des Kontos, nicht seine Werte** — (0.14.0 · F8): gemessen — ein bei 100 % abgemeldetes Konto hielt `warning`, `limitReached`, `total.warningsActive`, `total.maxLimitPercent` und `total.limitReached`, bis sich jemand neu anmeldete; eine Automatisierung …
+62. **`resets_at` kommt aus dem `limits[]`-Eintrag ODER dem flachen Block** — (0.14.0 · F9): beide im Repo liegenden Ableitungen der Live-Antwort vom 2026-09-06 führen im Sitzungs-Eintrag KEIN `resets_at`, während `five_hour`/`seven_day` es tragen — der Adapter schrieb …
+63. **Prototyp-Schlüssel sind keine Anbieter** — (0.14.0 · F4): die Anbieter-Tabellen entstehen über `Object.fromEntries` und tragen damit `Object.prototype` — `SIGN_IN_FLOWS["constructor"]` ist wahr.
+64. **„delivering again" erst ab der ZWEITEN Runde eines Prozesses** — (0.14.0 · F10): jedes Konto startet als `no-connection` (Entscheidung 19c), also sah jede erste Antwort wie eine Erholung aus — sieben `info`-Zeilen bei jedem Neustart, über einen Fehler, den nie jemand gemeldet hatte.
+65. **Der Anbieter darf seinen eigenen Grund sagen** — (0.14.0 · O2): bei 401/403/429/5xx wurde der Antwortkörper verworfen, `info.error` sagte nur „HTTP 401".
+66. **Bei `auth` auf der Verbrauchsabfrage wird EINMAL aufgefrischt und wiederholt** — (0.14.0 · O4): ein serverseitig entwertetes Zugangs-Token vor seinem Ablauf meldete bis zum Ablauf (Claude ~8 h) eine abgelehnte Anmeldung samt Benachrichtigung und erholte sich danach von selbst.
+67. **`windowEnd` rundet zur NÄCHSTEN Minute, NICHT auf** — (0.14.0, geprüft und VERWORFEN): der Audit-Vorschlag „aufrunden, damit `resetAt` nie vor dem echten Ende liegt" klingt richtig und zerstört genau die Stabilisierung, für die Entscheidung 37 gebaut wurde — der Jitter des …
+68. **Ein Modell ohne Verbrauch bekommt seine 0, statt gefegt zu werden** — (0.15.0 · B1, die zweite Hälfte von Entscheidung 49): Der Verbrauchsbericht ist eine Aussage über einen ZEITRAUM, kein Bestandsverzeichnis — ein Modell fehlt darin, weil nichts darauf lief, nicht weil der Anbieter es …
+69. **Die Stopp-Prüfung gilt auch im STARTpfad** — (0.15.0 · B3, die dritte Hälfte von 32/47): `stop()` erreicht nur eine Engine, die schon existiert — ein Abschalten, das in die Wartezeiten des Starts fiel, sah niemand.
+70. **Der Antwortkörper hat eine Obergrenze, nicht nur eine Frist** — (0.15.0 · B4): `AbortSignal.timeout` begrenzt, wie LANGE eine Antwort dauern darf, nicht wie GROSS sie werden kann — auf einer schnellen Leitung sind 15 s sehr viel Speicher, in einem Prozess, der monatelang läuft.
+71. **Ein Fehlertext hat EINE Quelle** — (0.15.0 · F1, Flotten-Klasse 1 seit 2026-09-02): 25 Stellen trugen `e instanceof Error ? e.message : String(e)` von Hand.
 
 ## Tests
 
