@@ -155,7 +155,7 @@ so instead of pretending to be connected; signing in again is all it takes.
     Placeholder for the next version (at the beginning of the line):
 -->
 
-### 0.15.0 (2026-09-16)
+### 0.15.0 (2026-09-16) — stable
 
 - Fixed: Model channels of an organisation account no longer vanish at the turn of a month — a model with no usage yet was deleted with its history and re-created on its next use
 - Fixed: Stopping the instance right after it started no longer leaves the accounts showing as connected while the instance is switched off
