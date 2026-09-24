@@ -118,7 +118,6 @@ jobs:
             echo ""
             echo "Source: https://github.com/ioBroker/ioBroker.repositories/blob/master/sources-dist-stable.json"
             echo "Fix: bump io-package.json common.dependencies / globalDependencies to at least the stable versions above."
-            echo "(release-script before_commit hook does this automatically — run 'npm run release' to apply.)"
             exit 1
           fi
           echo "✓ all ioBroker-deps at or ahead of stable repository"
