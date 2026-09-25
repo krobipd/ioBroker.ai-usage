@@ -6,7 +6,8 @@
     "scripts": {
         "start": "vite --port 4173",
         "lint": "eslint -c eslint.config.mjs",
-        "build": "tsc && vite build"
+        "build": "tsc && vite build",
+        "test": "vitest run --globals --dir src"
     },
     "dependencies": {},
     "devDependencies": {
