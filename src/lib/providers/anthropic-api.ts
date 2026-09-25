@@ -123,12 +123,21 @@ export function anthropicApiProvider(
         fetchJson,
         truncated("usage"),
       );
-      const costs = await fetchAllPages(
-        `${BASE}/cost_report?starting_at=${start}&bucket_width=1d&limit=31`,
-        headers,
-        fetchJson,
-        truncated("cost"),
-      );
+      // Not on the 1st (UTC): the month then begins on the open day, and the cost
+      // report answers a range that starts there with 400 "ending date must be after
+      // starting date" — measured live by another integration (switchboard PR #1185,
+      // 2026-09-15). Asked anyway, the whole round failed as a service fault for the
+      // entire day, the day's tokens with it. Nothing of the new month is billed in
+      // the report yet, so the month starts at 0 (decision 98).
+      const firstOfMonth = new Date(now()).getUTCDate() === 1;
+      const costs = firstOfMonth
+        ? []
+        : await fetchAllPages(
+            `${BASE}/cost_report?starting_at=${start}&bucket_width=1d&limit=31`,
+            headers,
+            fetchJson,
+            truncated("cost"),
+          );
       return parseAnthropicReports(usage, costs, now());
     },
   };

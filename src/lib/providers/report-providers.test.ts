@@ -1,3 +1,4 @@
+import { FetchError } from "../provider";
 import { anthropicApiProvider, parseAnthropicReports } from "./anthropic-api";
 import { fetchAllPages, isToday, monthStartIso, monthStartUnix, projectMonth } from "./report-utils";
 import { openAiProvider, parseOpenAiReports } from "./openai";
@@ -301,6 +302,46 @@ describe("report providers ask for full pages", () => {
     await provider.fetch();
     expect(urls).toHaveLength(2);
     expect(urls.every(url => url.includes("limit=31"))).toBe(true);
+  });
+
+  test("on the 1st the Anthropic cost report is not asked — the month starts at 0 (decision 98)", async () => {
+    // A range that begins on the open day is answered with 400 (switchboard PR
+    // #1185, live 2026-09-15); asked anyway, the whole round failed for the day.
+    const urls: string[] = [];
+    const provider = anthropicApiProvider(
+      "admin-key",
+      url => {
+        urls.push(url);
+        return Promise.resolve({
+          data: [{ starting_at: "2026-10-01T00:00:00Z", results: [{ uncached_input_tokens: 5, output_tokens: 7 }] }],
+        });
+      },
+      () => Date.UTC(2026, 9, 1, 9),
+    );
+    const snapshot = await provider.fetch();
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain("usage_report/messages");
+    expect(snapshot.costs).toEqual({ today: 0, month: 0, projectedMonth: 0, currency: "USD" });
+    expect(snapshot.tokens).toEqual({ inputToday: 5, outputToday: 7 });
+  });
+
+  test("a failure in the middle of the walk fails the round instead of returning half a month", async () => {
+    let page = 0;
+    await expect(
+      fetchAllPages("/r", {}, () => {
+        page++;
+        return page === 1
+          ? Promise.resolve({ data: [1], has_more: true, next_page: "p2" })
+          : Promise.reject(new FetchError("service", "HTTP 502"));
+      }),
+    ).rejects.toMatchObject({ kind: "service" });
+  });
+
+  test("the month-end projection handles the last day, February and a leap year", () => {
+    expect(projectMonth(31, Date.UTC(2026, 0, 31, 12))).toBe(31);
+    expect(projectMonth(14, Date.UTC(2026, 1, 14, 12))).toBe(28);
+    expect(projectMonth(14, Date.UTC(2028, 1, 14, 12))).toBe(29);
+    expect(projectMonth(1, Date.UTC(2026, 3, 1, 0, 30))).toBe(30);
   });
 
   test("a truncated report reaches the warn callback", async () => {
