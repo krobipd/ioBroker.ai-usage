@@ -1065,9 +1065,8 @@ export class PollEngine {
    * and the accounts then came back one by one as their staggered polls answered.
    */
   private writeTotals(): void {
-    if (this.stopped) {
-      return;
-    }
+    // No stop check of its own: every caller checks right before, with no wait in
+    // between — a guard here could never be the one that holds.
     const totals = computeTotals(
       this.runtimes.map(runtime => runtime.status),
       this.configuredAccounts,

@@ -7,7 +7,7 @@
         "start": "vite --port 4173",
         "lint": "eslint -c eslint.config.mjs",
         "build": "tsc && vite build",
-        "test": "vitest run --globals --dir src"
+        "test": "node node_modules/vitest/vitest.mjs run"
     },
     "dependencies": {},
     "devDependencies": {
@@ -27,7 +27,8 @@
         "react-dom": "^19.2.8",
         "vite": "^8.1.5",
         "vite-plugin-commonjs": "^0.10.4",
-        "vitest": "^5.0.0"
+        "vitest": "~5.0.2",
+        "jsdom": "~30.1.1"
     },
     "overrides": {
         "react": "^19.2.8",

@@ -847,6 +847,7 @@ interface Wiring {
       deleteObject(id: string): Promise<void>;
       listStateIds(prefix: string): Promise<string[]>;
       readState(id: string): Promise<unknown>;
+      upsertObject(def: { id: string; type: string; common: Record<string, unknown> }): Promise<void>;
     };
   } | null;
   onObjectChange(id: string, obj: unknown): Promise<void>;
@@ -860,6 +861,66 @@ const wiring = (adapter: AiUsageAdapter): Wiring => adapter as unknown as Wiring
 const KEY_ROW = { name: "Router", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 };
 
 describe("audit 2026-09-25 — the adapter layer", () => {
+  test("the datapoint balance counts states only, never channels", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    const deps = wiring(adapter).engine?.deps;
+    await deps?.upsertObject({ id: "or-api.limits", type: "channel", common: {} });
+    await deps?.upsertObject({ id: "or-api.limits.week.percent", type: "state", common: {} });
+    expect(internals(adapter).knownStateIds.has("or-api.limits")).toBe(false);
+    expect(internals(adapter).knownStateIds.has("or-api.limits.week.percent")).toBe(true);
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("a change the user made to a key is not reported as a startup warning", async () => {
+    const adapter = makeAdapter();
+    const resolveKey = (
+      adapter as unknown as {
+        resolveKey(account: { name: string; credentialId: string }, quiet: boolean): Promise<{ reason?: string }>;
+      }
+    ).resolveKey.bind(adapter);
+    adapter.getForeignObjectAsync = vi.fn(() => Promise.resolve(null));
+    const loud = await resolveKey({ name: "Router", credentialId: "system.credentials.gone" }, false);
+    expect(loud.reason).toContain("no longer exists");
+    expect(adapter.log.warn).toHaveBeenCalledTimes(1);
+    await resolveKey({ name: "Router", credentialId: "system.credentials.gone" }, true);
+    expect(adapter.log.warn).toHaveBeenCalledTimes(1);
+    expect(adapter.log.debug).toHaveBeenCalledWith(expect.stringContaining("no longer exists"));
+  });
+
+  test("only key accounts follow a credential — a subscription row has none to follow", async () => {
+    const adapter = makeAdapter();
+    adapter.config = {
+      accounts: [{ name: "Claude", provider: "claude-sub", credentialId: "", warnThreshold: 80 }, KEY_ROW],
+      pollInterval: 300,
+    } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    expect(adapter.subscribeForeignObjectsAsync).toHaveBeenCalledTimes(1);
+    expect(adapter.subscribeForeignObjectsAsync).toHaveBeenCalledWith("system.credentials.or");
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("F6: retiring a left-over tree writes only the states it really has", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
+    adapter.getAdapterObjectsAsync = vi.fn(() =>
+      Promise.resolve({
+        "ai-usage.0.claude": { type: "device" },
+        "ai-usage.0.claude.warning": { type: "state" },
+      }),
+    ) as unknown as typeof adapter.getAdapterObjectsAsync;
+    await internals(adapter).onReady();
+    const ids = (adapter.setStateChangedAsync as unknown as { mock: { calls: [string][] } }).mock.calls.map(
+      call => call[0],
+    );
+    expect(ids).toContain("claude.warning");
+    // Written, they would be created as bare states without name or role.
+    expect(ids).not.toContain("claude.limitReached");
+    expect(ids).not.toContain("claude.info.error");
+    internals(adapter).onUnload(() => undefined);
+  });
+
   test("R21: one account's action-required message cannot push out another's", () => {
     // js-controller 7.2.2 (`notificationHandler.ts`) keeps at most `limit` messages per
     // instance and category and drops the oldest. With 1, the second account's

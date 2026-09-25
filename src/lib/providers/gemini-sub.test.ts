@@ -371,3 +371,26 @@ describe("audit 2026-09-25 — Google", () => {
     ]);
   });
 });
+
+describe("names that cannot become an id (D09, 2026-09-25)", () => {
+  test("a quota bucket whose model name has no usable character is left out", () => {
+    // `sanitizeId("***")` is empty — an object id of "" would land on the account root.
+    expect(parseGeminiQuota({ buckets: [{ modelId: "***", remainingFraction: 0.5 }] }).limits).toBeUndefined();
+  });
+
+  test("a pool Google reports twice appears once", () => {
+    const pools = parseGeminiPools({
+      groups: [
+        {
+          displayName: "Gemini Models",
+          buckets: [
+            { bucketId: "gemini-5h", window: "5h", remainingFraction: 0.4 },
+            { bucketId: "gemini-5h", window: "5h", remainingFraction: 0.9 },
+          ],
+        },
+      ],
+    });
+    expect(pools).toHaveLength(1);
+    expect(pools[0].percent).toBe(60);
+  });
+});

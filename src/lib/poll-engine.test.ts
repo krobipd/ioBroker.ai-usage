@@ -2091,6 +2091,22 @@ describe("each stop check on its own, and the key swap of an armed account", () 
     expect(h.scheduled).toEqual([]);
   });
 
+  test("a shutdown during the skeleton's last object leaves the offline stamp standing", async () => {
+    const h = makeHarness();
+    const reasons = new Map([["k", "The selected key no longer exists"]]);
+    const engine = new PollEngine([account({ id: "k", name: "K" })], new Map(), 300, h.deps, reasons);
+    const upsert = h.deps.upsertObject;
+    h.deps.upsertObject = async def => {
+      await upsert(def);
+      if (def.id === "k.limitReached") {
+        engine.stop();
+        await engine.markAllOffline();
+      }
+    };
+    await engine.start();
+    expect(h.states.get("k.info.error")).toBe("Unknown");
+  });
+
   test("R15: a key replaced on an account that is already polling is asked at once", async () => {
     const h = makeHarness();
     const first = scriptedProvider([planWindow(10)]);

@@ -90,7 +90,8 @@
     "release-patch": "release-script patch --yes --all",
     "release-minor": "release-script minor --yes --all",
     "release-major": "release-script major --yes --all",
-    "fix:changelog": "node -e \"const fs=require('fs');for(const[f,r]of[['README.md',/^(-->[ \\t]*)\\r?\\n(#{1,6} )/m],['CHANGELOG_OLD.md',/^(#{1,6} .*)\\r?\\n(#{1,6} )/]])if(fs.existsSync(f)){const t=fs.readFileSync(f,'utf8'),n=t.replace(r,(m,a,b)=>a+'\\n\\n'+b);if(n!==t)fs.writeFileSync(f,n)}\""
+    "fix:changelog": "node -e \"const fs=require('fs');for(const[f,r]of[['README.md',/^(-->[ \\t]*)\\r?\\n(#{1,6} )/m],['CHANGELOG_OLD.md',/^(#{1,6} .*)\\r?\\n(#{1,6} )/]])if(fs.existsSync(f)){const t=fs.readFileSync(f,'utf8'),n=t.replace(r,(m,a,b)=>a+'\\n\\n'+b);if(n!==t)fs.writeFileSync(f,n)}\"",
+    "test:admin": "npm run check:admin && npm --prefix src-admin run test"
   },
   "bugs": {
     "url": "https://github.com/krobipd/ioBroker.ai-usage/issues"
