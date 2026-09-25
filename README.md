@@ -56,8 +56,10 @@ The instance settings show one list of AI accounts. Switch on what you want to m
 | **[OpenAI](https://openai.com), [Anthropic](https://www.anthropic.com)**      | Needs an **admin key** of your organisation, not the key the admin assistant uses. A personal account without an organisation cannot deliver these reports at all — use the Claude subscription instead |
 
 The three subscription endpoints are **not officially documented**; they are the ones those
-providers' own tools use and can change without notice. Claude was tested against a live
-subscription, ChatGPT and Google could not be — please open an issue if something looks wrong.
+providers' own tools use and can change without notice. Only the Claude subscription was tested
+against a real account; ChatGPT, Google, OpenRouter, DeepSeek and the OpenAI and Anthropic
+organisation reports are built from the providers' references and never ran against a real
+account — please open an issue if something looks wrong.
 
 | Option            | Description                                                                                          | Default |
 | ----------------- | ---------------------------------------------------------------------------------------------------- | ------- |
@@ -116,8 +118,9 @@ can be the one in force while your session and week are nearly empty. It never r
 **Only plan-wide windows raise the warning** — your session and your week — and the message names
 the window it came from. A window belonging to a single model keeps its own datapoints but stays
 out of it: a model you never use can sit at 100 % forever, and an alarm that never clears is worse
-than none. Google reports no plan-wide window at all, so there the fullest model window speaks for
-the account and the warning names that model. To watch one model anyway, build the automation on
+than none. Google is special: its quota pools are the plan-wide windows where it reports them;
+otherwise its per-model buckets are the plan, the fullest speaks for the account and the warning
+names that model. To watch one model anyway, build the automation on
 its own `limits.<window>.percent`.
 
 **A nearly spent budget counts the same way.** Where a provider reports a granted budget, it
@@ -142,6 +145,11 @@ started and has not asked yet.
 Save the settings first, then sign in — the row needs a saved account to attach the sign-in to.
 After a successful sign-in the account is queried immediately, so values appear within seconds.
 
+### A key row in the settings says its stored key is missing
+
+The key was deleted from the admin's credential storage. Switch the account off, or add the key
+again under Settings → Credentials — the adapter picks up a changed or new key while it runs.
+
 ### A subscription asks you to sign in again although it worked yesterday
 
 The provider rejected the stored sign-in — a refresh token that was revoked or expired. The row says
@@ -154,6 +162,36 @@ so instead of pretending to be connected; signing in again is all it takes.
 <!--
     Placeholder for the next version (at the beginning of the line):
 -->
+
+### **WORK IN PROGRESS**
+
+- Fixed: ChatGPT limits of a single model (such as GPT-5.3-Codex-Spark) were never shown — each now gets its own 5-hour and weekly window
+- Fixed: An OpenRouter key with a monthly limit counted its whole lifetime spend against that limit and could stay at "limit reached" for good
+- Changed: OpenRouter `credits.used` now shows the use in the running limit period; the lifetime spend stays in `costs.total`, so the history jumps once
+- New: OpenRouter spend today and this month, with a month-end projection, now also counted in the cost totals
+- Fixed: Claude extra usage billed in euros was counted as dollars in the cost totals — it now keeps the account's own currency
+- Fixed: Alarms of an account stayed on for good when its API key was removed, or when the last account was switched off
+- Fixed: After a restart the totals no longer drop to 0 for a moment, and `total.limitReached` no longer flips while the first query fails
+- Fixed: Last month's costs of an account that stopped delivering no longer stay in this month's totals
+- Fixed: A model limit alone no longer raises the account's warning when the plan-wide windows are still unused
+- Fixed: Signing out now clears the account's alarms at once instead of with the next query
+- Fixed: The ChatGPT sign-in no longer breaks off while you are still typing the code
+- New: The adapter picks up a key that was changed or deleted in the credential storage while it runs
+- New: A workspace stopped by its used-up credits or its spend control counts as "limit reached" for ChatGPT
+- New: Google's quota pools are read where Antigravity reports them and speak for the account
+- Improved: `info.error` says why a key account has no key — none selected, deleted from the storage, or holding no key
+- Improved: Google accounts without a Code Assist project show Google's own reason, and a refused quota query no longer reports a rejected sign-in
+- Fixed: An Anthropic organisation account no longer fails for the whole 1st of every month
+- Fixed: The settings page no longer spins forever when the instance does not answer, and shows a key row whose stored key is gone
+- Fixed: Copying the sign-in code or link now works on plain http:// as well
+- Improved: Several notifications of different accounts are kept instead of the newest replacing the previous one
+- Improved: A network outage is no longer a warning in the log — the connection icon and `info.error` carry it
+- Improved: A throttle is logged once, not on every retry, and the retry follows the wait the provider asks for
+- Fixed: A shutdown during the startup no longer leaves timers or writes behind
+
+Only the Claude subscription runs against a real account here. The ChatGPT, OpenRouter, Google,
+DeepSeek and organisation changes follow the providers' references and their own tools' sources
+and are covered by tests, but were not seen on a real account.
 
 ### 0.15.0 (2026-09-16) — stable
 

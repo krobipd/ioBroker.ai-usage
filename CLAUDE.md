@@ -29,7 +29,7 @@ src/lib/poll-engine.ts         → Orchestrierung (pur, IO injiziert): Zyklen je
 src/lib/provider.ts            → UsageProvider-Vertrag + UsageSnapshot + FetchError-Klassen
 src/lib/http.ts                → getJson/postJson/postForm über EINE `request`-Funktion (natives
                                  fetch, Status→eine von VIER Fehlerklassen: auth · rate-limit ·
-                                 service · network)
+                                 service · network); `FetchError` trägt `status` und `retryAfterMs`
 src/lib/providers/claude-auth.ts   → OAuth-Konstanten/PKCE/Tausch/Auffrischung (HA-Vorbild-verifiziert);
                                  Scope NUR user:profile (seit 0.10.0, Vorbild-bewiesen) + die
                                  claude-code-Absender-Kennung (Drossel-Eimer, s. Entscheidung 20)
@@ -59,7 +59,8 @@ src-admin/                     → React-Konfig-Panel (Module-Federation, Admin-
                                  EINE Liste — 3 Abo-Zeilen + je eine Zeile pro gespeichertem
                                  Schlüssel, Anmelde-Bereich klappt pro Zeile auf und rendert den
                                  Fluss des jeweiligen Anbieters; `src/rows.ts` = pure Zeilen-Logik
-                                 (testbar ohne React). Build → admin/custom (git-getrackt,
+                                 (testbar ohne React), importiert die geteilten Regeln aus `src/lib`
+                                 (Entscheidung 110). Build → admin/custom (git-getrackt,
                                  sonst GitHub-Install leer) via `npm run build:admin` (tasks.js)
 ```
 
@@ -145,6 +146,49 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 69. **Die Stopp-Prüfung gilt auch im STARTpfad** — (0.15.0 · B3, die dritte Hälfte von 32/47): `stop()` erreicht nur eine Engine, die schon existiert — ein Abschalten, das in die Wartezeiten des Starts fiel, sah niemand.
 70. **Der Antwortkörper hat eine Obergrenze, nicht nur eine Frist** — (0.15.0 · B4): `AbortSignal.timeout` begrenzt, wie LANGE eine Antwort dauern darf, nicht wie GROSS sie werden kann — auf einer schnellen Leitung sind 15 s sehr viel Speicher, in einem Prozess, der monatelang läuft.
 71. **Ein Fehlertext hat EINE Quelle** — (0.15.0 · F1, Flotten-Klasse 1 seit 2026-09-02): 25 Stellen trugen `e instanceof Error ? e.message : String(e)` von Hand.
+
+72. **Ein `date` ohne Wert ist `null`, nie `""`** — (0.16.0, Audit 2026-09-25 · K1): die Rolle verlangt einen Wert, den `new Date()` lesen kann; `windowEnd` liefert `null`, `StateWrite.value` und die Engine-Deps erlauben es.
+73. **`info.error` eines Schlüssel-Kontos nennt den ECHTEN Grund** — (0.16.0 · N1): kein Schlüssel gewählt · Eintrag im Speicher gelöscht · Eintrag ohne Schlüssel; der Adapter reicht den Grund als `reasons` an die Engine.
+74. **Die aus Schnappschüssen abgeleiteten Summen warten auf die erste Runde** — (0.16.0 · F7): `start()` schreibt nur Zähler und Verbindung; `limitReached` wird wie `warning` gesät und zählt, bis das Konto in diesem Prozess liefert oder seine Alarme genullt werden; Kosten und `maxLimitPercent` eines Kontos ohne Schnappschuss bleiben draußen (Währung/Fensterart aus der DB nicht rekonstruierbar).
+75. **Eine Sperr-Meldung braucht eine in DIESEM Prozess beobachtete Lieferung** — (0.16.0 · R7): `deliveredOnce`, nicht `firstPollDone`.
+76. **Log je Fehlerkategorie einmal warn, Wiederholung debug; ein Netzausfall ist ein Zustand (debug)** — (0.16.0 · R6/N4/N5, Flotten-Regel 2026-09-22): Startwert „nichts gemeldet“; „delivering again“ auf info nur nach einer Warnung.
+77. **Eine Antwort aus der Zeit VOR einer neuen Anmeldung ist veraltet** — (0.16.0 · F10): `pollNow` erhöht die Generation; `auth`/`rate-limit` einer älteren Generation wird verworfen.
+78. **Ein Zeitgeber-Takt auf eine laufende Runde entfällt, nur eine angeforderte Abfrage wird vorgemerkt** — (0.16.0 · R9).
+79. **Der Backoff zählt ab Rundenbeginn; ein längeres `Retry-After` gewinnt** — (0.16.0 · R8/R14).
+80. **Nur unmarkierte Fenster sprechen fürs Konto — ohne Rückfall** — (0.16.0 · F8): der frühere Rückfall aufs vollste Modell-Fenster fragte keinen Anbieter; wessen Eimer der Plan SIND (Google ohne Pools), lässt sie unmarkiert (Vertrag `LimitWindow.scoped`).
+81. **Geld zählt in der Summe nur im UTC-Tag/-Monat, für den es geholt wurde** — (0.16.0 · F9): `AccountStatus.fetchedAt`.
+82. **Ein Abmelden fragt sofort ab** — (0.16.0 · F11): `SignInDeps.onSignedOut` → `engine.pollNow`, damit die Alarme mit der Anzeige „abgemeldet“ gehen.
+83. **Ein abgelehntes Skelett betrifft nur sein Konto und wird von der nächsten Abfrage nachgeholt** — (0.16.0 · R3): die Zeitgeber werden trotzdem armiert.
+84. **Ein fehlgeschlagenes Löschen erreicht die Engine, und gezählt wird erst nach dem Löschen** — (0.16.0 · R4/R5): Lösch-Naht wirft weiter; `cleanupStaleObjects` versucht jede Wurzel einzeln.
+85. **Token-Dateien werden atomar geschrieben und beim Laden auf 0600 verengt** — (0.16.0 · R10): Temp-Datei + `rename`; `chmod`, wenn andere lesen dürfen (Altdateien vor 0.10.0).
+86. **Ein Abmelden, dessen Datei nicht gelöscht werden kann, sagt es** — (0.16.0 · F13): nur ENOENT wird geschluckt; die Karte bekommt „failed“ mit Grund, im Speicher wirkt das Abmelden trotzdem.
+87. **Ohne jedes Konto werden die Summen genullt und die übrig gebliebenen Bäume entalarmt** — (0.16.0 · F6): keine Löschung, der Leer-Tabellen-Schutz bleibt.
+88. **Der Adapter folgt den Zugangsdaten-Einträgen der Schlüssel-Konten** — (0.16.0 · R15): eigenes `subscribeForeignObjectsAsync` + `objectChange` mit try/catch (nicht adapter-cores `subscribeCredentials`, das außerhalb unseres try entschlüsselt); geänderter Schlüssel → `setProvider`, gelöschter → `setProvider(null, Grund)`.
+89. **Ein Gerätecode-Poll gehört zu SEINEM Versuch** — (0.16.0 · R11): eine Antwort für einen abgelösten oder abgemeldeten Versuch speichert nichts und reißt keinen neuen Poller ab.
+90. **ChatGPTs eigene Stopp-Signale sperren die plan-weiten Fenster** — (0.16.0 · F17/N6): `limit_reached`, `allowed === false`, `rate_limit_reached_type`, `spend_control.reached` wie Claudes `locked_reason`.
+91. **ChatGPT-Zusatzlimits sind Statusblöcke mit eigenen Fenstern** — (0.16.0 · F1, openai/codex `AdditionalRateLimitDetails`): je Eintrag `<metered_feature>-session`/`-week`, `scoped`.
+92. **Codex-Credits sind eine eigene Einheit** — (0.16.0 · D4): `pieces`, nie Geld.
+93. **Der Gerätecode-Poll wartet bei 403 UND 404** — (0.16.0 · F2, Codex `poll_for_token`): der 404 wird über `FetchError.status` erkannt.
+94. **OpenRouter misst das Limit am laufenden Zeitraum** — (0.16.0 · F3/N3): `used = limit − limit_remaining`; die Lebenszeit steht in `costs.total`.
+95. **OpenRouter-Tages- und Monatskosten kommen aus `usage_daily`/`usage_monthly`** — (0.16.0 · O1 wiederaufgenommen): der Ablehnungsgrund vom 15.09. (falscher Pfad) fiel mit `/api/v1/key` weg.
+96. **Claude-Extra-Guthaben trägt die Kontowährung** — (0.16.0 · F4): `extra_usage.currency` bzw. `spend.*.currency`, Rückfall USD.
+97. **Die Claude-Token-Adresse ist `platform.claude.com`** — (0.16.0 · D2): die Rückleitungs-Adresse bleibt (der Browser folgt Umleitungen, ein POST nicht).
+98. **Am 1. des Monats fragt der Adapter Anthropics Kostenbericht nicht ab** — (0.16.0 · F12, switchboard PR #1185): der Monat beginnt bei 0.
+99. **Ohne Code-Assist-Projekt nennt der Adapter Googles eigenen Grund** — (0.16.0 · F18, gemini-cli `setup.ts`): Verifizierung mit Link · Unzulässigkeit mit Grund · nie eingerichtet · sonst Abo nötig; nie `onboardUser`.
+100. **Ein Modell zweimal: der vollere Eimer steht dafür** — (0.16.0 · R12).
+101. **Googles Kontingent-Pools sind die plan-weiten Fenster** — (0.16.0 · P-D3, Antigravity-Manager `quota.rs`): Zweitaufruf `retrieveUserQuotaSummary` höchstens alle 15 Minuten, die letzte Antwort bleibt bei einem Fehler stehen; mit Pools werden die Modell-Eimer `scoped`.
+102. **Ein 403 auf die Google-Kontingentabfrage ist eine Weigerung, keine tote Anmeldung** — (0.16.0 · A9): `service`, kein Auffrischen.
+103. **DeepSeek wählt den Guthaben-Eintrag nach fester Regel** — (0.16.0 · R13): USD, sonst erster mit Guthaben, sonst erster.
+104. **Die vier Schlüssel-APIs bekommen `ioBroker.ai-usage/<version>` als User-Agent** — (0.16.0 · K9): die Abos behalten ihre Client-Kennungen (20/25).
+105. **Die Konfigseite zeigt eine Schlüssel-Zeile ohne Eintrag und sagt „nicht lesbar“ statt „keine gespeichert“** — (0.16.0 · F14/F15).
+106. **Jede Nachricht der Konfigseite hat eine Frist** — (0.16.0 · F16): Status 10 s, Aktionen 30 s (der Adapter wartet darin selbst bis 15 s).
+107. **Start, Speichern und ein neu eingeschaltetes Abo fragen den Anmeldestatus sofort** — (0.16.0 · R18).
+108. **Eine Statusantwort von vor einer Nutzer-Aktion überschreibt sie nicht** — (0.16.0 · R19): Sequenznummer je Anbieter.
+109. **Kopieren funktioniert auch unter http://** — (0.16.0 · R20): Rückfall ohne Clipboard-API, Rückmeldung am Knopf.
+110. **Die Konfigseite importiert die Regeln aus `src/lib`, statt sie zu kopieren** — (0.16.0 · T17): `accountId`, Anbieterliste, `clampThreshold`, `SignInState`; `dts: false`.
+111. **`rate_limit_reset_credits.available_count` aus `/wham/usage` wird NICHT genutzt** — (0.16.0 · D5, geprüft und verworfen): der Server zählt abgelaufene Gutscheine mit; Entscheidung 54 bleibt.
+112. **Bis zu zehn Meldungen je Instanz** — (0.16.0 · R21): `notifications…limit: 10` — begrenzt gegen Anhäufung, groß genug gegen Verdrängung über Konten hinweg.
+113. **Anthropics `costs.today` wird NICHT gelöscht** — (0.16.0 · K3, Quellen widersprechen sich): der Hinweis steht in der Anbietertabelle der Doku.
 
 ## Tests
 
