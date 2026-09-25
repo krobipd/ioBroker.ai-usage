@@ -47,4 +47,25 @@ describe("deepSeekProvider", () => {
     expect(calls[0].url).toBe("https://api.deepseek.com/user/balance");
     expect(calls[0].headers.Authorization).toBe("Bearer sk-ds");
   });
+
+  test("several currencies: the choice does not depend on their order (decision 103)", () => {
+    const usd = { currency: "USD", total_balance: "5.00", granted_balance: "0", topped_up_balance: "5.00" };
+    const cny = { currency: "CNY", total_balance: "30.00", granted_balance: "0", topped_up_balance: "30.00" };
+    for (const infos of [
+      [usd, cny],
+      [cny, usd],
+    ]) {
+      expect(parseDeepSeekBalance({ is_available: true, balance_infos: infos }).credits).toMatchObject({
+        remaining: 5,
+        currency: "USD",
+      });
+    }
+    // No USD: the first entry that holds money, not an empty one in front of it.
+    const empty = { currency: "CNY", total_balance: "0.00" };
+    const eur = { currency: "EUR", total_balance: "7.50" };
+    expect(parseDeepSeekBalance({ balance_infos: [empty, eur] }).credits).toMatchObject({
+      remaining: 7.5,
+      currency: "EUR",
+    });
+  });
 });
