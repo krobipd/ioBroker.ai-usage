@@ -7,11 +7,12 @@ on:
     tags:
       - v[0-9]+.[0-9]+.[0-9]+
       - v[0-9]+.[0-9]+.[0-9]+-**
-    # Reine Doku-Pushes lösen keinen Lauf aus: an einer Textzeile kann kein
-    # Test fallen. Laut GitHub-Doku gilt "Path filters are not evaluated for
-    # pushes of tags" — der Release-Lauf am Tag bleibt also unberührt. Bewusst
-    # NUR unter `push`, nicht unter `pull_request`: dort liefert der Lauf den
-    # Pflicht-Prüfauftrag der Branch-Sperre (Dependabot-Zusammenführung).
+    # A documentation-only push starts no run. The repository standard checks DO read these files
+    # (README changelog, docs/, .gitignore) — the local pre-push guard runs them for such a push.
+    # GitHub's docs state "Path filters are not evaluated for pushes of tags", so the
+    # release run on a tag is unaffected. Deliberately only under `push`, never under
+    # `pull_request` — there this run is the required check of the branch protection
+    # (which is what lets Dependabot merges through).
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -122,11 +123,11 @@ jobs:
           fi
           echo "✓ all ioBroker-deps at or ahead of stable repository"
 
-  # Die Admin-Komponente ist ein eigenes Bundle mit eigenem package.json — der
-  # Root-Lint ignoriert `src-admin/` und die ioBroker-Check-Action installiert dort
-  # nichts. Ohne diesen Job standen 839 Zeilen Produktionscode ausserhalb JEDES
-  # Gates (Audit 2026-09-04): die 116 Lint-Funde, die 0.10.0 aufgeraeumt hat,
-  # haetten jederzeit unbemerkt zurueckkommen koennen.
+  # The admin component is a bundle of its own with its own package.json — the root
+  # lint ignores `src-admin/` and the ioBroker check action installs nothing there.
+  # Without this job 839 lines of production code stood outside EVERY gate (audit
+  # 2026-09-04): the 116 lint findings 0.10.0 cleaned up could have returned
+  # unnoticed at any time.
   admin-check-and-lint:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
     runs-on: ubuntu-latest
@@ -139,10 +140,10 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             src-admin/package-lock.json
-      # BEIDE Installationen: der Lint der Komponente laedt die Prettier-Regel, und
-      # Prettier sucht seine Konfiguration aufwaerts — es landet bei der Root-Datei,
-      # die `@iobroker/eslint-config` importiert. Ohne die Root-Abhaengigkeiten
-      # scheitert der Lint an einem nicht aufloesbaren Paket (2026-09-05).
+      # BOTH installs: the component's lint loads the Prettier rule, and Prettier looks
+      # for its configuration upwards — it ends at the root file, which imports
+      # `@iobroker/eslint-config`. Without the root dependencies the lint fails on a
+      # package it cannot resolve (2026-09-05).
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts
@@ -159,9 +160,9 @@ jobs:
         run: npm run check:admin
       - name: Lint the admin component
         run: npm --prefix src-admin run lint
-      # Die Vitest-Konfig liegt ausserhalb des tsconfig-include und wurde von keinem
-      # Gate gelesen — so ueberlebte ein toter `forks`-Schluessel den Umstieg auf
-      # vitest 5, ohne je zu wirken (Audit 2026-09-04).
+      # The vitest config lies outside the tsconfig include and no gate read it — so a
+      # dead `forks` key survived the move to vitest 5 without ever taking effect
+      # (audit 2026-09-04).
       - name: Type-check the vitest config
         run: npm run check:config
 

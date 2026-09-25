@@ -471,7 +471,7 @@ describe("the leftover supportedMessages key", () => {
     adapter.getForeignObjectAsync = vi.fn(() => {
       return Promise.reject(new Error("objects db down"));
     });
-    // Kein Abbruch des Starts, wenn die Objekt-Datenbank nicht antwortet.
+    // The start does not abort when the object database does not answer.
     await expect(internals(adapter).clearStopInstanceFlag()).resolves.toBe(false);
   });
 });

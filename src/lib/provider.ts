@@ -85,8 +85,8 @@ export interface LimitWindow {
    *
    * Such a bucket is reported as its own datapoint but never drives the account's
    * warning: a model the user does not use can sit at 100 % forever, and a counter
-   * that never falls is worse than no counter (krobi 2026-08-26: "das betrifft nur
-   * Fable, nicht allgemein"). Providers whose ONLY buckets are per-model (Google)
+   * that never falls is worse than no counter (krobi 2026-08-26: "that only concerns
+   * Fable, not in general"). Providers whose ONLY buckets are per-model (Google)
    * leave this unset — there the model buckets are the plan.
    */
   scoped?: boolean;
@@ -99,8 +99,8 @@ export interface LimitWindow {
    * 54 % are not); where a provider does not, the tree builder marks the window
    * that speaks for the account instead, so the datapoint means the same thing
    * everywhere. It is an indicator only — the account's warning stays on the
-   * plan-wide windows (krobi 2026-09-06: "fable 100% ist das fable limit, aber
-   * weder das 5h stunden limit noch das wochenlimit").
+   * plan-wide windows (krobi 2026-09-06: "Fable at 100 % is the Fable
+   * limit, but neither the 5 h limit nor the weekly limit").
    */
   active?: boolean;
   /**

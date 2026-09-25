@@ -688,8 +688,8 @@ export class PollEngine {
     }
     // Only PLAN-WIDE windows speak for the account — a per-model bucket at 100 %
     // must not read as "this AI is full" (krobi 2026-08-26, again 2026-09-06:
-    // "fable 100% ist das fable limit, aber weder das 5h stunden limit noch das
-    // wochenlimit").
+    // "Fable at 100 % is the Fable limit, but neither the 5 h limit nor the weekly
+    // limit").
     const driver = limitingWindow(snapshot);
     const percent = driver?.percent ?? 0;
     const wasWarning = runtime.status.warning;
