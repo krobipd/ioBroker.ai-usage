@@ -39,13 +39,15 @@ describe("mapSnapshot", () => {
       ]),
     );
     // The reset state is a FIXED part of every window: it exists even while the
-    // provider reports no running window, and its value is then the empty string.
+    // provider reports no running window, and its value is then null — no date
+    // (decision 72: the `date` role wants a value `new Date()` can read, and ""
+    // is not one).
     // Deleting it on a momentary omission made the datapoint come and go with the
     // provider's mood (krobi, live 2026-09-01).
     expect(ids).toContain("claude.limits.week.resetAt");
     // Announced facts, not measurements: the window's end goes through the
     // comparing write, so an unchanged reset time stops re-dating itself every cycle.
-    expect(writes).toContainEqual({ id: "claude.limits.week.resetAt", value: "", compare: true });
+    expect(writes).toContainEqual({ id: "claude.limits.week.resetAt", value: null, compare: true });
     expect(writes).toContainEqual({
       id: "claude.limits.session.resetAt",
       value: "2026-08-25T14:00:00Z",
@@ -133,10 +135,10 @@ describe("mapSnapshot", () => {
       value: "2026-10-01T00:00:00Z",
       compare: true,
     });
-    // No voucher held: the count says 0 and the companion empties — neither leaves.
+    // No voucher held: the count says 0 and the companion has no value — neither leaves.
     const without = mapSnapshot("gpt", { credits: { remaining: 4, currency: "USD", resetCredits: 0 } });
     expect(without.writes).toContainEqual({ id: "gpt.credits.resetCredits", value: 0 });
-    expect(without.writes).toContainEqual({ id: "gpt.credits.resetCreditsNextExpiry", value: "", compare: true });
+    expect(without.writes).toContainEqual({ id: "gpt.credits.resetCreditsNextExpiry", value: null, compare: true });
   });
 
   test("the DeepSeek availability flag becomes a read-only indicator", () => {
@@ -264,14 +266,27 @@ describe("maxLimitPercent", () => {
     ).toBe(40);
   });
 
-  test("an account with ONLY model windows is spoken for by the fullest of them", () => {
-    // Google reports no plan-wide bucket at all — leaving the account without any
-    // window would mean its warning could never fire.
+  test("model windows never speak for the account, also when nothing else was delivered", () => {
+    // Decision 80: the fallback to the fullest model window asked no provider. A
+    // Claude answer whose plan-wide windows were still unused (sent as null) let a
+    // model at 100 % raise the account's warning — what decision 10 rules out.
     expect(
       limitingWindow({
         limits: [
-          { name: "pro", label: "gemini-2.5-pro", labelKey: "nameWindowSession", percent: 25, scoped: true },
-          { name: "flash", label: "gemini-2.5-flash", labelKey: "nameWindowSession", percent: 80, scoped: true },
+          { name: "fable", label: "Fable", labelKey: "nameWindowModelWeek", percent: 100, scoped: true },
+          { name: "opus", label: "Opus", labelKey: "nameWindowModelWeek", percent: 40, scoped: true },
+        ],
+      }),
+    ).toBeUndefined();
+  });
+
+  test("a provider whose buckets ARE the plan leaves them unmarked, and the fullest speaks", () => {
+    // Google: no plan-wide bucket at all, so its per-model buckets are the plan.
+    expect(
+      limitingWindow({
+        limits: [
+          { name: "pro", label: "gemini-2.5-pro", labelKey: "nameWindowQuota", percent: 25 },
+          { name: "flash", label: "gemini-2.5-flash", labelKey: "nameWindowQuota", percent: 80 },
         ],
       }),
     ).toMatchObject({ percent: 80, label: "gemini-2.5-flash" });
@@ -359,9 +374,9 @@ describe("windowEnd", () => {
   });
 
   test("no window, no date — and nothing invented from rubbish", () => {
-    expect(windowEnd(undefined)).toBe("");
-    expect(windowEnd("")).toBe("");
-    expect(windowEnd("whenever")).toBe("");
+    expect(windowEnd(undefined)).toBeNull();
+    expect(windowEnd("")).toBeNull();
+    expect(windowEnd("whenever")).toBeNull();
   });
 
   test("the window's reset datapoint carries the rounded value", () => {

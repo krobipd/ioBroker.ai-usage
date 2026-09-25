@@ -3,7 +3,7 @@ import type { LimitWindow, UsageSnapshot } from "./provider";
 import { sanitizeId } from "./pure-helpers";
 
 /**
- * A window end, rounded to the minute.
+ * A window end, rounded to the minute — or `null` while no window is running.
  *
  * Anthropic re-computes the timestamp on every request, so the same window end
  * arrives as ...59.898Z, ...00.364Z, ...59.539Z — sub-second noise that made every
@@ -19,16 +19,19 @@ import { sanitizeId } from "./pure-helpers";
  * 14:10 and 14:11. The flapping is the bigger lie; the half-minute the value can
  * sit early is inside the precision the minute already declares.
  *
+ * `null`, not "": the role is `date`, and the state-role catalogue wants a value
+ * `new Date()` can read — `new Date("")` is Invalid Date (decision 72).
+ *
  * @param iso the provider's timestamp
- * @returns the timestamp rounded to the minute, or "" when it is unusable
+ * @returns the timestamp rounded to the minute, or null when there is none or it is unusable
  */
-export function windowEnd(iso: string | undefined): string {
+export function windowEnd(iso: string | undefined): string | null {
   if (!iso) {
-    return "";
+    return null;
   }
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) {
-    return "";
+    return null;
   }
   return new Date(Math.round(ms / 60_000) * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
@@ -66,8 +69,8 @@ export interface ObjectDef {
 export interface StateWrite {
   /** State id relative to the instance root. */
   id: string;
-  /** The value. */
-  value: boolean | number | string;
+  /** The value; `null` where a `date` has none (decision 72). */
+  value: boolean | number | string | null;
   /**
    * True for a state that goes through the COMPARING write, like every indicator
    * of the fleet — set for a state whose role is `indicator` or `date`.
@@ -102,7 +105,7 @@ interface StatePair {
  * @param name the object name (translation object)
  * @param type the value type
  * @param role the state role
- * @param value the current value
+ * @param value the current value (`null` only for a `date` without a time)
  * @param unit optional unit
  * @param desc a short explanation, where the name does not already give one
  * @returns the def/value pair
@@ -112,7 +115,7 @@ function state(
   name: ioBroker.StringOrTranslated,
   type: "boolean" | "number" | "string",
   role: string,
-  value: boolean | number | string,
+  value: boolean | number | string | null,
   unit?: string,
   desc?: ioBroker.StringOrTranslated,
 ): StatePair {
@@ -227,7 +230,7 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
       // omit the timestamp whenever no window is currently running (Anthropic
       // sends it as null right after a reset) — treating that as "capability
       // gone" deleted the datapoint mid-throttle and re-created it after the
-      // next use (krobi, live 2026-09-01). The datapoint stays; an empty string
+      // next use (krobi, live 2026-09-01). The datapoint stays; no value (`null`)
       // says "no running window", because keeping the OLD date would be a lie.
       add(
         state(
@@ -324,7 +327,7 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
         ),
       );
       // Companion timestamp — same fixed-part rule as limits.*.resetAt: always
-      // present next to the count, empty while no voucher is held.
+      // present next to the count, without a value while no voucher is held.
       add(
         state(
           `${accountId}.credits.resetCreditsNextExpiry`,
@@ -475,24 +478,24 @@ export function mapSnapshot(accountId: string, snapshot: UsageSnapshot): TreeRes
  * warning its label ("Credits" or the window's name), so the message always says
  * what it is talking about.
  *
- * Windows marked `scoped` cover a single model and are left out as long as a
- * plan-wide window exists — a model the user never touches may sit at 100 %
- * permanently and would pin the account's warning on forever. Their datapoints
- * still exist; they just do not speak for the account.
+ * Windows marked `scoped` cover a single model and never speak for the account — a
+ * model the user never touches may sit at 100 % permanently and would pin the
+ * account's warning on forever. Their datapoints still exist; they just do not
+ * speak for the account (decision 80).
  *
- * When an account has ONLY model windows (Google reports no plan-wide bucket at
- * all), the fullest of them speaks instead — an account whose warning could never
- * fire would be no better than one whose warning never clears. The label carries
- * the model name, so the warning says which model it came from.
+ * There used to be a fallback: an answer carrying ONLY model windows let the
+ * fullest of them speak. It was meant for Google, but it asked no provider — a
+ * Claude answer whose plan-wide windows were still unused (sent as null) let the
+ * model window raise the warning, exactly what decision 10 rules out. A provider
+ * whose buckets ARE the plan leaves them unmarked instead (`LimitWindow.scoped`).
  *
  * @param snapshot the snapshot
  * @returns percent plus the label that produced it, or undefined when nothing applies
  */
 export function limitingWindow(snapshot: UsageSnapshot): LimitDriver | undefined {
   const limits = snapshot.limits ?? [];
-  const planWide = limits.filter(limit => !limit.scoped);
   let best: LimitDriver | undefined;
-  for (const limit of planWide.length > 0 ? planWide : limits) {
+  for (const limit of limits.filter(entry => !entry.scoped)) {
     if (!best || limit.percent > best.percent) {
       best = { percent: limit.percent, label: limit.label, window: limit };
     }

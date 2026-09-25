@@ -40,6 +40,7 @@ interface Harness {
   /** What the next POST answers; a function is called instead and throws. */
   answers: unknown[];
   signedIn: string[];
+  signedOut: string[];
   logs: string[];
   clock: { now: number };
   /** Run every armed interval once and let the promises settle. */
@@ -52,6 +53,7 @@ function makeHarness(): Harness {
   const posts: { url: string; body: unknown; options?: PostOptions }[] = [];
   const answers: unknown[] = [];
   const signedIn: string[] = [];
+  const signedOut: string[] = [];
   const logs: string[] = [];
   const timers: (() => void)[] = [];
   const clock = { now: 1_000_000 };
@@ -87,6 +89,7 @@ function makeHarness(): Harness {
     },
     log: { info: m => void logs.push(m), debug: m => void logs.push(m) },
     onSignedIn: provider => void signedIn.push(provider),
+    onSignedOut: provider => void signedOut.push(provider),
   };
   return {
     deps,
@@ -94,6 +97,7 @@ function makeHarness(): Harness {
     posts,
     answers,
     signedIn,
+    signedOut,
     logs,
     clock,
     intervals: () => timers.length,
@@ -228,14 +232,66 @@ describe("the device-code flow", () => {
     const blocked = new Promise<unknown>(resolve => {
       release = () => resolve({});
     });
-    h.deps.postJson = () => blocked;
+    // The stand-in COUNTS: the one it replaced was the only thing that did, and
+    // without this the assertion below held whatever the guard did.
+    let requests = 0;
+    h.deps.postJson = () => {
+      requests++;
+      return blocked;
+    };
     await h.tick();
     await h.tick();
     await h.tick();
     release();
     await new Promise(resolve => setImmediate(resolve));
     // Three ticks, ONE request in flight.
+    expect(requests).toBe(1);
     expect(h.posts.length).toBe(before);
+  });
+
+  test("a sign-out while a poll is in flight: the late answer stores nothing", async () => {
+    // Decision 16's gate, device-code half: the answer belongs to an attempt the
+    // user has already ended.
+    const h = makeHarness();
+    const manager = new SignInManager(h.deps);
+    h.answers.push({ device_auth_id: "d-1", user_code: "C", interval: "5" });
+    await manager.start("chatgpt-sub");
+    let release = (): void => undefined;
+    h.deps.postJson = (url: string) =>
+      url.includes("deviceauth/token")
+        ? new Promise<unknown>(resolve => {
+            release = () => resolve({ authorization_code: "c", code_verifier: "v" });
+          })
+        : Promise.resolve({ access_token: "at", refresh_token: "rt" });
+    h.deps.postForm = () => Promise.resolve({ access_token: "at", refresh_token: "rt" });
+    const tick = h.tick();
+    await manager.signOut("chatgpt-sub");
+    release();
+    await tick;
+    await new Promise(resolve => setImmediate(resolve));
+    expect(h.stores.get("chatgpt-sub")?.value ?? null).toBeNull();
+    expect(h.signedIn).toEqual([]);
+  });
+
+  test("a failure of an old poll does not tear down the attempt that replaced it", async () => {
+    const h = makeHarness();
+    const manager = new SignInManager(h.deps);
+    h.answers.push({ device_auth_id: "d-1", user_code: "OLD", interval: "5" });
+    await manager.start("chatgpt-sub");
+    let fail = (): void => undefined;
+    h.deps.postJson = (url: string) =>
+      url.includes("deviceauth/token")
+        ? new Promise<unknown>((_resolve, reject) => {
+            fail = () => reject(new Error("boom"));
+          })
+        : Promise.resolve({ device_auth_id: "d-2", user_code: "NEW", interval: "5" });
+    const tick = h.tick();
+    await manager.start("chatgpt-sub");
+    fail();
+    await tick;
+    await new Promise(resolve => setImmediate(resolve));
+    expect(await manager.state("chatgpt-sub")).toMatchObject({ status: "awaiting-device", userCode: "NEW" });
+    expect(h.intervals()).toBe(1);
   });
 
   test("an expired code stops the poller and says what to do", async () => {
@@ -319,6 +375,23 @@ describe("what the settings page is told", () => {
     await h.deps.store("claude-sub").save({ accessToken: "a", refreshToken: "r", expiresAt: 0 });
     expect(await manager.signOut("claude-sub")).toEqual({ status: "signed-out" });
     expect(h.stores.get("claude-sub")?.value).toBeNull();
+    // The adapter is told at once, so the account's alarms go right away (decision 82).
+    expect(h.signedOut).toEqual(["claude-sub"]);
+  });
+
+  test("a sign-out whose file cannot be deleted says so, and still takes effect in memory", async () => {
+    const h = makeHarness();
+    const manager = new SignInManager(h.deps);
+    const store = h.deps.store("claude-sub");
+    await store.save({ accessToken: "a", refreshToken: "r", expiresAt: 0 });
+    store.clear = () => {
+      (store as unknown as { value: TokenSet | null }).value = null;
+      return Promise.reject(new Error("EACCES: permission denied"));
+    };
+    const answer = await manager.signOut("claude-sub");
+    expect(answer).toMatchObject({ status: "failed" });
+    expect((answer as { reason: string }).reason).toContain("EACCES");
+    expect(h.signedOut).toEqual(["claude-sub"]);
   });
 
   test("a running paste attempt is reported back, so a reopened page keeps its link", async () => {

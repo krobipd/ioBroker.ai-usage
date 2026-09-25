@@ -1,5 +1,8 @@
 import { computeTotals } from "./totals";
 
+/** A fixed "now" — money only counts in the UTC day/month it was fetched for. */
+const NOW = Date.UTC(2026, 8, 25, 12);
+
 describe("computeTotals", () => {
   test("sums USD costs, tracks max percent, counts warnings and reachability", () => {
     const totals = computeTotals(
@@ -20,6 +23,7 @@ describe("computeTotals", () => {
         { reachable: false, warning: false },
       ],
       3,
+      NOW,
     );
     expect(totals.costsToday).toBe(0.8);
     expect(totals.costsMonth).toBe(17.8);
@@ -42,6 +46,7 @@ describe("computeTotals", () => {
         },
       ],
       1,
+      NOW,
     );
     expect(totals.limitReached).toBe(true);
   });
@@ -61,7 +66,7 @@ describe("computeTotals", () => {
         },
       ],
     };
-    expect(computeTotals([{ snapshot, reachable: true, warning: false }], 1).limitReached).toBe(true);
+    expect(computeTotals([{ snapshot, reachable: true, warning: false }], 1, NOW).limitReached).toBe(true);
   });
 
   test("a locked MODEL window does not lift the sum — it never spoke for the account", () => {
@@ -77,7 +82,7 @@ describe("computeTotals", () => {
         },
       ],
     };
-    expect(computeTotals([{ snapshot, reachable: true, warning: false }], 1).limitReached).toBe(false);
+    expect(computeTotals([{ snapshot, reachable: true, warning: false }], 1, NOW).limitReached).toBe(false);
   });
 
   test("foreign currencies and piece-credits stay out of the money sums", () => {
@@ -91,6 +96,7 @@ describe("computeTotals", () => {
         },
       ],
       2,
+      NOW,
     );
     expect(totals.costsMonth).toBe(0);
     // The piece-credit percent still counts as a limit utilisation.
@@ -100,13 +106,13 @@ describe("computeTotals", () => {
   test("accounts counts what the user configured, not what could be polled", () => {
     // Two accounts switched on, one of them without a usable credential: the user
     // reads their own list, so a smaller number would just look broken.
-    const totals = computeTotals([{ reachable: true, warning: false }], 2);
+    const totals = computeTotals([{ reachable: true, warning: false }], 2, NOW);
     expect(totals.accounts).toBe(2);
     expect(totals.accountsReachable).toBe(1);
   });
 
   test("an empty account list yields zeroed totals", () => {
-    const totals = computeTotals([], 0);
+    const totals = computeTotals([], 0, NOW);
     expect(totals).toMatchObject({
       costsToday: 0,
       costsMonth: 0,

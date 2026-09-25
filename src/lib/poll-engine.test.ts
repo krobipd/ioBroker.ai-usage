@@ -1,7 +1,7 @@
 import { PollEngine, type EngineDeps } from "./poll-engine";
 import type { ObjectDef } from "./snapshot-tree";
 import type { AccountConfig } from "./pure-helpers";
-import { FetchError, type UsageProvider, type UsageSnapshot } from "./provider";
+import { FetchError, type LimitWindow, type UsageProvider, type UsageSnapshot } from "./provider";
 
 /**
  * A scripted provider: shift one result per fetch (value = snapshot, function = thrower).
@@ -33,7 +33,7 @@ function scriptedProvider(script: (UsageSnapshot | (() => never))[]): UsageProvi
 
 interface Harness {
   deps: EngineDeps;
-  states: Map<string, boolean | number | string>;
+  states: Map<string, boolean | number | string | null>;
   /** Ids written through the changed-write seam (indicators). */
   changedWrites: string[];
   objects: string[];
@@ -48,6 +48,8 @@ interface Harness {
   authStates: { accountId: string; rejected: boolean }[];
   /** How many repeating timers are armed right now. */
   intervalCount(): number;
+  /** Every timer ever armed, with its kind and delay — for the stagger/interval rules. */
+  scheduled: { kind: "interval" | "once"; ms: number }[];
   /** Every warning the engine logged, in order. */
   warnings: string[];
   /** Every info line the engine logged, in order. */
@@ -64,7 +66,7 @@ interface Harness {
 }
 
 function makeHarness(): Harness {
-  const states = new Map<string, boolean | number | string>();
+  const states = new Map<string, boolean | number | string | null>();
   const changedWrites: string[] = [];
   const objects: string[] = [];
   const deleted: string[] = [];
@@ -74,6 +76,7 @@ function makeHarness(): Harness {
   const authStates: { accountId: string; rejected: boolean }[] = [];
   const pending: (() => void)[] = [];
   const intervals: (() => void)[] = [];
+  const scheduled: { kind: "interval" | "once"; ms: number }[] = [];
   const clock = { now: 1_000_000 };
   const warnings: string[] = [];
   const infos: string[] = [];
@@ -120,15 +123,27 @@ function makeHarness(): Harness {
       states.set(id, value);
       return Promise.resolve();
     },
-    schedule: cb => {
+    schedule: (cb, ms) => {
       intervals.push(cb);
+      scheduled.push({ kind: "interval", ms });
       return cb;
     },
-    scheduleOnce: cb => {
+    scheduleOnce: (cb, ms) => {
       pending.push(cb);
+      scheduled.push({ kind: "once", ms });
       return cb;
     },
-    cancel: () => undefined,
+    // Really removes the timer: a stand-in that ignored its argument let `stop()`
+    // lose its cancel loop without a single test noticing — only the `stopped` flag
+    // was ever exercised.
+    cancel: handle => {
+      for (const list of [pending, intervals]) {
+        const index = list.indexOf(handle as () => void);
+        if (index >= 0) {
+          list.splice(index, 1);
+        }
+      }
+    },
     now: () => clock.now,
     log: {
       debug: () => undefined,
@@ -169,6 +184,7 @@ function makeHarness(): Harness {
       return () => control.release?.();
     },
     intervalCount: () => intervals.length,
+    scheduled,
     tick: async () => {
       // First tick(s) drain the staggered one-shots; afterwards each tick is one interval round.
       if (pending.length > 0) {
@@ -859,6 +875,9 @@ describe("PollEngine", () => {
     expect(h.states.get("a.info.unreach")).toBe(true);
     await h.tick();
     expect(h.states.get("a.info.unreach")).toBe(false);
+    // The failure was WARNED — in the first round of the process too (decision 76)
+    // — and so the recovery is announced.
+    expect(h.warnings.filter(line => line.includes("reports a fault"))).toHaveLength(1);
     expect(infos.some(line => line.includes("delivering again"))).toBe(true);
   });
 
@@ -1380,5 +1399,590 @@ describe("what the fleet sweep of 2026-09-16 found", () => {
     h.deleted.length = 0;
     await h.tick();
     expect(h.deleted.some(id => id.startsWith("a.limits.week"))).toBe(true);
+  });
+});
+
+/**
+ * A limit snapshot with one plan-wide window.
+ *
+ * @param percent the window's utilisation
+ * @param extra further window fields (a lock reason, a scope mark)
+ * @returns the snapshot
+ */
+function planWindow(percent: number, extra: Partial<LimitWindow> = {}): UsageSnapshot {
+  return { limits: [{ name: "week", labelKey: "nameWindowWeek", label: "Week", percent, ...extra }] };
+}
+
+/** Every snapshot-derived total the engine writes. */
+const DERIVED_TOTALS = [
+  "total.costs.today",
+  "total.costs.month",
+  "total.costs.projectedMonth",
+  "total.maxLimitPercent",
+  "total.warningsActive",
+  "total.limitReached",
+];
+
+describe("audit 2026-09-25 — the measured probes as tests", () => {
+  test("F5: a key account without a provider retires its alarms at startup", async () => {
+    const h = makeHarness();
+    h.states.set("k.warning", true);
+    h.states.set("k.limitReached", true);
+    const reasons = new Map([["k", "The selected key no longer exists in the credential storage — pick another"]]);
+    const engine = new PollEngine([account({ id: "k", name: "K" })], new Map(), 300, h.deps, reasons);
+    await engine.start();
+    expect(h.states.get("k.warning")).toBe(false);
+    expect(h.states.get("k.limitReached")).toBe(false);
+    expect(h.states.get("total.warningsActive")).toBe(0);
+    expect(h.states.get("total.limitReached")).toBe(false);
+    // The reason the adapter found, not "no key selected" for every case (decision 73).
+    expect(String(h.states.get("k.info.error"))).toContain("no longer exists");
+  });
+
+  test("R15: a credential that disappears while running retires the account's alarms", async () => {
+    const h = makeHarness();
+    const engine = new PollEngine(
+      [account({ id: "k", name: "K" })],
+      new Map([["k", scriptedProvider([planWindow(95)])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("k.warning")).toBe(true);
+    await engine.setProvider("k", null, "The selected key no longer exists");
+    expect(h.states.get("k.warning")).toBe(false);
+    expect(h.states.get("k.limitReached")).toBe(false);
+    expect(h.states.get("total.warningsActive")).toBe(0);
+    expect(h.states.get("k.info.unreach")).toBe(true);
+    expect(h.states.get("k.info.error")).toBe("The selected key no longer exists");
+  });
+
+  test("R15: a key that arrives while running arms the account and polls it", async () => {
+    const h = makeHarness();
+    const engine = new PollEngine([account({ id: "k", name: "K" })], new Map(), 300, h.deps);
+    await engine.start();
+    expect(h.intervalCount()).toBe(0);
+    const provider = scriptedProvider([planWindow(10)]);
+    await engine.setProvider("k", provider);
+    await h.tick();
+    expect(provider.fetches).toBe(1);
+    expect(h.intervalCount()).toBe(1);
+    expect(h.states.get("k.limits.week.percent")).toBe(10);
+  });
+
+  test("F7: a restart does not write the snapshot-derived totals before the first round", async () => {
+    const h = makeHarness();
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([planWindow(100)])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    for (const id of DERIVED_TOTALS) {
+      expect(h.changedWrites).not.toContain(id);
+    }
+    await h.tick();
+    expect(h.states.get("total.limitReached")).toBe(true);
+  });
+
+  test("F7: a first round that fails keeps total.limitReached where the account's own datapoint stands", async () => {
+    for (const failure of [
+      (): never => {
+        throw new FetchError("rate-limit", "429");
+      },
+      (): never => {
+        throw new FetchError("network", "ENOTFOUND");
+      },
+    ]) {
+      const h = makeHarness();
+      h.states.set("a.limitReached", true);
+      h.states.set("total.limitReached", true);
+      const engine = new PollEngine(
+        [account({ id: "a", name: "A" })],
+        new Map([["a", scriptedProvider([failure])]]),
+        300,
+        h.deps,
+      );
+      await engine.start();
+      await h.tick();
+      expect(h.states.get("a.limitReached")).toBe(true);
+      expect(h.states.get("total.limitReached")).toBe(true);
+    }
+  });
+
+  test("F6/F7: with no account at all, every total is written as zero", async () => {
+    const h = makeHarness();
+    h.states.set("total.limitReached", true);
+    h.states.set("total.costs.month", 12);
+    const engine = new PollEngine([], new Map(), 300, h.deps);
+    await engine.start();
+    expect(h.states.get("total.limitReached")).toBe(false);
+    expect(h.states.get("total.costs.month")).toBe(0);
+    expect(h.states.get("total.accounts")).toBe(0);
+    expect(h.states.get("info.connection")).toBe(false);
+  });
+
+  test("F8: only a model window delivered — it does not raise the warning", async () => {
+    const h = makeHarness();
+    const engine = new PollEngine(
+      [account({ id: "c", name: "C" })],
+      new Map([
+        [
+          "c",
+          scriptedProvider([
+            {
+              limits: [{ name: "fable", label: "Fable", labelKey: "nameWindowModelWeek", percent: 100, scoped: true }],
+            },
+          ]),
+        ],
+      ]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("c.warning")).toBe(false);
+    expect(h.states.get("c.limitReached")).toBe(false);
+    expect(h.notifications).toEqual([]);
+  });
+
+  test("F9: last month's money of a failing account leaves the sums at the month boundary", async () => {
+    const h = makeHarness();
+    h.clock.now = Date.UTC(2026, 9, 31, 22);
+    const fail = (): never => {
+      throw new FetchError("service", "500");
+    };
+    const a = scriptedProvider([{ costs: { today: 3, month: 100, currency: "USD" } }, fail]);
+    const b = scriptedProvider([
+      { costs: { today: 0, month: 0, currency: "USD" } },
+      { costs: { today: 1, month: 1, currency: "USD" } },
+    ]);
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" }), account({ id: "b", name: "B" })],
+      new Map([
+        ["a", a],
+        ["b", b],
+      ]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    expect(h.states.get("total.costs.month")).toBe(100);
+    h.clock.now = Date.UTC(2026, 10, 1, 2);
+    await h.tick();
+    expect(h.states.get("total.costs.month")).toBe(1);
+    expect(h.states.get("total.costs.today")).toBe(1);
+  });
+
+  test("F10: a rejection from before the new sign-in is dropped, not reported again", async () => {
+    const h = makeHarness();
+    let calls = 0;
+    let release: () => void = () => undefined;
+    const provider: UsageProvider = {
+      kind: "openrouter",
+      fetch: async (): Promise<UsageSnapshot> => {
+        calls++;
+        if (calls === 1) {
+          throw new FetchError("auth", "401");
+        }
+        if (calls === 2) {
+          await new Promise<void>(resolve => {
+            release = resolve;
+          });
+          throw new FetchError("auth", "401");
+        }
+        return planWindow(10);
+      },
+    };
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    const signedIn = engine.pollNow("a");
+    release();
+    await signedIn;
+    await new Promise(resolve => setImmediate(resolve));
+    expect(h.notifications).toHaveLength(1);
+    expect(calls).toBe(3);
+    expect(h.states.get("a.info.unreach")).toBe(false);
+  });
+
+  test("F10: a throttle from before the new sign-in does not make the new query wait", async () => {
+    const h = makeHarness();
+    let calls = 0;
+    let release: () => void = () => undefined;
+    const provider: UsageProvider = {
+      kind: "openrouter",
+      fetch: async (): Promise<UsageSnapshot> => {
+        calls++;
+        if (calls === 1) {
+          await new Promise<void>(resolve => {
+            release = resolve;
+          });
+          throw new FetchError("rate-limit", "429");
+        }
+        return planWindow(10);
+      },
+    };
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    const signedIn = engine.pollNow("a");
+    release();
+    await signedIn;
+    await new Promise(resolve => setImmediate(resolve));
+    expect(calls).toBe(2);
+    expect(h.states.get("a.limits.week.percent")).toBe(10);
+  });
+
+  test("R1: a shutdown during the first sweep's database view deletes and zeroes nothing", async () => {
+    const h = makeHarness();
+    h.existing.push("a.limits.old.percent", "a.models.o3.tokensToday");
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const list = h.deps.listStateIds;
+    h.deps.listStateIds = async prefix => {
+      await gate;
+      return list(prefix);
+    };
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([planWindow(10)])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    engine.stop();
+    await engine.markAllOffline();
+    release();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(h.deleted).toEqual([]);
+    expect(h.states.has("a.models.o3.tokensToday")).toBe(false);
+    expect(h.infos.filter(line => line.includes("removed"))).toEqual([]);
+  });
+
+  test("R2: a shutdown during the skeleton leaves the offline stamp standing and arms nothing", async () => {
+    const h = makeHarness();
+    const release = h.holdNextUpsert();
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" }), account({ id: "k", name: "K" })],
+      new Map([["a", scriptedProvider([planWindow(10)])]]),
+      300,
+      h.deps,
+    );
+    const started = engine.start();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    engine.stop();
+    await engine.markAllOffline();
+    release();
+    await started;
+    expect(h.states.get("k.info.error")).toBe("Unknown");
+    expect(h.scheduled).toEqual([]);
+  });
+
+  test("R3: a skeleton the database refuses does not stop the polling for good", async () => {
+    const h = makeHarness();
+    h.rejectUpserts = { message: "db down" };
+    const provider = scriptedProvider([planWindow(10)]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    expect(h.scheduled.some(timer => timer.kind === "once")).toBe(true);
+    // One line for the account (and one for the totals — a different object group).
+    expect(h.warnings.filter(line => line.startsWith("A: the account's objects could not be created"))).toHaveLength(1);
+    h.rejectUpserts = null;
+    await h.tick();
+    expect(provider.fetches).toBe(1);
+    expect(h.objects).toContain("a.info.unreach");
+    expect(h.states.get("a.limits.week.percent")).toBe(10);
+  });
+
+  test("R6: a fault in the first round of a process is warned once, its repeats are debug", async () => {
+    const h = makeHarness();
+    const broken = (): never => {
+      throw new TypeError("x is undefined");
+    };
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([broken, broken])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    expect(h.warnings.filter(line => line.includes("could not be processed"))).toHaveLength(1);
+  });
+
+  test("R6/N4: a throttle that repeats is warned once", async () => {
+    const h = makeHarness();
+    const throttled = (): never => {
+      throw new FetchError("rate-limit", "429");
+    };
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([throttled, throttled, throttled])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    for (let round = 0; round < 3; round++) {
+      await h.tick();
+      h.clock.now += 61 * 60_000;
+    }
+    expect(h.warnings.filter(line => line.includes("rate-limited"))).toHaveLength(1);
+  });
+
+  test("R6/N5: a network outage is a state — no warning, and no recovery line afterwards", async () => {
+    const h = makeHarness();
+    const down = (): never => {
+      throw new FetchError("network", "ENOTFOUND");
+    };
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      // Delivering first: only a service that WAS online reaches the third-strike
+      // line at all — started offline, the test would never touch it.
+      new Map([["a", scriptedProvider([planWindow(5), down, down, down, planWindow(10)])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    for (let round = 0; round < 4; round++) {
+      await h.tick();
+    }
+    expect(String(h.states.get("a.info.error"))).toContain("Not reachable");
+    await h.tick();
+    expect(h.states.get("a.limits.week.percent")).toBe(10);
+    expect(h.warnings).toEqual([]);
+    expect(h.infos.filter(line => line.includes("delivering again"))).toEqual([]);
+  });
+
+  test("R7: a lock seen on the first delivery after a failed round is no observed transition", async () => {
+    const h = makeHarness();
+    const down = (): never => {
+      throw new FetchError("network", "ENOTFOUND");
+    };
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([down, planWindow(100, { lockedReason: "closed" })])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    await h.tick();
+    expect(h.warnings.filter(line => line.includes("locked"))).toEqual([]);
+    expect(h.states.get("a.limitReached")).toBe(true);
+  });
+
+  test("R8: the backoff counts from the start of the round, so the tick at its end polls", async () => {
+    const h = makeHarness();
+    let calls = 0;
+    const provider: UsageProvider = {
+      kind: "openrouter",
+      fetch: (): Promise<UsageSnapshot> => {
+        calls++;
+        h.clock.now += 500; // the answer takes half a second
+        if (calls === 1) {
+          throw new FetchError("rate-limit", "429");
+        }
+        return Promise.resolve(planWindow(10));
+      },
+    };
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 600, h.deps);
+    await engine.start();
+    const roundStart = h.clock.now;
+    await h.tick();
+    expect(String(h.states.get("a.info.error"))).toContain("about 10 min");
+    h.clock.now = roundStart + 600_000;
+    await h.tick();
+    expect(calls).toBe(2);
+  });
+
+  test("R14: a provider asking for a longer wait than our backoff is honoured", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      () => {
+        throw new FetchError("rate-limit", "429", { status: 429, retryAfterMs: 30 * 60_000 });
+      },
+      planWindow(10),
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 600, h.deps);
+    await engine.start();
+    const roundStart = h.clock.now;
+    await h.tick();
+    expect(String(h.states.get("a.info.error"))).toContain("about 30 min");
+    h.clock.now = roundStart + 20 * 60_000;
+    await h.tick();
+    expect(provider.fetches).toBe(1);
+    h.clock.now = roundStart + 30 * 60_000;
+    await h.tick();
+    expect(provider.fetches).toBe(2);
+  });
+
+  test("R9: a timer tick during a running poll is dropped, a requested poll runs right after", async () => {
+    const h = makeHarness();
+    let calls = 0;
+    let release: () => void = () => undefined;
+    const provider: UsageProvider = {
+      kind: "openrouter",
+      fetch: async (): Promise<UsageSnapshot> => {
+        calls++;
+        if (calls === 2) {
+          await new Promise<void>(resolve => {
+            release = resolve;
+          });
+        }
+        return planWindow(10);
+      },
+    };
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick(); // round 1
+    const slow = h.tick(); // round 2 hangs
+    await h.tick(); // a tick lands on it
+    release();
+    await slow;
+    await new Promise(resolve => setImmediate(resolve));
+    expect(calls).toBe(2);
+
+    const second = h.tick();
+    const requested = engine.pollNow("a");
+    await Promise.all([second, requested]);
+    await new Promise(resolve => setImmediate(resolve));
+    expect(calls).toBe(4);
+  });
+
+  test("decision 59: an answered rejection resets the network strike counter", async () => {
+    for (const answered of [
+      (): never => {
+        throw new FetchError("auth", "401");
+      },
+      (): never => {
+        throw new FetchError("no-credentials", "Not signed in");
+      },
+    ]) {
+      const h = makeHarness();
+      const down = (): never => {
+        throw new FetchError("network", "ENOTFOUND");
+      };
+      const engine = new PollEngine(
+        [account({ id: "a", name: "A" })],
+        new Map([["a", scriptedProvider([down, down, answered, down, down])]]),
+        300,
+        h.deps,
+      );
+      await engine.start();
+      for (let round = 0; round < 5; round++) {
+        await h.tick();
+      }
+      expect(String(h.states.get("a.info.error"))).not.toContain("Not reachable");
+    }
+  });
+
+  test("the timers: staggered first polls, the interval armed inside them, cancelled on stop", async () => {
+    const h = makeHarness();
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" }), account({ id: "b", name: "B" })],
+      new Map([
+        ["a", scriptedProvider([planWindow(1)])],
+        ["b", scriptedProvider([planWindow(1)])],
+      ]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    expect(h.scheduled).toEqual([
+      { kind: "once", ms: 0 },
+      { kind: "once", ms: 3000 },
+    ]);
+    await h.tick();
+    expect(h.scheduled.filter(timer => timer.kind === "interval")).toEqual([
+      { kind: "interval", ms: 300_000 },
+      { kind: "interval", ms: 300_000 },
+    ]);
+    engine.stop();
+    expect(h.intervalCount()).toBe(0);
+  });
+
+  test("the backoff doubles, stops at an hour and starts over after a success", async () => {
+    const h = makeHarness();
+    const throttled = (): never => {
+      throw new FetchError("rate-limit", "429");
+    };
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([
+        ["a", scriptedProvider([throttled, throttled, throttled, throttled, throttled, planWindow(1), throttled])],
+      ]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    const seen: string[] = [];
+    for (let round = 0; round < 7; round++) {
+      await h.tick();
+      seen.push(String(h.states.get("a.info.error")));
+      h.clock.now += 61 * 60_000;
+    }
+    expect(seen.map(text => /about (\d+) min/.exec(text)?.[1] ?? "-")).toEqual([
+      "10",
+      "20",
+      "40",
+      "60",
+      "60",
+      "-",
+      "10",
+    ]);
+  });
+
+  test("the first-round report fires after the LAST account, not the first", async () => {
+    const h = makeHarness();
+    let reported = 0;
+    h.deps.afterFirstRound = () => void reported++;
+    const pending: (() => void)[] = [];
+    const slow: UsageProvider = {
+      kind: "openrouter",
+      fetch: () =>
+        new Promise<UsageSnapshot>(resolve => {
+          pending.push(() => resolve(planWindow(1)));
+        }),
+    };
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" }), account({ id: "b", name: "B" })],
+      new Map<string, UsageProvider>([
+        ["a", scriptedProvider([planWindow(1)])],
+        ["b", slow],
+      ]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    await h.tick();
+    expect(reported).toBe(0);
+    pending.forEach(done => done());
+    await new Promise(resolve => setImmediate(resolve));
+    expect(reported).toBe(1);
+  });
+
+  test("a new sign-in clears the backoff and the rejection before it asks", async () => {
+    const h = makeHarness();
+    const provider = scriptedProvider([
+      () => {
+        throw new FetchError("rate-limit", "429");
+      },
+      planWindow(5),
+    ]);
+    const engine = new PollEngine([account({ id: "a", name: "A" })], new Map([["a", provider]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    await engine.pollNow("a");
+    expect(provider.fetches).toBe(2);
+    expect(h.states.get("a.limits.week.percent")).toBe(5);
   });
 });

@@ -39,6 +39,17 @@ export function isDelivering(state: AccountState): boolean {
   return state === "ok" || state === "rate-limited";
 }
 
+/**
+ * Whether a failure is one a replaced sign-in can produce — and a stale round may
+ * therefore drop instead of report (see {@link PollEngine.pollNow}).
+ *
+ * @param error the thrown value
+ * @returns true for a rejected sign-in or a throttle
+ */
+function isStaleAnswer(error: unknown): boolean {
+  return error instanceof FetchError && (error.kind === "auth" || error.kind === "rate-limit");
+}
+
 /** Consecutive network failures after which an account is judged unreachable. */
 const MAX_NETWORK_FAILURES = 3;
 /** First backoff after a rate-limit answer (ms); doubles per repeat. */
@@ -79,8 +90,11 @@ export interface EngineDeps {
    * notification again, however long the value had already been standing.
    */
   readState(id: string): Promise<boolean | number | string | null>;
-  /** Write a state value with ack — for MEASUREMENTS, where every cycle carries information. */
-  setState(id: string, value: boolean | number | string): void;
+  /**
+   * Write a state value with ack — for MEASUREMENTS, where every cycle carries information.
+   * `null` is "no value": an announced time that is not running (decision 72).
+   */
+  setState(id: string, value: boolean | number | string | null): void;
   /**
    * Write a state only when the value differs from what the database holds — for
    * INDICATORS. js-controller does the comparison (`setStateChangedAsync`), which is
@@ -90,7 +104,7 @@ export interface EngineDeps {
    * Returns a promise so the shutdown path can WAIT for its writes; everywhere else
    * it is deliberately ignored — a poll cycle must not be held up by the database.
    */
-  setStateChanged(id: string, value: boolean | number | string): Promise<void>;
+  setStateChanged(id: string, value: boolean | number | string | null): Promise<void>;
   /** Schedule a repeating callback; returns a cancel handle. */
   schedule(cb: () => void, ms: number): unknown;
   /** Schedule a one-shot callback; returns a cancel handle. */
@@ -174,6 +188,34 @@ interface AccountRuntime {
   createdObjects: Set<string>;
   /** Whether this account has been through its first poll. */
   firstPollDone: boolean;
+  /**
+   * Whether this account DELIVERED in this process — a snapshot reached the tree.
+   *
+   * `firstPollDone` is also true after a first round that failed, so it cannot say
+   * whether the previous side of a transition was observed (decision 50/64): a lock
+   * reported on the first delivery after a failed start is a transition nobody saw.
+   */
+  deliveredOnce: boolean;
+  /**
+   * The failure category the log last WARNED about, or null.
+   *
+   * The fleet de-duplicates on the category: the first failure of a kind is one
+   * warn, every repeat is debug. It starts at null — the previous stand-in,
+   * `serviceOnline === false`, is also what a fresh process starts with, so a fault
+   * in the first round of a process was never logged at all. A network outage never
+   * lands here: offline is a state the datapoints carry, not a log line.
+   */
+  loggedCategory: "service" | "unprocessable" | "rate-limit" | "auth" | "storage" | null;
+  /**
+   * Bumped by {@link PollEngine.pollNow}. A round remembers the generation it started
+   * in; a rejection or throttle from an OLDER generation belongs to the sign-in that
+   * was just replaced and is dropped instead of reported.
+   */
+  generation: number;
+  /** Whether the account's static objects exist — a failed skeleton is retried by the next poll. */
+  skeletonReady: boolean;
+  /** Whether the account's poll timers are armed (a provider can arrive later, decision 88). */
+  armed: boolean;
   /** True while a poll of this account is in flight — a second one must not overlap. */
   polling: boolean;
   /** Set when a poll was requested while one was running; runs once the current one ends. */
@@ -212,12 +254,15 @@ export class PollEngine {
    * @param providers each account id's provider (accounts without one are skipped)
    * @param intervalSec the poll interval in seconds
    * @param deps the injected adapter callbacks
+   * @param reasons why an account has no provider, per account id — the adapter knows
+   *   whether no key was selected, the selected entry is gone, or it carries no key
    */
   public constructor(
     accounts: readonly AccountConfig[],
     providers: ReadonlyMap<string, UsageProvider>,
     private readonly intervalSec: number,
     private readonly deps: EngineDeps,
+    reasons: ReadonlyMap<string, string> = new Map(),
   ) {
     this.configuredAccounts = accounts.length;
     for (const config of accounts) {
@@ -243,10 +288,15 @@ export class PollEngine {
         // Nothing known until the service says something; the skeleton writes
         // REASON_UNKNOWN, and the first answer replaces it. An account without a
         // credential has its answer already.
-        error: provider ? REASON_UNKNOWN : NO_CREDENTIAL_REASON,
+        error: provider ? REASON_UNKNOWN : (reasons.get(config.id) ?? NO_CREDENTIAL_REASON),
         locked: false,
         createdObjects: new Set(),
         firstPollDone: false,
+        deliveredOnce: false,
+        loggedCategory: null,
+        generation: 0,
+        skeletonReady: false,
+        armed: false,
         polling: false,
         pollAgain: false,
         deliveredIds: null,
@@ -258,15 +308,36 @@ export class PollEngine {
   /** Create the static per-account and totals objects, then arm the poll cycles. */
   public async start(): Promise<void> {
     for (const runtime of this.runtimes) {
-      await this.createAccountSkeleton(runtime);
+      // Decision 69 inside the engine: a shutdown that lands in the skeleton's waits
+      // must not let the start run on — it would overwrite the "Unknown" that
+      // `markAllOffline()` just wrote and arm timers the host refuses.
+      if (this.stopped) {
+        return;
+      }
+      await this.createAccountSkeletonSafe(runtime);
     }
-    await this.createTotalsSkeleton();
-    this.writeTotals();
+    if (this.stopped) {
+      return;
+    }
+    try {
+      await this.createTotalsSkeleton();
+    } catch (e) {
+      // The totals are written again after every poll; a missing object here costs
+      // their values until the database takes them, never the polling itself.
+      this.deps.log.warn(`The totals could not be created — the object database rejected them (${errorText(e)})`);
+    }
+    if (this.stopped) {
+      return;
+    }
     if (this.runtimes.length === 0) {
-      // Nothing will ever poll — report right away, the cleanup may still have changed something.
+      // Nothing will ever poll. Report first — that is what releases the totals
+      // derived from snapshots — and then write them: with no account, all of them
+      // are zero, which is exactly what a user who switched everything off must see.
       this.reportFirstRoundOnce();
       return;
     }
+    // The counts only; what the snapshots decide waits for the first round (decision 74).
+    this.writeTotals();
     this.runtimes.forEach((runtime, index) => {
       if (!runtime.provider) {
         // Nothing to ask. The skeleton above has already said so; count it as
@@ -275,21 +346,68 @@ export class PollEngine {
         this.reportFirstRoundOnce();
         return;
       }
-      // The repeating timer is armed INSIDE the staggered first poll, not next to
-      // it: armed here it would start counting for every account in the same
-      // instant, and from the second round on all of them would fire together —
-      // exactly the burst the stagger exists to prevent, against providers that
-      // answer a burst by locking the whole account for a day.
-      this.handles.push(
-        this.deps.scheduleOnce(() => {
-          if (this.stopped) {
-            return;
-          }
-          this.handles.push(this.deps.schedule(() => void this.pollAccount(runtime), this.intervalSec * 1000));
-          void this.pollAccount(runtime);
-        }, index * STAGGER_MS),
-      );
+      this.arm(runtime, index * STAGGER_MS);
     });
+  }
+
+  /**
+   * Arm one account's poll cycle: a staggered first poll that then arms the repeating timer.
+   *
+   * The repeating timer is armed INSIDE the staggered first poll, not next to it:
+   * armed together they would all count from the same instant, and from the second
+   * round on every account would fire at once — exactly the burst the stagger exists
+   * to prevent, against providers that answer a burst by locking the account.
+   *
+   * @param runtime the account's runtime
+   * @param delayMs the stagger before the first poll
+   */
+  private arm(runtime: AccountRuntime, delayMs: number): void {
+    runtime.armed = true;
+    this.handles.push(
+      this.deps.scheduleOnce(() => {
+        if (this.stopped) {
+          return;
+        }
+        this.handles.push(this.deps.schedule(() => void this.pollAccount(runtime, false), this.intervalSec * 1000));
+        void this.pollAccount(runtime, false);
+      }, delayMs),
+    );
+  }
+
+  /**
+   * Swap an account's source while the adapter runs — the credential in the admin's
+   * central storage was edited or deleted.
+   *
+   * Without it the key was read once at startup: a key replaced after a leak kept
+   * being sent until the next restart, and a deleted one left the account's alarms
+   * standing for ever, because a key account without a provider is never polled
+   * and never reaches the transition that clears them (decision 61, second half).
+   *
+   * @param accountId the account's object id
+   * @param provider the new source, or null when the credential is gone or unusable
+   * @param reason why there is no source — shown in `info.error`
+   */
+  public async setProvider(accountId: string, provider: UsageProvider | null, reason?: string): Promise<void> {
+    const runtime = this.runtimes.find(entry => entry.config.id === accountId);
+    if (!runtime || this.stopped) {
+      return;
+    }
+    runtime.provider = provider;
+    if (!provider) {
+      runtime.generation++;
+      this.retireAlarms(runtime);
+      runtime.state = "not-signed-in";
+      runtime.error = reason ?? NO_CREDENTIAL_REASON;
+      runtime.status.reachable = false;
+      void this.writeAccountStatus(runtime);
+      this.writeTotals();
+      return;
+    }
+    if (!runtime.armed) {
+      this.arm(runtime, 0);
+      return;
+    }
+    await this.pollNow(accountId);
   }
 
   /** Cancel every timer. Synchronous — safe from onUnload. */
@@ -342,11 +460,14 @@ export class PollEngine {
   public async pollNow(accountId: string): Promise<void> {
     const runtime = this.runtimes.find(entry => entry.config.id === accountId);
     if (runtime) {
-      // A fresh sign-in clears a previous auth failure and any backoff.
+      // A fresh sign-in clears a previous auth failure and any backoff. A round still
+      // in flight belongs to the sign-in that was just replaced: the new generation
+      // makes its rejection or throttle a stale answer, not a new report (decision 77).
+      runtime.generation++;
       runtime.authNotified = false;
       runtime.authRejected = false;
       runtime.skipUntil = 0;
-      await this.pollAccount(runtime);
+      await this.pollAccount(runtime, true);
     }
   }
 
@@ -358,14 +479,24 @@ export class PollEngine {
    * on a rotating refresh token sign each other out. A request that arrives while
    * one is running is remembered and runs right after, so nothing is lost.
    *
+   * A timer tick that lands on a running round is dropped instead: it is no request
+   * anyone is waiting for, and remembering it made the next round start the moment
+   * the current one ended — no pause at all against a provider that may throttle
+   * (decision 78).
+   *
    * @param runtime the account's runtime
+   * @param requested true for a poll someone asked for (sign-in, sign-out, new key)
    */
-  private async pollAccount(runtime: AccountRuntime): Promise<void> {
+  private async pollAccount(runtime: AccountRuntime, requested: boolean): Promise<void> {
     if (this.stopped || !runtime.provider) {
       return;
     }
     if (runtime.polling) {
-      runtime.pollAgain = true;
+      if (requested) {
+        runtime.pollAgain = true;
+      } else {
+        this.deps.log.debug(`${runtime.config.name}: the previous poll is still running — this tick is skipped`);
+      }
       return;
     }
     runtime.polling = true;
@@ -376,7 +507,7 @@ export class PollEngine {
     }
     if (runtime.pollAgain && !this.stopped) {
       runtime.pollAgain = false;
-      await this.pollAccount(runtime);
+      await this.pollAccount(runtime, true);
     }
   }
 
@@ -387,7 +518,11 @@ export class PollEngine {
    */
   private async pollOnce(runtime: AccountRuntime): Promise<void> {
     const { config } = runtime;
-    if (this.deps.now() < runtime.skipUntil) {
+    // Taken BEFORE the request: a backoff counted from the answer's arrival put the
+    // tick that lands exactly on its end a few hundred milliseconds too early, and
+    // every wait grew by one full interval (decision 79).
+    const roundStart = this.deps.now();
+    if (roundStart < runtime.skipUntil) {
       this.deps.log.debug(`${config.name}: in rate-limit backoff — poll skipped`);
       // Still counts as "been through": otherwise an account that starts inside a
       // backoff would hold the first-round report back forever.
@@ -395,7 +530,18 @@ export class PollEngine {
       this.reportFirstRoundOnce();
       return;
     }
-    const wasFailing = runtime.state !== "ok";
+    if (!runtime.skeletonReady) {
+      await this.createAccountSkeletonSafe(runtime);
+      if (this.stopped) {
+        return;
+      }
+      if (!runtime.skeletonReady) {
+        runtime.firstPollDone = true;
+        this.reportFirstRoundOnce();
+        return;
+      }
+    }
+    const generation = runtime.generation;
     // Did THIS round bring values into the tree? The retained `state` cannot answer
     // that: a tolerated network failure leaves it on "ok" until the third strike,
     // so the stamp used to move for a round that fetched nothing (decision 43, the
@@ -425,7 +571,13 @@ export class PollEngine {
       if (this.stopped) {
         return;
       }
-      this.handleFailure(runtime, e);
+      if (generation !== runtime.generation && isStaleAnswer(e)) {
+        // The sign-in this round started with has just been replaced; its rejection
+        // or throttle says nothing about the new one, which runs right after.
+        this.deps.log.debug(`${config.name}: dropped a stale answer from before the new sign-in (${errorText(e)})`);
+        return;
+      }
+      this.handleFailure(runtime, e, roundStart);
     }
     if (fetched !== undefined) {
       // The WRITE path has its own guard. Inside the fetch `try` a rejected
@@ -440,17 +592,19 @@ export class PollEngine {
         }
         // Only now: the totals must not run ahead of the tree they claim to sum.
         runtime.status.snapshot = fetched;
+        runtime.status.fetchedAt = this.deps.now();
+        runtime.status.limitReachedSeed = false;
         runtime.storageFailed = false;
+        runtime.deliveredOnce = true;
         delivered = true;
-        if (wasFailing && runtime.firstPollDone) {
-          // The failure said so in the log; the recovery has to as well, or the
-          // last word on this account stays a warning that is no longer true.
-          // It belongs here, not next to the fetch: "delivering again" means the
-          // values reached the tree, not that the request came back. Only from the
-          // SECOND round of this process on: the skeleton starts every account as
-          // "no-connection" (decision 19c), so without the guard every start
-          // announced a recovery from a failure nobody had been told about.
+        if (runtime.loggedCategory !== null) {
+          // The failure said so in the log; the recovery has to as well, or the last
+          // word on this account stays a warning that is no longer true. Only where
+          // a warning WAS written: a start, a first sign-in or a network outage left
+          // none, and "delivering again" after silence announces a recovery from a
+          // failure nobody was told about (decisions 64 and 76).
           this.deps.log.info(`${config.name}: delivering again`);
+          runtime.loggedCategory = null;
         }
       } catch (e) {
         if (this.stopped) {
@@ -472,6 +626,9 @@ export class PollEngine {
       return;
     }
     this.firstRoundReported = true;
+    // Every account has been through once: the totals derived from snapshots are
+    // now a statement about all of them, not about whoever answered first.
+    this.writeTotals();
     this.deps.afterFirstRound?.();
   }
 
@@ -486,6 +643,11 @@ export class PollEngine {
     const { config } = runtime;
     const { objects, writes } = mapSnapshot(config.id, snapshot);
     for (const object of objects) {
+      // Checked per object, not once after the loop: a shutdown in the middle of a
+      // long first creation must not let the remaining upserts run on (decision 47).
+      if (this.stopped) {
+        return;
+      }
       if (!runtime.createdObjects.has(object.id)) {
         await this.deps.upsertObject(object);
         runtime.createdObjects.add(object.id);
@@ -536,12 +698,12 @@ export class PollEngine {
     // A provider that CLOSED a plan-wide window has said outright what the
     // percentage only implies. Both count.
     const locked = lockedWindows(snapshot);
-    // Only from the SECOND round of this process on. Being locked has no datapoint
-    // of its own (decision 36 — it feeds `limitReached` and this line), so the
-    // first round has nothing to compare against: reporting a transition there
-    // claims an event nobody observed, and it repeated on every restart while the
-    // window had been locked for hours.
-    if (locked.length > 0 && !runtime.locked && runtime.firstPollDone) {
+    // Only once this process has SEEN the account deliver. Being locked has no
+    // datapoint of its own (decision 36 — it feeds `limitReached` and this line), so
+    // the first delivery has nothing to compare against — also when it comes after a
+    // failed first round: reporting a transition there claims an event nobody
+    // observed (decision 75).
+    if (locked.length > 0 && !runtime.locked && runtime.deliveredOnce) {
       this.deps.log.warn(`${config.name}: ${locked[0].label} is locked by the provider — ${locked[0].reason}`);
     }
     runtime.locked = locked.length > 0;
@@ -570,8 +732,16 @@ export class PollEngine {
    */
   private async removeVanished(runtime: AccountRuntime, delivered: string[]): Promise<void> {
     const known = runtime.deliveredIds ?? (await this.deps.listStateIds(runtime.config.id));
+    // The view of the first round waits on the database; a shutdown in that wait must
+    // not be followed by zeroed models and deleted objects (decision 47, the sweep).
+    if (this.stopped) {
+      return;
+    }
     const reported = this.zeroUnusedModels(known, delivered);
     for (const id of orphanObjectIds(known, reported, runtime.staticIds)) {
+      if (this.stopped) {
+        return;
+      }
       await this.deps.deleteObject(id);
       runtime.createdObjects.delete(id);
       this.deps.log.info(`${runtime.config.name}: removed "${id}" — the provider no longer reports it`);
@@ -645,6 +815,7 @@ export class PollEngine {
       return;
     }
     runtime.storageFailed = true;
+    runtime.loggedCategory = "storage";
     this.deps.log.warn(
       `${runtime.config.name}: the values were fetched but could not be stored — the object database rejected the write (${message})`,
     );
@@ -686,8 +857,9 @@ export class PollEngine {
    *
    * @param runtime the account's runtime
    * @param error the thrown error
+   * @param roundStart when this round began (ms) — the backoff counts from here
    */
-  private handleFailure(runtime: AccountRuntime, error: unknown): void {
+  private handleFailure(runtime: AccountRuntime, error: unknown, roundStart: number): void {
     const { config } = runtime;
     const message = errorText(error);
     if (error instanceof FetchError && error.kind === "no-credentials") {
@@ -699,19 +871,11 @@ export class PollEngine {
       runtime.failCount = 0;
       runtime.serviceOnline = true;
       if (runtime.state !== "not-signed-in") {
-        // ON THE TRANSITION only. A deliberate sign-out (or a key that vanished
-        // from the credential store) means the account is no longer watched: its
-        // VALUES stay (decision 6/15), but its ALARMS must not. Measured: an
-        // account signed out at 100 % held `warning`, `limitReached`,
-        // `total.warningsActive`, `total.maxLimitPercent` and `total.limitReached`
-        // until someone signed in again — an automation waiting on them never
-        // moved. `computeTotals` skips an account without a snapshot, so dropping
-        // it here removes the account from every sum at once.
-        runtime.status.snapshot = undefined;
-        runtime.status.warning = false;
-        runtime.locked = false;
-        void this.deps.setStateChanged(`${config.id}.warning`, false);
-        void this.deps.setStateChanged(`${config.id}.limitReached`, false);
+        // ON THE TRANSITION only. A deliberate sign-out means the account is no
+        // longer watched: its VALUES stay (decision 6/15), but its ALARMS must not.
+        // Only the subscriptions arrive here; a key that vanished from the credential
+        // store reaches the same retirement through `setProvider` and the skeleton.
+        this.retireAlarms(runtime);
       }
       runtime.state = "not-signed-in";
       runtime.error = message;
@@ -734,6 +898,7 @@ export class PollEngine {
       }
       if (!runtime.authNotified) {
         runtime.authNotified = true;
+        runtime.loggedCategory = "auth";
         const text = `${config.name}: credentials rejected — ${message}`;
         this.deps.log.warn(text);
         this.deps.notify?.(config.name, text);
@@ -746,19 +911,22 @@ export class PollEngine {
       runtime.failCount = 0;
       runtime.serviceOnline = true;
       runtime.state = "rate-limited";
-      runtime.error = `Throttled by the provider — retrying in ${Math.round(runtime.backoffMs / 60000)} min, last values kept`;
-      runtime.skipUntil = this.deps.now() + runtime.backoffMs;
-      this.deps.log.warn(
-        `${config.name}: rate-limited — backing off for ${Math.round(runtime.backoffMs / 60000)} min, keeping last values`,
+      // The provider's own wait wins when it asks for longer than our backoff.
+      const waitMs = Math.max(runtime.backoffMs, error.retryAfterMs ?? 0);
+      const minutes = Math.max(1, Math.round(waitMs / 60000));
+      runtime.error = `Throttled by the provider — retrying in about ${minutes} min, last values kept`;
+      runtime.skipUntil = roundStart + waitMs;
+      this.logFailure(
+        runtime,
+        "rate-limit",
+        `${config.name}: rate-limited — backing off for about ${minutes} min, keeping last values`,
       );
       runtime.backoffMs = Math.min(BACKOFF_MAX_MS, runtime.backoffMs * 2);
       return;
     }
     if (error instanceof FetchError && error.kind === "service") {
       runtime.failCount = 0;
-      if (runtime.serviceOnline) {
-        this.deps.log.warn(`${config.name}: the service reports a fault (${message}) — values kept`);
-      }
+      this.logFailure(runtime, "service", `${config.name}: the service reports a fault (${message}) — values kept`);
       runtime.serviceOnline = false;
       runtime.state = "service-down";
       runtime.error = `The AI service reports a fault — ${message}`;
@@ -770,9 +938,11 @@ export class PollEngine {
       // failure it spent two rounds in `debug` and then claimed "not reachable" —
       // the one thing that was certainly not the case.
       runtime.failCount = 0;
-      if (runtime.serviceOnline) {
-        this.deps.log.warn(`${config.name}: the answer could not be processed (${message}) — values kept`);
-      }
+      this.logFailure(
+        runtime,
+        "unprocessable",
+        `${config.name}: the answer could not be processed (${message}) — values kept`,
+      );
       runtime.serviceOnline = false;
       runtime.state = "service-down";
       runtime.error = `The answer could not be processed — ${message}`;
@@ -781,13 +951,56 @@ export class PollEngine {
     runtime.failCount++;
     this.deps.log.debug(`${config.name}: fetch failed (${message}), attempt ${runtime.failCount}`);
     if (runtime.failCount >= MAX_NETWORK_FAILURES) {
+      // Debug, not warn: offline is a STATE, and `info.unreach`/`info.error` carry it
+      // (fleet rule 2026-09-22). A log line here only repeats the datapoint.
       if (runtime.serviceOnline) {
-        this.deps.log.warn(`${config.name}: not reachable after ${runtime.failCount} attempts (${message})`);
+        this.deps.log.debug(`${config.name}: not reachable after ${runtime.failCount} attempts (${message})`);
       }
       runtime.serviceOnline = false;
       runtime.state = "no-connection";
       runtime.error = `Not reachable after ${runtime.failCount} attempts — ${message}`;
     }
+  }
+
+  /**
+   * Log a failure once per category: warn on the first, debug on every repeat.
+   *
+   * @param runtime the account's runtime
+   * @param category what kind of failure this is
+   * @param text the log line
+   */
+  private logFailure(
+    runtime: AccountRuntime,
+    category: "service" | "unprocessable" | "rate-limit",
+    text: string,
+  ): void {
+    if (runtime.loggedCategory === category) {
+      this.deps.log.debug(text);
+      return;
+    }
+    runtime.loggedCategory = category;
+    this.deps.log.warn(text);
+  }
+
+  /**
+   * Take an account out of every alarm and every sum — it is no longer watched.
+   *
+   * Measured (decision 61): an account signed out at 100 % held `warning`,
+   * `limitReached`, `total.warningsActive`, `total.maxLimitPercent` and
+   * `total.limitReached` until someone signed in again — an automation waiting on
+   * them never moved. `computeTotals` skips an account without a snapshot, so dropping
+   * it removes the account from every sum at once. Its VALUES stay (decision 6/15).
+   *
+   * @param runtime the account's runtime
+   */
+  private retireAlarms(runtime: AccountRuntime): void {
+    const { config } = runtime;
+    runtime.status.snapshot = undefined;
+    runtime.status.warning = false;
+    runtime.status.limitReachedSeed = false;
+    runtime.locked = false;
+    void this.deps.setStateChanged(`${config.id}.warning`, false);
+    void this.deps.setStateChanged(`${config.id}.limitReached`, false);
   }
 
   /**
@@ -843,27 +1056,67 @@ export class PollEngine {
     }
   }
 
-  /** Recompute and write the totals + info.connection. */
+  /**
+   * Recompute and write the totals + info.connection.
+   *
+   * The sums that come out of SNAPSHOTS wait until every account has been through
+   * its first poll (decision 74). Written at start they were computed from nothing:
+   * every restart dropped `total.limitReached`, `total.maxLimitPercent` and the costs
+   * to 0 for a moment — a real change of value, a false flank for every automation —
+   * and the accounts then came back one by one as their staggered polls answered.
+   */
   private writeTotals(): void {
+    if (this.stopped) {
+      return;
+    }
     const totals = computeTotals(
       this.runtimes.map(runtime => runtime.status),
       this.configuredAccounts,
+      this.deps.now(),
     );
     // Every total goes through the changed-write. They are recomputed after EVERY
     // account's poll — with several accounts that meant one write per account per
     // round, almost always of the value that was already there. What they say only
     // changes when an account's numbers change, and then the write happens.
-    void this.deps.setStateChanged("total.costs.today", totals.costsToday);
-    void this.deps.setStateChanged("total.costs.month", totals.costsMonth);
-    void this.deps.setStateChanged("total.costs.projectedMonth", totals.costsProjectedMonth);
-    void this.deps.setStateChanged("total.maxLimitPercent", totals.maxLimitPercent);
-    void this.deps.setStateChanged("total.warningsActive", totals.warningsActive);
-    void this.deps.setStateChanged("total.limitReached", totals.limitReached);
+    if (this.firstRoundReported) {
+      void this.deps.setStateChanged("total.costs.today", totals.costsToday);
+      void this.deps.setStateChanged("total.costs.month", totals.costsMonth);
+      void this.deps.setStateChanged("total.costs.projectedMonth", totals.costsProjectedMonth);
+      void this.deps.setStateChanged("total.maxLimitPercent", totals.maxLimitPercent);
+      void this.deps.setStateChanged("total.warningsActive", totals.warningsActive);
+      void this.deps.setStateChanged("total.limitReached", totals.limitReached);
+    }
     void this.deps.setStateChanged("total.accountsReachable", totals.accountsReachable);
     // The configured count only ever changes with the configuration, which restarts
     // the instance — rewriting it every cycle would be pure noise in a recording.
     void this.deps.setStateChanged("total.accounts", totals.accounts);
     void this.deps.setStateChanged("info.connection", totals.accountsReachable > 0);
+  }
+
+  /**
+   * Create the skeleton, and survive a database that refuses it.
+   *
+   * One rejected upsert used to throw out of `start()` before a single timer was
+   * armed: "Startup failed", and the process ran on without ever polling again. The
+   * failure is now the account's alone, logged once, and the next poll retries it.
+   *
+   * @param runtime the account's runtime
+   */
+  private async createAccountSkeletonSafe(runtime: AccountRuntime): Promise<void> {
+    try {
+      await this.createAccountSkeleton(runtime);
+      runtime.skeletonReady = !this.stopped;
+    } catch (e) {
+      const message = errorText(e);
+      if (runtime.storageFailed) {
+        this.deps.log.debug(`${runtime.config.name}: the account's objects still cannot be created (${message})`);
+        return;
+      }
+      runtime.storageFailed = true;
+      this.deps.log.warn(
+        `${runtime.config.name}: the account's objects could not be created — the object database rejected them (${message}); retrying with the next poll`,
+      );
+    }
   }
 
   /**
@@ -963,8 +1216,14 @@ export class PollEngine {
       },
     ];
     for (const def of defs) {
+      if (this.stopped) {
+        return;
+      }
       await this.deps.upsertObject(def);
       runtime.createdObjects.add(def.id);
+    }
+    if (this.stopped) {
+      return;
     }
     runtime.staticIds = defs.filter(def => def.type === "state").map(def => def.id);
     // Mark it as not delivering right away, before anything has been asked.
@@ -984,6 +1243,14 @@ export class PollEngine {
     // usable credential has its answer already, and repeating "Unknown" there
     // would hide it.
     void this.deps.setStateChanged(`${config.id}.info.error`, runtime.error);
+    if (!runtime.provider) {
+      // An account the adapter cannot poll is not watched — a key that was removed
+      // from the credential store, or never selected. Seeding its alarms from the
+      // database left them standing for ever: it never reaches a poll and therefore
+      // never the transition that clears them (decision 61, the startup half).
+      this.retireAlarms(runtime);
+      return;
+    }
     // Where the threshold stood BEFORE this process. A crossing is a transition,
     // and the previous side of it lives in the adapter's own datapoint — the only
     // place that survives a restart. Held in memory alone, every start of the
@@ -993,6 +1260,11 @@ export class PollEngine {
     // user deleted it) reads as false, which is exactly the old behaviour.
     try {
       runtime.status.warning = (await this.deps.readState(`${config.id}.warning`)) === true;
+      // The same for `limitReached`, with the same rule in the sum (decision 74): it
+      // counts in `total.limitReached` until this process has a snapshot of the
+      // account. Without it a first round that failed flipped the total to false
+      // while the account's own datapoint still said true.
+      runtime.status.limitReachedSeed = (await this.deps.readState(`${config.id}.limitReached`)) === true;
     } catch (e) {
       this.deps.log.debug(`${config.name}: could not read the previous warning state (${errorText(e)})`);
     }

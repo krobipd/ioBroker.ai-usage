@@ -124,10 +124,9 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
       continue;
     }
     seen.add(name);
-    // Marked `scoped` like every other per-model bucket: Google reports NO plan-wide
-    // window, so `limitingWindow` falls back to the fullest of these and names the
-    // model in the warning. Without the mark, every single model could raise the
-    // account's warning — the "Fable at 100 %" case that made the alarm meaningless.
+    // NOT `scoped`: Google reports no plan-wide window, so these buckets ARE the plan
+    // (`LimitWindow.scoped`, decision 80). The fullest of them speaks for the account
+    // and the label names the model, so the warning says which one it came from.
     const window: LimitWindow = {
       name,
       label: model || kind || "Quota",
@@ -136,7 +135,6 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
       labelKey: "nameWindowQuota",
       labelArg: model || kind || "",
       percent: Math.round((1 - Math.min(Math.max(fraction, 0), 1)) * 1000) / 10,
-      scoped: true,
     };
     if (typeof bucket.resetTime === "string" && bucket.resetTime) {
       window.resetAt = bucket.resetTime;

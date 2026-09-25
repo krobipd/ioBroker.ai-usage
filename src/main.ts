@@ -1,6 +1,6 @@
 import * as utils from "@iobroker/adapter-core";
 import { Credentials } from "@iobroker/adapter-core";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { errorText } from "./lib/error-text";
 import { getJson, postForm, postJson } from "./lib/http";
@@ -35,6 +35,12 @@ const PROVIDER_BY_ACCOUNT_ID: Record<string, string> = Object.fromEntries(
  * of the two spellings that had crept in.
  */
 const SORT_KEY_END = "￿";
+
+/** What an account's key resolves to: the key, or the reason there is none. */
+type KeyResolution = { key: string; reason?: undefined } | { key?: undefined; reason: string };
+
+/** What `info.error` says when no key is selected at all (the engine's own default). */
+const REASON_NO_KEY_SELECTED = "No API key selected — pick one in the instance settings";
 
 /** A cancellable handle: interval or timeout — the engine treats them uniformly. */
 type TimerHandle =
@@ -79,6 +85,11 @@ export class AiUsageAdapter extends utils.Adapter {
   private removedStates = 0;
   /** Whether the startup balance was already logged. */
   private balanceLogged = false;
+  /**
+   * The central credentials this instance watches, with the key each one resolved to
+   * last and the accounts that use it (decision 88).
+   */
+  private readonly watchedCredentials = new Map<string, { key: string | undefined; accounts: AccountConfig[] }>();
 
   /**
    * Set the moment the host asks us to stop — the startup path's half of decision 32.
@@ -116,9 +127,24 @@ export class AiUsageAdapter extends utils.Adapter {
           this.log.debug(`First query after sign-in failed: ${errorText(e)}`);
         });
       },
+      onSignedOut: provider => {
+        const id = SUBSCRIPTION_IDS[provider];
+        if (!id) {
+          return;
+        }
+        // Asked at once, like after a sign-in: the provider answers "not signed in"
+        // locally, and that transition is what clears the account's alarms and takes
+        // it out of the sums. Waiting for the next round left `warning` and
+        // `limitReached` standing for up to an hour after the settings page already
+        // said "signed out" (decision 82).
+        void this.engine?.pollNow(id).catch(e => {
+          this.log.debug(`Query after sign-out failed: ${errorText(e)}`);
+        });
+      },
     });
     this.on("ready", this.onReady.bind(this));
     this.on("message", this.onMessage.bind(this));
+    this.on("objectChange", this.onObjectChange.bind(this));
     this.on("unload", this.onUnload.bind(this));
   }
 
@@ -259,14 +285,14 @@ export class AiUsageAdapter extends utils.Adapter {
         if (!read) {
           cached = await this.readTokenFile(file, provider);
           read = true;
+          if (cached) {
+            await this.repairTokenFileMode(file);
+          }
         }
         return cached;
       },
       save: async (tokens: TokenSet): Promise<void> => {
-        await mkdir(dir, { recursive: true });
-        // Owner-only file mode on top of the encryption — same hardening as the
-        // govee credentials file; the content is ciphertext either way.
-        await writeFile(file, this.encrypt(JSON.stringify(tokens)), { encoding: "utf8", mode: 0o600 });
+        await this.writeTokenFile(dir, file, tokens);
         cached = tokens;
         read = true;
         writeFailed = false;
@@ -286,8 +312,7 @@ export class AiUsageAdapter extends utils.Adapter {
         cached = next;
         read = true;
         try {
-          await mkdir(dir, { recursive: true });
-          await writeFile(file, this.encrypt(JSON.stringify(next)), { encoding: "utf8", mode: 0o600 });
+          await this.writeTokenFile(dir, file, next);
           writeFailed = false;
         } catch (e) {
           // Best effort by design: the fresh tokens are usable, the next refresh
@@ -308,11 +333,65 @@ export class AiUsageAdapter extends utils.Adapter {
         cached = null;
         read = true;
         writeFailed = false;
-        await unlink(file).catch(() => {
-          /* already gone */
-        });
+        try {
+          await unlink(file);
+        } catch (e) {
+          // Only "already gone" is fine. A file that cannot be deleted (a root-owned
+          // leftover of a hand deploy, a read-only disk) keeps the sign-in alive on
+          // disk: the next start reads it and the account is silently signed in
+          // again — the sign-out only ever happened in memory (decision 86).
+          if ((e as NodeJS.ErrnoException)?.code === "ENOENT") {
+            return;
+          }
+          const label = PROVIDER_LABELS[provider] ?? provider;
+          this.log.warn(
+            `${label}: the stored sign-in could not be deleted (${errorText(e)}) — it returns after a restart`,
+          );
+          throw e;
+        }
       },
     };
+  }
+
+  /**
+   * Write a token file so that it is never half-written and never readable by others.
+   *
+   * Written to a temporary file first and then renamed over the real one: a rename
+   * is atomic on the same file system, so a crash or a power cut in the middle of
+   * the write leaves the previous file intact instead of a truncated one that reads
+   * as "damaged" and costs the sign-in (decision 85). The mode is set on creation —
+   * owner-only on top of the encryption, the content is ciphertext either way.
+   *
+   * @param dir the instance data directory
+   * @param file the token file
+   * @param tokens the tokens to store
+   */
+  private async writeTokenFile(dir: string, file: string, tokens: TokenSet): Promise<void> {
+    await mkdir(dir, { recursive: true });
+    const temporary = `${file}.tmp`;
+    await writeFile(temporary, this.encrypt(JSON.stringify(tokens)), { encoding: "utf8", mode: 0o600 });
+    await rename(temporary, file);
+  }
+
+  /**
+   * Narrow a token file that others may read down to owner-only.
+   *
+   * `mode` on `writeFile` applies when a file is CREATED. Every token file written
+   * before 0.10.0 was created without it and stays world-readable for as long as
+   * nothing recreates it — the hardening reached new sign-ins only (decision 85).
+   *
+   * @param file the token file
+   */
+  private async repairTokenFileMode(file: string): Promise<void> {
+    try {
+      const info = await stat(file);
+      if ((info.mode & 0o077) !== 0) {
+        await chmod(file, 0o600);
+        this.log.debug(`Narrowed the stored sign-in ${file} to owner-only access`);
+      }
+    } catch (e) {
+      this.log.debug(`Could not check the access mode of ${file}: ${errorText(e)}`);
+    }
   }
 
   /**
@@ -519,91 +598,114 @@ export class AiUsageAdapter extends utils.Adapter {
       }
       if (accounts.length === 0) {
         this.log.info("No AI accounts configured — add accounts in the instance settings");
-        await this.setStateChangedAsync("info.connection", { val: false, ack: true });
-        return;
+        // Not a return: an engine with no account writes every total as zero, and
+        // the trees the empty-table guard keeps get their alarms retired. Returning
+        // here froze `total.*` and every old `warning`/`limitReached` on whatever the
+        // last run had written — for good (decision 87).
+        await this.retireLeftoverAlarms();
       }
       const providers = new Map<string, UsageProvider>();
+      const reasons = new Map<string, string>();
       for (const account of accounts) {
-        const provider = await this.makeProvider(account, interval);
-        if (provider) {
-          providers.set(account.id, provider);
+        const built = await this.makeProvider(account, interval);
+        if (built.provider) {
+          providers.set(account.id, built.provider);
+        } else if (built.reason) {
+          reasons.set(account.id, built.reason);
         }
       }
       if (this.unloading) {
         return;
       }
-      this.engine = new PollEngine(accounts, providers, interval, {
-        upsertObject: async def => {
-          await this.extendObject(def.id, { type: def.type, common: def.common as ioBroker.ObjectCommon, native: {} });
-          if (def.type === "state") {
-            this.countUpsert(def.id);
-          }
-        },
-        setState: (id, value) => {
-          void this.setState(id, { val: value, ack: true }).catch(() => {
-            /* states DB going down — never crash the poll loop */
-          });
-        },
-        setStateChanged: async (id, value) => {
-          // Awaited only by the shutdown path; the poll loop drops the promise.
-          await this.setStateChangedAsync(id, { val: value, ack: true }).catch(() => {
-            /* states DB going down — never crash the poll loop */
-          });
-        },
-        deleteObject: async id => {
-          try {
+      this.engine = new PollEngine(
+        accounts,
+        providers,
+        interval,
+        {
+          upsertObject: async def => {
+            await this.extendObject(def.id, {
+              type: def.type,
+              common: def.common as ioBroker.ObjectCommon,
+              native: {},
+            });
+            if (def.type === "state") {
+              this.countUpsert(def.id);
+            }
+          },
+          setState: (id, value) => {
+            void this.setState(id, { val: value, ack: true }).catch(() => {
+              /* states DB going down — never crash the poll loop */
+            });
+          },
+          setStateChanged: async (id, value) => {
+            // Awaited only by the shutdown path; the poll loop drops the promise.
+            await this.setStateChangedAsync(id, { val: value, ack: true }).catch(() => {
+              /* states DB going down — never crash the poll loop */
+            });
+          },
+          deleteObject: async id => {
+            // No catch here: a failed deletion has to reach the engine, which counts it
+            // as a failed sweep and tries again next round. Swallowed here, the engine
+            // logged "removed" for an object that was still there and dropped it from
+            // what it knew — the retry it promises never happened (decision 84).
             await this.delObjectAsync(id, { recursive: true });
             if (this.knownStateIds.delete(id)) {
               this.removedStates++;
             }
-          } catch (e) {
-            this.log.debug(`Could not remove ${id}: ${errorText(e)}`);
-          }
+          },
+          readState: async id => {
+            const state = await this.getStateAsync(id).catch(() => null);
+            return state?.val ?? null;
+          },
+          listStateIds: async prefix => {
+            const start = `${this.namespace}.${prefix}.`;
+            const view = await this.getObjectViewAsync("system", "state", {
+              startkey: start,
+              endkey: `${start}${SORT_KEY_END}`,
+            });
+            return (view?.rows ?? []).map(row => row.id.substring(this.namespace.length + 1));
+          },
+          schedule: (cb, ms): TimerHandle => ({ kind: "interval", handle: this.setInterval(cb, ms) }),
+          scheduleOnce: (cb, ms): TimerHandle => ({ kind: "timeout", handle: this.setTimeout(cb, ms) }),
+          cancel: handle => {
+            const timer = handle as TimerHandle;
+            if (timer.kind === "interval") {
+              this.clearInterval(timer.handle);
+            } else {
+              this.clearTimeout(timer.handle);
+            }
+          },
+          now: () => Date.now(),
+          log: {
+            debug: m => this.log.debug(m),
+            info: m => this.log.info(m),
+            warn: m => this.log.warn(m),
+            error: m => this.log.error(m),
+          },
+          afterFirstRound: () => this.logDatapointBalance(),
+          authState: (accountId, rejected) => {
+            const provider = PROVIDER_BY_ACCOUNT_ID[accountId];
+            if (provider) {
+              this.signIn.setRejected(provider, rejected);
+            }
+          },
+          notify: this.config.notifications
+            ? (_account, message) =>
+                void this.registerNotification("ai-usage", "userActionRequired", message).catch(e =>
+                  this.log.debug(`Could not raise notification: ${errorText(e)}`),
+                )
+            : undefined,
         },
-        readState: async id => {
-          const state = await this.getStateAsync(id).catch(() => null);
-          return state?.val ?? null;
-        },
-        listStateIds: async prefix => {
-          const start = `${this.namespace}.${prefix}.`;
-          const view = await this.getObjectViewAsync("system", "state", {
-            startkey: start,
-            endkey: `${start}${SORT_KEY_END}`,
-          });
-          return (view?.rows ?? []).map(row => row.id.substring(this.namespace.length + 1));
-        },
-        schedule: (cb, ms): TimerHandle => ({ kind: "interval", handle: this.setInterval(cb, ms) }),
-        scheduleOnce: (cb, ms): TimerHandle => ({ kind: "timeout", handle: this.setTimeout(cb, ms) }),
-        cancel: handle => {
-          const timer = handle as TimerHandle;
-          if (timer.kind === "interval") {
-            this.clearInterval(timer.handle);
-          } else {
-            this.clearTimeout(timer.handle);
-          }
-        },
-        now: () => Date.now(),
-        log: {
-          debug: m => this.log.debug(m),
-          info: m => this.log.info(m),
-          warn: m => this.log.warn(m),
-          error: m => this.log.error(m),
-        },
-        afterFirstRound: () => this.logDatapointBalance(),
-        authState: (accountId, rejected) => {
-          const provider = PROVIDER_BY_ACCOUNT_ID[accountId];
-          if (provider) {
-            this.signIn.setRejected(provider, rejected);
-          }
-        },
-        notify: this.config.notifications
-          ? (_account, message) =>
-              void this.registerNotification("ai-usage", "userActionRequired", message).catch(e =>
-                this.log.debug(`Could not raise notification: ${errorText(e)}`),
-              )
-          : undefined,
-      });
+        reasons,
+      );
       await this.engine.start();
+      if (this.unloading) {
+        return;
+      }
+      await this.watchCredentials(accounts);
+      if (this.unloading || accounts.length === 0) {
+        return;
+      }
       this.log.info(`Monitoring ${providers.size} of ${accounts.length} AI account(s), polling every ${interval} s`);
     } catch (e) {
       this.log.error(`Startup failed: ${errorText(e)}`);
@@ -671,60 +773,191 @@ export class AiUsageAdapter extends utils.Adapter {
    *
    * @param account the validated account config
    * @param intervalSec the poll interval, for providers that pace a secondary call
-   * @returns the provider, or undefined to leave the account unpolled
+   * @returns the provider, or the reason the account cannot be polled
    */
-  private async makeProvider(account: AccountConfig, intervalSec: number): Promise<UsageProvider | undefined> {
+  private async makeProvider(
+    account: AccountConfig,
+    intervalSec: number,
+  ): Promise<{ provider?: UsageProvider; reason?: string }> {
     switch (account.provider) {
       case "claude-sub":
-        return claudeSubProvider(this.tokenStore(account.provider), postJson);
+        return { provider: claudeSubProvider(this.tokenStore(account.provider), postJson) };
       case "chatgpt-sub":
-        return chatgptSubProvider(this.tokenStore(account.provider), postJson, getJson, Date.now, intervalSec);
+        return {
+          provider: chatgptSubProvider(this.tokenStore(account.provider), postJson, getJson, Date.now, intervalSec),
+        };
       case "gemini-sub":
-        return geminiSubProvider(this.tokenStore(account.provider), postJson, postForm);
-      case "openrouter": {
-        const key = await this.resolveKey(account);
-        return key ? openRouterProvider(key) : undefined;
+        return { provider: geminiSubProvider(this.tokenStore(account.provider), postJson, postForm) };
+      default: {
+        const resolved = await this.resolveKey(account);
+        return resolved.key ? { provider: this.keyProvider(account, resolved.key) } : { reason: resolved.reason };
       }
-      case "deepseek": {
-        const key = await this.resolveKey(account);
-        return key ? deepSeekProvider(key) : undefined;
-      }
-      case "openai": {
-        const key = await this.resolveKey(account);
-        return key ? openAiProvider(key, getJson, Date.now, m => this.log.warn(`${account.name}: ${m}`)) : undefined;
-      }
-      case "anthropic-api": {
-        const key = await this.resolveKey(account);
-        return key
-          ? anthropicApiProvider(key, getJson, Date.now, m => this.log.warn(`${account.name}: ${m}`))
-          : undefined;
-      }
+    }
+  }
+
+  /**
+   * The provider of one key account, for a key already read.
+   *
+   * @param account the account
+   * @param key the API key
+   * @returns the provider
+   */
+  private keyProvider(account: AccountConfig, key: string): UsageProvider | undefined {
+    const warn = (m: string): void => this.log.warn(`${account.name}: ${m}`);
+    switch (account.provider) {
+      case "openrouter":
+        return openRouterProvider(key);
+      case "deepseek":
+        return deepSeekProvider(key);
+      case "openai":
+        return openAiProvider(key, getJson, Date.now, warn);
+      case "anthropic-api":
+        return anthropicApiProvider(key, getJson, Date.now, warn);
+      default:
+        return undefined;
     }
   }
 
   /**
    * Read and decrypt a key-form credential from the central credential storage.
    *
+   * The three ways there can be no key are told apart: `info.error` used to say "no
+   * API key selected" for all of them — also to a user whose selected entry had been
+   * deleted, while the log said something else (decision 73).
+   *
    * @param account the account whose credential to resolve
-   * @returns the key, or undefined (with a log line) when it cannot be read
+   * @param quiet true when the caller reports the outcome itself (a change the user
+   *   made is one info line, not a start-up warning about a missing key)
+   * @returns the key, or the reason there is none (logged as a warning unless quiet)
    */
-  private async resolveKey(account: AccountConfig): Promise<string | undefined> {
+  private async resolveKey(account: AccountConfig, quiet = false): Promise<KeyResolution> {
+    const warn = (m: string): void => (quiet ? this.log.debug(m) : this.log.warn(m));
     if (!account.credentialId) {
-      this.log.warn(`${account.name}: no credential selected — pick one in the instance settings`);
-      return undefined;
+      warn(`${account.name}: no credential selected — pick one in the instance settings`);
+      return { reason: REASON_NO_KEY_SELECTED };
     }
     try {
+      if (!(await this.getForeignObjectAsync(account.credentialId))) {
+        warn(`${account.name}: credential ${account.credentialId} no longer exists`);
+        return {
+          reason:
+            "The selected key no longer exists in the credential storage — pick another one in the instance settings",
+        };
+      }
       const credential = await Credentials.getCredentials(this, account.credentialId);
       const values = credential.values as { key?: unknown };
       const key = typeof values.key === "string" && values.key ? values.key : undefined;
       if (!key) {
-        this.log.warn(`${account.name}: credential ${account.credentialId} carries no API key`);
+        warn(`${account.name}: credential ${account.credentialId} carries no API key`);
+        return { reason: "The selected credential carries no API key — check it in the credential storage" };
       }
-      return key;
+      return { key };
     } catch (e) {
-      this.log.warn(`${account.name}: cannot read credential ${account.credentialId} (${errorText(e)})`);
-      return undefined;
+      const message = errorText(e);
+      warn(`${account.name}: cannot read credential ${account.credentialId} (${message})`);
+      return { reason: `The selected key cannot be read — ${message}` };
     }
+  }
+
+  /**
+   * Follow the central credentials the key accounts use.
+   *
+   * The key used to be read once at startup: a key replaced after a leak kept being
+   * sent until the next restart, and a deleted one left the account standing with
+   * its alarms (decision 88). A change now swaps the account's source in place.
+   *
+   * Subscribed directly rather than through adapter-core's `subscribeCredentials`:
+   * that helper decodes the credential inside its own event listener, where an
+   * exception would escape every handler of ours. Here the whole reaction runs in
+   * {@link onObjectChange}, inside one try/catch, and reuses {@link resolveKey}.
+   *
+   * @param accounts the configured accounts
+   */
+  private async watchCredentials(accounts: readonly AccountConfig[]): Promise<void> {
+    for (const account of accounts) {
+      if (!account.credentialId.startsWith("system.credentials.")) {
+        continue;
+      }
+      const entry = this.watchedCredentials.get(account.credentialId);
+      if (entry) {
+        entry.accounts.push(account);
+        continue;
+      }
+      const resolved = await this.resolveKey(account, true);
+      this.watchedCredentials.set(account.credentialId, { key: resolved.key, accounts: [account] });
+      try {
+        await this.subscribeForeignObjectsAsync(account.credentialId);
+      } catch (e) {
+        this.log.debug(`Could not follow ${account.credentialId}: ${errorText(e)}`);
+      }
+    }
+  }
+
+  /**
+   * A watched credential changed or was deleted in the admin's central storage.
+   *
+   * @param id the object id
+   * @param obj the new object, or null/undefined when it was deleted
+   */
+  private async onObjectChange(id: string, obj: ioBroker.Object | null | undefined): Promise<void> {
+    try {
+      const entry = this.watchedCredentials.get(id);
+      if (!entry || this.unloading || !this.engine) {
+        return;
+      }
+      for (const account of entry.accounts) {
+        const resolved = obj ? await this.resolveKey(account, true) : undefined;
+        if (resolved?.key !== undefined && resolved.key === entry.key) {
+          continue; // renamed or re-saved — the key itself is the same
+        }
+        if (resolved?.key) {
+          this.log.info(`${account.name}: the credential ${id} was changed — using the new key`);
+          await this.engine.setProvider(account.id, this.keyProvider(account, resolved.key) ?? null);
+        } else {
+          const reason =
+            resolved?.reason ??
+            "The selected key no longer exists in the credential storage — pick another one in the instance settings";
+          this.log.info(
+            `${account.name}: the credential ${id} is ${obj ? "no longer usable" : "gone"} — the account is no longer watched`,
+          );
+          await this.engine.setProvider(account.id, null, reason);
+        }
+      }
+      entry.key = obj ? (await this.resolveKey(entry.accounts[0], true)).key : undefined;
+    } catch (e) {
+      this.log.error(`Reacting to a changed credential failed: ${errorText(e)}`);
+    }
+  }
+
+  /**
+   * With no account configured, the empty-table guard keeps every old tree — and with
+   * it every alarm and every green connection icon the last run left behind.
+   *
+   * Nothing is deleted (the guard stays), but a tree that is no longer watched must
+   * not keep saying "warning" or "delivering" (decision 87). Only states that exist
+   * are written: an id that is not there would be created as a bare state.
+   */
+  private async retireLeftoverAlarms(): Promise<void> {
+    const roots = new Set<string>();
+    for (const id of this.existingObjectIds) {
+      const root = id.split(".")[0];
+      if (root && root !== "info" && root !== "total") {
+        roots.add(root);
+      }
+    }
+    const writes: Promise<unknown>[] = [];
+    const write = (id: string, val: boolean | string): void => {
+      if (this.knownStateIds.has(id)) {
+        writes.push(this.setStateChangedAsync(id, { val, ack: true }).catch(() => undefined));
+      }
+    };
+    for (const root of roots) {
+      write(`${root}.warning`, false);
+      write(`${root}.limitReached`, false);
+      write(`${root}.info.unreach`, true);
+      write(`${root}.info.error`, "Unknown");
+    }
+    await Promise.all(writes);
   }
 
   /**
@@ -777,28 +1010,29 @@ export class AiUsageAdapter extends utils.Adapter {
       return;
     }
     const keep = new Set([...accounts.map(account => account.id), "info", "total"]);
-    try {
-      // From the startup snapshot — the same read, not a second one.
-      const roots = new Set<string>();
-      for (const id of this.existingObjectIds) {
-        const root = id.split(".")[0];
-        if (root && !keep.has(root)) {
-          roots.add(root);
-        }
+    // From the startup snapshot — the same read, not a second one.
+    const roots = new Set<string>();
+    for (const id of this.existingObjectIds) {
+      const root = id.split(".")[0];
+      if (root && !keep.has(root)) {
+        roots.add(root);
       }
-      for (const root of roots) {
+    }
+    // One try per root: a failure on the first used to skip every other root, and
+    // the datapoints were counted as removed before the deletion had even run —
+    // the balance line reported what had not happened (decision 84).
+    for (const root of roots) {
+      const ids = [...this.knownStateIds].filter(id => id === root || id.startsWith(`${root}.`));
+      try {
         this.log.info(`Removing objects of no longer configured account "${root}"`);
-        // Count the datapoints BEFORE they are gone — afterwards there is nothing to count.
-        for (const id of [...this.knownStateIds]) {
-          if (id === root || id.startsWith(`${root}.`)) {
-            this.knownStateIds.delete(id);
-            this.removedStates++;
-          }
-        }
         await this.delObjectAsync(root, { recursive: true });
+        for (const id of ids) {
+          this.knownStateIds.delete(id);
+          this.removedStates++;
+        }
+      } catch (e) {
+        this.log.warn(`Cleanup of the stale account "${root}" failed: ${errorText(e)}`);
       }
-    } catch (e) {
-      this.log.warn(`Cleanup of stale objects failed: ${errorText(e)}`);
     }
   }
 
@@ -830,7 +1064,14 @@ export class AiUsageAdapter extends utils.Adapter {
       const engine = this.engine;
       this.engine?.stop();
       this.engine = null;
-      void (engine?.markAllOffline() ?? this.setStateChangedAsync("info.connection", { val: false, ack: true }))
+      const unsubscribed = [...this.watchedCredentials.keys()].map(id =>
+        this.unsubscribeForeignObjectsAsync(id).catch(() => undefined),
+      );
+      this.watchedCredentials.clear();
+      void Promise.all([
+        engine?.markAllOffline() ?? this.setStateChangedAsync("info.connection", { val: false, ack: true }),
+        ...unsubscribed,
+      ])
         .then(() => this.log.debug("Shutdown: final states written"))
         .catch(e => this.log.debug(`Shutdown: final states rejected — ${errorText(e)}`))
         .finally(callback);

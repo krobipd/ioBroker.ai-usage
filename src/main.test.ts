@@ -8,6 +8,8 @@ const writeOptions = new Map<string, unknown>();
 const unreadable = new Set<string>();
 /** While set, every write is refused with this message (a full or read-only disk). */
 const writeFailure = { message: "" };
+/** The access mode per path, as `stat` reports it — set by a write, changed by `chmod`. */
+const fileModes = new Map<string, number>();
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(() => Promise.resolve(undefined)),
@@ -31,6 +33,29 @@ vi.mock("node:fs/promises", () => ({
     }
     files.set(path, content);
     writeOptions.set(path, options);
+    fileModes.set(path, (options as { mode?: number } | undefined)?.mode ?? 0o644);
+    return Promise.resolve();
+  }),
+  rename: vi.fn((from: string, to: string) => {
+    const content = files.get(from);
+    if (content === undefined) {
+      return Promise.reject(new Error("ENOENT"));
+    }
+    files.delete(from);
+    files.set(to, content);
+    writeOptions.set(to, writeOptions.get(from));
+    writeOptions.delete(from);
+    fileModes.set(to, fileModes.get(from) ?? 0o644);
+    fileModes.delete(from);
+    return Promise.resolve();
+  }),
+  stat: vi.fn((path: string) =>
+    files.has(path)
+      ? Promise.resolve({ mode: 0o100000 | (fileModes.get(path) ?? 0o644) })
+      : Promise.reject(new Error("ENOENT")),
+  ),
+  chmod: vi.fn((path: string, mode: number) => {
+    fileModes.set(path, mode);
     return Promise.resolve();
   }),
   unlink: vi.fn((path: string) => {
@@ -61,7 +86,12 @@ vi.mock("@iobroker/adapter-core", () => {
     public delObjectAsync = vi.fn(async () => {});
     public getAdapterObjectsAsync = vi.fn(() => Promise.resolve({}));
     public getObjectViewAsync = vi.fn(() => Promise.resolve({ rows: [] as { id: string }[] }));
-    public getForeignObjectAsync = vi.fn(() => Promise.resolve(null));
+    public getForeignObjectAsync = vi.fn((id: string) =>
+      Promise.resolve(id.startsWith("system.credentials.") ? { _id: id } : null),
+    );
+    public subscribeForeignObjectsAsync = vi.fn(() => Promise.resolve());
+    public unsubscribeForeignObjectsAsync = vi.fn(() => Promise.resolve());
+    public getStateAsync = vi.fn(() => Promise.resolve(null));
     public extendForeignObjectAsync = vi.fn(() => Promise.resolve({}));
     public encrypt = (value: string): string => `enc:${value}`;
     public decrypt = (value: string): string => {
@@ -102,8 +132,8 @@ interface Internals {
   makeProvider(
     account: { provider: string; name: string; credentialId: string },
     intervalSec: number,
-  ): Promise<{ kind: string } | undefined>;
-  resolveKey(account: { name: string; credentialId: string }): Promise<string | undefined>;
+  ): Promise<{ provider?: { kind: string }; reason?: string }>;
+  resolveKey(account: { name: string; credentialId: string }): Promise<{ key?: string; reason?: string }>;
   engine: { deps?: unknown } | null;
   signIn: { state(provider: string): Promise<{ status: string; reason?: string }> };
   onUnload(cb: () => void): void;
@@ -122,6 +152,7 @@ function makeAdapter(): AiUsageAdapter {
   writeOptions.clear();
   unreadable.clear();
   writeFailure.message = "";
+  fileModes.clear();
   return new AiUsageAdapter();
 }
 
@@ -652,7 +683,7 @@ describe("building a provider for every account kind", () => {
         { provider: kind, name: kind, credentialId: "system.credentials.x" },
         300,
       );
-      expect(provider?.kind).toBe(kind);
+      expect(provider.provider?.kind).toBe(kind);
     });
   }
 });
@@ -660,8 +691,9 @@ describe("building a provider for every account kind", () => {
 describe("resolving a stored key", () => {
   test("no credential picked: the account stays unpolled and the reason is named", async () => {
     const adapter = makeAdapter();
-    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "" });
-    expect(key).toBeUndefined();
+    const resolved = await internals(adapter).resolveKey({ name: "Router", credentialId: "" });
+    expect(resolved.key).toBeUndefined();
+    expect(resolved.reason).toContain("No API key selected");
     expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("no credential selected"));
   });
 
@@ -671,8 +703,10 @@ describe("resolving a stored key", () => {
       Credentials: { getCredentials: ReturnType<typeof vi.fn> };
     };
     core.Credentials.getCredentials = vi.fn(() => Promise.resolve({ values: {} }));
-    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
-    expect(key).toBeUndefined();
+    const resolved = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
+    expect(resolved.key).toBeUndefined();
+    // `info.error` names THIS reason, not "no key selected" (decision 73).
+    expect(resolved.reason).toContain("carries no API key");
     expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("carries no API key"));
   });
 
@@ -682,16 +716,25 @@ describe("resolving a stored key", () => {
       Credentials: { getCredentials: ReturnType<typeof vi.fn> };
     };
     core.Credentials.getCredentials = vi.fn(() => Promise.reject(new Error("storage locked")));
-    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
-    expect(key).toBeUndefined();
+    const resolved = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
+    expect(resolved.key).toBeUndefined();
+    expect(resolved.reason).toContain("storage locked");
     expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("storage locked"));
     core.Credentials.getCredentials = vi.fn(() => Promise.resolve({ values: { key: "k" } }));
   });
 
   test("a usable credential comes back as the key itself", async () => {
     const adapter = makeAdapter();
-    const key = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
-    expect(key).toBe("k");
+    const resolved = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
+    expect(resolved.key).toBe("k");
+  });
+
+  test("a selected key that no longer exists is named as exactly that", async () => {
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(() => Promise.resolve(null));
+    const resolved = await internals(adapter).resolveKey({ name: "Router", credentialId: "system.credentials.or" });
+    expect(resolved.key).toBeUndefined();
+    expect(resolved.reason).toContain("no longer exists");
   });
 });
 
@@ -787,5 +830,291 @@ describe("a shutdown that lands inside the startup", () => {
 
     expect(adapter.delObjectAsync).toHaveBeenCalledWith("old-api", { recursive: true });
     expect(internals(adapter).engine).not.toBeNull();
+  });
+});
+
+/** Loose access to what the adapter hands its collaborators, for the wiring tests. */
+interface Wiring {
+  signIn: {
+    deps: { onSignedIn(provider: string): void; onSignedOut(provider: string): void };
+    state(provider: string): Promise<{ status: string; reason?: string }>;
+  };
+  engine: {
+    pollNow: (id: string) => Promise<void>;
+    setProvider?: (id: string, provider: unknown, reason?: string) => Promise<void>;
+    deps?: {
+      authState?(id: string, rejected: boolean): void;
+      deleteObject(id: string): Promise<void>;
+      listStateIds(prefix: string): Promise<string[]>;
+      readState(id: string): Promise<unknown>;
+    };
+  } | null;
+  onObjectChange(id: string, obj: unknown): Promise<void>;
+  watchedCredentials: Map<string, unknown>;
+  removedStates: number;
+}
+
+const wiring = (adapter: AiUsageAdapter): Wiring => adapter as unknown as Wiring;
+
+/** A key account row, as the settings page stores it. */
+const KEY_ROW = { name: "Router", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 };
+
+describe("audit 2026-09-25 — the adapter layer", () => {
+  test("F6: with no account, the totals are zeroed and the trees the guard keeps lose their alarms", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;
+    adapter.getAdapterObjectsAsync = vi.fn(() =>
+      Promise.resolve({
+        "ai-usage.0.claude": { type: "device" },
+        "ai-usage.0.claude.warning": { type: "state" },
+        "ai-usage.0.claude.limitReached": { type: "state" },
+        "ai-usage.0.claude.info.unreach": { type: "state" },
+        "ai-usage.0.claude.info.error": { type: "state" },
+      }),
+    ) as unknown as typeof adapter.getAdapterObjectsAsync;
+    await internals(adapter).onReady();
+    const written = (adapter.setStateChangedAsync as unknown as { mock: { calls: [string, { val: unknown }][] } }).mock
+      .calls;
+    const value = (id: string): unknown => written.filter(call => call[0] === id).at(-1)?.[1].val;
+    expect(value("claude.warning")).toBe(false);
+    expect(value("claude.limitReached")).toBe(false);
+    expect(value("claude.info.unreach")).toBe(true);
+    expect(value("claude.info.error")).toBe("Unknown");
+    expect(value("total.limitReached")).toBe(false);
+    expect(value("total.accounts")).toBe(0);
+    // Nothing deleted: the empty-table guard stays.
+    expect(adapter.delObjectAsync).not.toHaveBeenCalled();
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("F13: a sign-out whose token file cannot be deleted is not silent", async () => {
+    const adapter = makeAdapter();
+    const store = internals(adapter).tokenStore("claude-sub");
+    await store.save(tokens);
+    const fs = await import("node:fs/promises");
+    vi.mocked(fs.unlink).mockImplementationOnce(() => {
+      const error = new Error("EACCES: permission denied") as NodeJS.ErrnoException;
+      error.code = "EACCES";
+      return Promise.reject(error);
+    });
+    await expect(store.clear()).rejects.toThrow("EACCES");
+    expect(adapter.log.warn).toHaveBeenCalledWith(expect.stringContaining("could not be deleted"));
+    // In memory the sign-out took effect regardless.
+    expect(await store.load()).toBeNull();
+  });
+
+  test("R10: a token file is written beside and then renamed — a failed write leaves the old one intact", async () => {
+    const adapter = makeAdapter();
+    const store = internals(adapter).tokenStore("claude-sub");
+    await store.save(tokens);
+    const fs = await import("node:fs/promises");
+    expect(fs.rename).toHaveBeenCalledWith(`${CLAUDE_FILE}.tmp`, CLAUDE_FILE);
+    writeFailure.message = "ENOSPC: no space left on device";
+    await store.replace(tokens, { accessToken: "at2", refreshToken: "rt2", expiresAt: 9_999_999_999_999 });
+    expect(files.get(CLAUDE_FILE)).toBe(`enc:${JSON.stringify(tokens)}`);
+  });
+
+  test("R10: a token file others may read is narrowed to owner-only when it is loaded", async () => {
+    const adapter = makeAdapter();
+    files.set(CLAUDE_FILE, `enc:${JSON.stringify(tokens)}`);
+    fileModes.set(CLAUDE_FILE, 0o644);
+    expect(await internals(adapter).tokenStore("claude-sub").load()).toEqual(tokens);
+    expect(fileModes.get(CLAUDE_FILE)).toBe(0o600);
+  });
+
+  test("R4: a deletion the database refuses reaches the engine instead of being swallowed", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    adapter.delObjectAsync = vi.fn(() => Promise.reject(new Error("db down")));
+    await expect(wiring(adapter).engine?.deps?.deleteObject("or-api.limits.x")).rejects.toThrow("db down");
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("R5: one stale account that cannot be removed does not keep the others, and is not counted", async () => {
+    const adapter = makeAdapter();
+    internals(adapter).existingObjectIds = new Set(["old1.x", "old2.y"]);
+    internals(adapter).knownStateIds = new Set(["old1.x", "old2.y"]);
+    const attempts: string[] = [];
+    adapter.delObjectAsync = vi.fn((id: string) => {
+      attempts.push(id);
+      return id === "old1" ? Promise.reject(new Error("db")) : Promise.resolve();
+    });
+    await internals(adapter).cleanupStaleObjects([{ id: "keep" }]);
+    expect(attempts).toEqual(["old1", "old2"]);
+    expect(wiring(adapter).removedStates).toBe(1);
+  });
+
+  test("F11/decision 9: sign-in and sign-out both make the engine ask at once — the account's own id", () => {
+    const adapter = makeAdapter();
+    const pollNow = vi.fn(() => Promise.resolve());
+    wiring(adapter).engine = { pollNow };
+    wiring(adapter).signIn.deps.onSignedIn("claude-sub");
+    wiring(adapter).signIn.deps.onSignedOut("chatgpt-sub");
+    expect(pollNow.mock.calls).toEqual([["claude"], ["chatgpt"]]);
+  });
+
+  test("decision 28: a rejection the engine reports reaches the settings card", async () => {
+    const adapter = makeAdapter();
+    adapter.config = {
+      accounts: [{ name: "Claude", provider: "claude-sub", credentialId: "", warnThreshold: 80 }],
+      pollInterval: 300,
+    } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    await internals(adapter).tokenStore("claude-sub").save(tokens);
+    wiring(adapter).engine?.deps?.authState?.("claude", true);
+    expect((await wiring(adapter).signIn.state("claude-sub")).status).toBe("failed");
+    wiring(adapter).engine?.deps?.authState?.("claude", false);
+    expect((await wiring(adapter).signIn.state("claude-sub")).status).toBe("signed-in");
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("a sign-in message for a real provider reaches the manager, and a failure is still answered", async () => {
+    const adapter = makeAdapter();
+    const answers: unknown[] = [];
+    adapter.sendTo = vi.fn((_from: string, _cmd: string, response: unknown) => void answers.push(response));
+    await internals(adapter).onMessage({
+      command: "signInStart",
+      message: { provider: "claude-sub" },
+      from: "x",
+      callback: 1,
+    });
+    expect(answers[0]).toMatchObject({ status: "awaiting-paste" });
+    wiring(adapter).signIn.state = () => Promise.reject(new Error("boom"));
+    await internals(adapter).onMessage({
+      command: "signInStatus",
+      message: { provider: "claude-sub" },
+      from: "x",
+      callback: 1,
+    });
+    expect(answers[1]).toEqual({ error: "internal error — see log" });
+  });
+
+  test("the state view of an account ends at its own dot — foo-api never lists foo-api2-api", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    await wiring(adapter).engine?.deps?.listStateIds("foo-api");
+    expect(adapter.getObjectViewAsync).toHaveBeenCalledWith("system", "state", {
+      startkey: "ai-usage.0.foo-api.",
+      endkey: "ai-usage.0.foo-api.￿",
+    });
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("decision 50 at the adapter: the previous warning is read back from the database", async () => {
+    const adapter = makeAdapter();
+    adapter.getStateAsync = vi.fn(() => Promise.resolve({ val: true })) as never;
+    adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    expect(await wiring(adapter).engine?.deps?.readState("or-api.warning")).toBe(true);
+    expect(adapter.getStateAsync).toHaveBeenCalledWith("or-api.warning");
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("R15: the key accounts' credentials are followed, and a change swaps the key in place", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    expect(adapter.subscribeForeignObjectsAsync).toHaveBeenCalledWith("system.credentials.or");
+    const setProvider = vi.fn(() => Promise.resolve());
+    (wiring(adapter).engine as { setProvider?: unknown }).setProvider = setProvider;
+    const core = (await import("@iobroker/adapter-core")) as unknown as {
+      Credentials: { getCredentials: ReturnType<typeof vi.fn> };
+    };
+    // Same key re-saved: nothing to do.
+    await wiring(adapter).onObjectChange("system.credentials.or", { _id: "system.credentials.or" });
+    expect(setProvider).not.toHaveBeenCalled();
+    // A new key: the account's provider is replaced.
+    core.Credentials.getCredentials = vi.fn(() => Promise.resolve({ values: { key: "k2" } }));
+    await wiring(adapter).onObjectChange("system.credentials.or", { _id: "system.credentials.or" });
+    expect(setProvider).toHaveBeenCalledWith("or-api", expect.objectContaining({ kind: "openrouter" }));
+    // Deleted: the account is no longer watched, with the reason.
+    await wiring(adapter).onObjectChange("system.credentials.or", null);
+    expect(setProvider).toHaveBeenLastCalledWith("or-api", null, expect.stringContaining("no longer exists"));
+    core.Credentials.getCredentials = vi.fn(() => Promise.resolve({ values: { key: "k" } }));
+    // The subscriptions end with the instance.
+    internals(adapter).onUnload(() => undefined);
+    expect(adapter.unsubscribeForeignObjectsAsync).toHaveBeenCalledWith("system.credentials.or");
+  });
+
+  // Each guard of the startup is checked on its own: the NEXT step must not run. The
+  // guards are redundant in effect (a later one would still stop the engine), so a
+  // test that only asked for "no engine" let any single guard disappear unnoticed.
+  for (const [stage, next, label] of [
+    ["refreshManifestObjects", "snapshotExistingStates", "after the manifest refresh"],
+    ["removeMovedStates", "makeProvider", "after the cleanup"],
+    ["makeProvider", "watchCredentials", "after the providers were built"],
+  ] as const) {
+    test(`a shutdown ${label} stops the startup there`, async () => {
+      const adapter = makeAdapter();
+      adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+      const target = internals(adapter) as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+      const original = target[stage].bind(adapter);
+      target[stage] = async (...args: unknown[]) => {
+        const result = await original(...args);
+        internals(adapter).onUnload(() => undefined);
+        return result;
+      };
+      const reached = vi.fn();
+      const follow = target[next].bind(adapter);
+      target[next] = (...args: unknown[]) => {
+        reached();
+        return follow(...args);
+      };
+      await internals(adapter).onReady();
+      expect(reached).not.toHaveBeenCalled();
+      expect(internals(adapter).engine).toBeNull();
+    });
+  }
+
+  test("a shutdown while the engine starts stops the startup before the credentials are followed", async () => {
+    const adapter = makeAdapter();
+    adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+    // The account's first skeleton object — inside `engine.start()`, not the
+    // manifest refresh before it.
+    adapter.extendObject = vi.fn((id: string) => {
+      if (id === "or-api") {
+        internals(adapter).onUnload(() => undefined);
+      }
+      return Promise.resolve();
+    }) as never;
+    await internals(adapter).onReady();
+    expect(adapter.subscribeForeignObjectsAsync).not.toHaveBeenCalled();
+  });
+
+  test("N1: the reason the adapter found for a missing key is what info.error says", async () => {
+    const adapter = makeAdapter();
+    adapter.getForeignObjectAsync = vi.fn(() => Promise.resolve(null));
+    adapter.config = { accounts: [KEY_ROW], pollInterval: 300 } as unknown as ioBroker.AdapterConfig;
+    await internals(adapter).onReady();
+    expect(adapter.setStateChangedAsync).toHaveBeenCalledWith("or-api.info.error", {
+      val: expect.stringContaining("no longer exists"),
+      ack: true,
+    });
+    internals(adapter).onUnload(() => undefined);
+  });
+
+  test("the shutdown waits for the offline stamp before it calls back", async () => {
+    const adapter = makeAdapter();
+    const order: string[] = [];
+    let release: () => void = () => undefined;
+    wiring(adapter).engine = {
+      pollNow: () => Promise.resolve(),
+      stop: () => undefined,
+      markAllOffline: () =>
+        new Promise<void>(resolve => {
+          release = () => {
+            order.push("offline");
+            resolve();
+          };
+        }),
+    } as never;
+    internals(adapter).onUnload(() => void order.push("callback"));
+    await new Promise(resolve => setImmediate(resolve));
+    expect(order).toEqual([]);
+    release();
+    await new Promise(resolve => setImmediate(resolve));
+    expect(order).toEqual(["offline", "callback"]);
   });
 });

@@ -42,6 +42,8 @@ export interface SignInDeps {
   log: { info(m: string): void; debug(m: string): void };
   /** Called after tokens were stored — the adapter queries that account at once. */
   onSignedIn(provider: string): void;
+  /** Called after a sign-out — the adapter queries that account at once, which clears its alarms. */
+  onSignedOut(provider: string): void;
 }
 
 /**
@@ -231,12 +233,24 @@ export class SignInManager {
    * @returns the resulting state
    */
   public async signOut(provider: string): Promise<SignInState> {
-    await this.deps.store(provider).clear();
     this.attempts.delete(provider);
     this.failures.delete(provider);
     this.rejected.delete(provider);
     this.stopPoller(provider);
-    return { status: "signed-out" };
+    let failed: string | undefined;
+    try {
+      await this.deps.store(provider).clear();
+    } catch (e) {
+      // The store has already forgotten the tokens in memory; the FILE survived. The
+      // card must say so — the sign-in would return with the next restart.
+      failed = errorText(e);
+    }
+    // Either way the adapter no longer holds usable tokens: ask at once, so the
+    // account's alarms go the moment the page says "signed out" (decision 82).
+    this.deps.onSignedOut(provider);
+    return failed
+      ? { status: "failed", reason: `Signed out, but the stored sign-in could not be deleted — ${failed}` }
+      : { status: "signed-out" };
   }
 
   /**
@@ -265,10 +279,18 @@ export class SignInManager {
    * @param start the device-code handle
    */
   private armPoller(provider: string, start: DeviceCodeStart): void {
+    // Whether the attempt this poller belongs to is still the running one. A sign-out
+    // or a new start replaces it; an answer that arrives for the old one afterwards
+    // must neither store its tokens (the user just signed out — decision 16's gate,
+    // device-code half) nor tear down the new attempt's poller (decision 89).
+    const current = (): boolean => {
+      const attempt = this.attempts.get(provider);
+      return attempt?.flow === "device-code" && attempt.start === start;
+    };
     const tick = async (): Promise<void> => {
       // One request at a time. The server advises five seconds and a request may
       // take fifteen, so ticks could otherwise pile up on a slow answer.
-      if (this.polling.has(provider)) {
+      if (this.polling.has(provider) || !current()) {
         return;
       }
       this.polling.add(provider);
@@ -280,7 +302,7 @@ export class SignInManager {
           return;
         }
         const result = await pollDeviceCode(start, this.deps.postJson);
-        if (result.status === "ready") {
+        if (result.status === "ready" && current()) {
           this.stopPoller(provider);
           const tokens = await exchangeDeviceCode(
             result.code,
@@ -288,12 +310,16 @@ export class SignInManager {
             this.deps.postForm,
             this.deps.now(),
           );
-          await this.finish(provider, tokens);
+          if (current()) {
+            await this.finish(provider, tokens);
+          }
         }
       } catch (e) {
-        this.stopPoller(provider);
-        this.attempts.delete(provider);
-        this.failures.set(provider, errorText(e));
+        if (current()) {
+          this.stopPoller(provider);
+          this.attempts.delete(provider);
+          this.failures.set(provider, errorText(e));
+        }
       } finally {
         this.polling.delete(provider);
       }
