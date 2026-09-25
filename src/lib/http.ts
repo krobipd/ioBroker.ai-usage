@@ -110,16 +110,22 @@ async function request(url: string, init: RequestInit, authOn400 = false): Promi
     // key". Best effort in the strictest sense: the status decides the class, the
     // body only decorates the text, and a body that cannot be read changes nothing.
     const detail = await errorDetail(response);
-    if (response.status === 401 || response.status === 403 || (authOn400 && response.status === 400)) {
-      throw new FetchError("auth", `HTTP ${response.status}${detail}`);
+    // The status rides along: a caller may have to tell apart what the class alone
+    // does not — the ChatGPT device-code poll reads 404 as "not confirmed yet".
+    const status = response.status;
+    if (status === 401 || status === 403 || (authOn400 && status === 400)) {
+      throw new FetchError("auth", `HTTP ${status}${detail}`, { status });
     }
-    if (response.status === 429) {
-      throw new FetchError("rate-limit", `HTTP 429${detail}`);
+    if (status === 429) {
+      throw new FetchError("rate-limit", `HTTP 429${detail}`, {
+        status,
+        retryAfterMs: retryAfterMs(response.headers.get("retry-after"), Date.now()),
+      });
     }
     // 5xx = the service answered and is broken; anything else unexpected is treated
     // the same way, because the service DID answer — only a throw above means we
     // never reached it.
-    throw new FetchError("service", `HTTP ${response.status}${detail}`);
+    throw new FetchError("service", `HTTP ${status}${detail}`, { status });
   }
   let text: string;
   try {
@@ -135,6 +141,32 @@ async function request(url: string, init: RequestInit, authOn400 = false): Promi
   } catch (e) {
     throw new FetchError("service", `invalid JSON: ${errorText(e)}`);
   }
+}
+
+/**
+ * The wait a `Retry-After` header asks for, in ms.
+ *
+ * The header is either a number of seconds or an HTTP date (RFC 9110 §10.2.3). The
+ * adapter's own backoff starts at ten minutes; a provider asking for longer has to
+ * be honoured, or the first retry lands inside its lock.
+ *
+ * @param header the raw header value
+ * @param nowMs current time (ms)
+ * @returns the wait in ms, or undefined when the header is missing or unusable
+ */
+export function retryAfterMs(header: string | null, nowMs: number): number | undefined {
+  if (!header || !header.trim()) {
+    return undefined;
+  }
+  const text = header.trim();
+  if (/^\d+$/.test(text)) {
+    return Number(text) * 1000;
+  }
+  const at = Date.parse(text);
+  if (!Number.isFinite(at)) {
+    return undefined;
+  }
+  return Math.max(0, at - nowMs);
 }
 
 /** Longest provider message taken over into the error text. */

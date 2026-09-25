@@ -1,5 +1,5 @@
 import { FetchError } from "./provider";
-import { getJson, postForm, postJson } from "./http";
+import { getJson, postForm, postJson, retryAfterMs } from "./http";
 
 /**
  * `http.ts` is the ONLY module that calls the global `fetch` directly — every other
@@ -113,6 +113,35 @@ describe("failure classification", () => {
   test("429 is a rate limit — the values stay valid, the account stays green", async () => {
     respondWith(429);
     expect(await kindOf(() => getJson("https://example.invalid/x", {}))).toBe("rate-limit");
+  });
+
+  test("the HTTP status rides on the failure, for callers that must tell answers apart", async () => {
+    // The ChatGPT device-code poll reads a 404 as "not confirmed yet" — the class
+    // alone (`service`) cannot say that.
+    for (const status of [401, 403, 404, 429, 500]) {
+      respondWith(status);
+      const error = await getJson("https://example.invalid/x", {}).catch((e: unknown) => e);
+      expect((error as FetchError).status).toBe(status);
+    }
+  });
+
+  test("a Retry-After in seconds or as a date travels with the rate limit", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("{}", { status: 429, headers: { "Retry-After": "1800" } }))),
+    );
+    const seconds = (await getJson("https://x/y", {}).catch((e: unknown) => e)) as FetchError;
+    expect(seconds.retryAfterMs).toBe(1_800_000);
+    expect(retryAfterMs(new Date(Date.UTC(2026, 8, 25, 12, 30)).toUTCString(), Date.UTC(2026, 8, 25, 12))).toBe(
+      1_800_000,
+    );
+  });
+
+  test("a missing or unusable Retry-After leaves the adapter's own backoff in charge", () => {
+    expect(retryAfterMs(null, 0)).toBeUndefined();
+    expect(retryAfterMs("", 0)).toBeUndefined();
+    expect(retryAfterMs("soon", 0)).toBeUndefined();
+    expect(retryAfterMs("Wed, 21 Oct 2015 07:28:00 GMT", Date.UTC(2026, 0, 1))).toBe(0);
   });
 
   test("5xx is a service fault, not a missing connection", async () => {

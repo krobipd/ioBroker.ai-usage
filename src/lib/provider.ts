@@ -208,18 +208,35 @@ export interface UsageSnapshot {
  */
 export type FetchErrorKind = "auth" | "rate-limit" | "service" | "network" | "no-credentials";
 
+/** What an HTTP failure carries besides its class — the facts a caller may need to decide on. */
+export interface FetchErrorDetails {
+  /** The HTTP status the provider answered with; absent when nothing was answered. */
+  status?: number;
+  /** How long the provider asked us to wait (`Retry-After`), in ms. */
+  retryAfterMs?: number;
+}
+
 /** A typed fetch failure. */
 export class FetchError extends Error {
+  /** The HTTP status, where the failure came from an answer (see {@link FetchErrorDetails.status}). */
+  public readonly status?: number;
+  /** The provider's own wait request, where it sent one (see {@link FetchErrorDetails.retryAfterMs}). */
+  public readonly retryAfterMs?: number;
+
   /**
    * @param kind the failure class
    * @param message the human-readable reason
+   * @param details the HTTP status and the provider's wait request, where known
    */
   public constructor(
     public readonly kind: FetchErrorKind,
     message: string,
+    details: FetchErrorDetails = {},
   ) {
     super(message);
     this.name = "FetchError";
+    this.status = details.status;
+    this.retryAfterMs = details.retryAfterMs;
   }
 }
 

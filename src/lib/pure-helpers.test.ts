@@ -2,6 +2,8 @@ import { PROVIDERS } from "./provider";
 import {
   accountId,
   clampPollInterval,
+  clampThreshold,
+  finiteNumber,
   datapointBalanceLine,
   parseAccounts,
   PROVIDER_KINDS,
@@ -101,11 +103,45 @@ describe("parseAccounts", () => {
     expect(parseAccounts([null, 42, "x"]).accounts).toEqual([]);
   });
 
-  test("clamps an out-of-range warn threshold to the default", () => {
+  test("clamps an out-of-range warn threshold to the nearest bound, like the settings page", () => {
     const [account] = parseAccounts([
       { name: "A", provider: "deepseek", credentialId: "system.credentials.a", warnThreshold: 400, enabled: true },
     ]).accounts;
-    expect(account.warnThreshold).toBe(80);
+    expect(account.warnThreshold).toBe(100);
+  });
+});
+
+describe("clampThreshold", () => {
+  test("one rule for the adapter and the settings page", () => {
+    expect(clampThreshold(5)).toBe(10);
+    expect(clampThreshold(0)).toBe(10);
+    expect(clampThreshold(300)).toBe(100);
+    expect(clampThreshold(85.4)).toBe(85);
+    expect(clampThreshold("90")).toBe(90);
+  });
+
+  test("anything that is not a number gets the default", () => {
+    expect(clampThreshold("abc")).toBe(80);
+    expect(clampThreshold("")).toBe(80);
+    expect(clampThreshold(undefined)).toBe(80);
+    expect(clampThreshold(null)).toBe(80);
+    expect(clampThreshold(true)).toBe(80);
+  });
+});
+
+describe("finiteNumber", () => {
+  test("numbers and numeric strings get through", () => {
+    expect(finiteNumber(3)).toBe(3);
+    expect(finiteNumber("110.00")).toBe(110);
+    expect(finiteNumber(" 7 ")).toBe(7);
+  });
+
+  test("what Number() would quietly turn into a number is refused", () => {
+    // `Number(true)` is 1, `Number(false)`, `Number(" ")` and `Number([])` are 0,
+    // `Number([7])` is 7 — none of them is a figure a provider reported.
+    for (const value of [true, false, " ", "", [], [7], {}, null, undefined, "abc", NaN, Infinity]) {
+      expect(finiteNumber(value)).toBeUndefined();
+    }
   });
 });
 

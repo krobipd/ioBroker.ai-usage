@@ -34,6 +34,10 @@ export async function fetchAllPages(
 ): Promise<unknown[]> {
   const buckets: unknown[] = [];
   let page: string | undefined;
+  // Every cursor already followed. A server that hands back the same `next_page`
+  // again would otherwise be asked the identical question up to the page ceiling,
+  // every round, and its buckets counted once per answer.
+  const followed = new Set<string>();
   for (let i = 0; i < MAX_REPORT_PAGES; i++) {
     const body = (await fetchJson(page ? `${url}&page=${encodeURIComponent(page)}` : url, headers)) as {
       data?: unknown;
@@ -46,6 +50,12 @@ export async function fetchAllPages(
     if (body?.has_more !== true || typeof body?.next_page !== "string" || !body.next_page) {
       return buckets;
     }
+    if (followed.has(body.next_page)) {
+      // The walk would go in a circle: say so, like the ceiling does.
+      onTruncated?.(i + 1);
+      return buckets;
+    }
+    followed.add(body.next_page);
     page = body.next_page;
   }
   // Left the loop with the server still offering more: the numbers below are a

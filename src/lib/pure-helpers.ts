@@ -136,16 +136,36 @@ export function parseAccounts(raw: unknown): ParsedAccounts {
       continue;
     }
     seen.add(id);
-    const threshold = Number(row.warnThreshold);
     accounts.push({
       name,
       id,
       provider: provider as ProviderKind,
       credentialId,
-      warnThreshold: Number.isFinite(threshold) && threshold >= 10 && threshold <= 100 ? threshold : 80,
+      warnThreshold: clampThreshold(row.warnThreshold),
     });
   }
   return { accounts, discarded };
+}
+
+/** The warn threshold an account gets when its row carries no usable number. */
+export const DEFAULT_WARN_THRESHOLD = 80;
+
+/**
+ * The warn threshold of one row, clamped to the range the adapter accepts (10–100 %).
+ *
+ * ONE rule for both sides. The settings page clamped an out-of-range entry to the
+ * nearest bound while the adapter replaced it with the default — a user typing 5
+ * saw 10 on the page and got 80 in the adapter. The page imports this function.
+ *
+ * @param raw the configured value (a number, or the text typed into the field)
+ * @returns the threshold in percent
+ */
+export function clampThreshold(raw: unknown): number {
+  const value = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+  if (!Number.isFinite(value)) {
+    return DEFAULT_WARN_THRESHOLD;
+  }
+  return Math.min(100, Math.max(10, Math.round(value)));
 }
 
 /**
@@ -163,13 +183,18 @@ export function round2(value: number): number {
  *
  * Providers deliver amounts as strings ("110.00"), as numbers, as null for
  * "unlimited" and occasionally as an empty string — all of which `Number()` alone
- * turns into 0 or NaN. Only a real number gets through here.
+ * turns into 0 or NaN. Only a real number gets through here: a number, or a string
+ * that holds one. `Number()` also turns `true` into 1, `false`, `" "` and `[]` into 0
+ * and `[7]` into 7, so everything else is refused by its type first.
  *
  * @param value the raw value
  * @returns the number, or undefined
  */
 export function finiteNumber(value: unknown): number | undefined {
-  if (value === null || value === undefined || value === "") {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value !== "string" || value.trim() === "") {
     return undefined;
   }
   const num = Number(value);

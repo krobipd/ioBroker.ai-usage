@@ -236,11 +236,31 @@ describe("fetchAllPages", () => {
     const buckets = await fetchAllPages(
       "/r",
       {},
-      () => Promise.resolve({ data: [1], has_more: true, next_page: "next" }),
+      (() => {
+        let page = 0;
+        return () => Promise.resolve({ data: [1], has_more: true, next_page: `p${++page}` });
+      })(),
       pages => truncated.push(pages),
     );
     expect(truncated).toEqual([32]);
     expect(buckets).toHaveLength(32);
+  });
+
+  test("a server that repeats its cursor is not asked the same page again and again", async () => {
+    const truncated: number[] = [];
+    let calls = 0;
+    const buckets = await fetchAllPages(
+      "/r",
+      {},
+      () => {
+        calls++;
+        return Promise.resolve({ data: [calls], has_more: true, next_page: "same" });
+      },
+      pages => truncated.push(pages),
+    );
+    expect(calls).toBe(2);
+    expect(buckets).toEqual([1, 2]);
+    expect(truncated).toEqual([2]);
   });
 
   test("a complete report never reports truncation", async () => {
