@@ -1,3 +1,4 @@
+import { errorText } from "../error-text";
 import { withAuthRetry } from "./auth-retry";
 import {
   FetchError,
@@ -66,13 +67,26 @@ async function callCodeAssist(
   throw lastError instanceof Error ? lastError : new FetchError("network", "no Code-Assist host answered");
 }
 
+/** What `loadCodeAssist` says about the account (gemini-cli `LoadCodeAssistResponse`). */
+export interface CodeAssistInfo {
+  /** The Code-Assist project id, or "" when Google assigned none. */
+  project: string;
+  /** The tier's readable name. */
+  tier: string;
+  /** Whether Google reports a current tier at all — without one the account was never set up. */
+  hasCurrentTier: boolean;
+  /** Why Google considers the account ineligible, where it says so. */
+  ineligible: { reasonCode: string; reasonMessage: string; validationUrl: string }[];
+}
+
 /**
- * Read the project id and the tier out of a `loadCodeAssist` answer.
+ * Read the project id, the tier and the reasons for ineligibility out of a
+ * `loadCodeAssist` answer.
  *
  * @param body the parsed answer
- * @returns project id and tier label
+ * @returns what the answer says about the account
  */
-export function parseCodeAssist(body: unknown): { project: string; tier: string } {
+export function parseCodeAssist(body: unknown): CodeAssistInfo {
   const raw = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
   const project = typeof raw.cloudaicompanionProject === "string" ? raw.cloudaicompanionProject : "";
   const paid = (raw.paidTier ?? {}) as Record<string, unknown>;
@@ -83,7 +97,44 @@ export function parseCodeAssist(body: unknown): { project: string; tier: string 
     (typeof paid.id === "string" && paid.id) ||
     (typeof current.id === "string" && current.id) ||
     "";
-  return { project, tier };
+  const text = (value: unknown): string => (typeof value === "string" ? value : "");
+  const ineligible = (Array.isArray(raw.ineligibleTiers) ? raw.ineligibleTiers : [])
+    .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    .map(entry => ({
+      reasonCode: text(entry.reasonCode),
+      reasonMessage: text(entry.reasonMessage),
+      validationUrl: text(entry.validationUrl),
+    }));
+  const hasCurrentTier = typeof raw.currentTier === "object" && raw.currentTier !== null;
+  return { project, tier, hasCurrentTier, ineligible };
+}
+
+/**
+ * Why an account has no Code-Assist project, in the terms Google gives.
+ *
+ * gemini-cli (`setup.ts`) tells apart what "no project" can mean: a verification
+ * Google asks for (`VALIDATION_REQUIRED` with its link), an account Google calls
+ * ineligible (with its own reason), and an account that was never set up (no
+ * current tier). Every one of them used to read "a subscription is required" — also
+ * to a paying Pro user who had simply never opened Antigravity (decision 99). The
+ * adapter never writes to Google, so it cannot do the set-up itself; it names it.
+ *
+ * @param info what `loadCodeAssist` said
+ * @returns the reason, for `info.error`
+ */
+export function noProjectReason(info: CodeAssistInfo): string {
+  const validation = info.ineligible.find(entry => entry.reasonCode === "VALIDATION_REQUIRED" && entry.validationUrl);
+  if (validation) {
+    return `Google asks for a one-time account verification — ${validation.validationUrl}`;
+  }
+  const stated = info.ineligible.find(entry => entry.reasonMessage || entry.reasonCode);
+  if (stated) {
+    return `Google does not offer Code Assist to this account — ${stated.reasonMessage || stated.reasonCode}`;
+  }
+  if (!info.hasCurrentTier) {
+    return "The Google account is not set up for Code Assist yet — open Antigravity once with this account";
+  }
+  return "Google returned no project for this account — a Google AI subscription (Pro/Ultra) is required";
 }
 
 /**
@@ -104,8 +155,11 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
   }
   const raw = body as Record<string, unknown>;
   const buckets = Array.isArray(raw.buckets) ? raw.buckets : [];
-  const limits: LimitWindow[] = [];
-  const seen = new Set<string>();
+  // By name: the same model may come twice (a 5-hour and a weekly bucket, measured
+  // by Antigravity-Manager 2026-09-19). The FULLER one stands for the model — the
+  // first one used to win, and a 5-hour bucket at 10 % hid a week at 100 % (decision
+  // 100, CodexBar `parseQuotaBuckets` keeps the smallest remaining fraction as well).
+  const byName = new Map<string, LimitWindow>();
   for (const entry of buckets) {
     if (typeof entry !== "object" || entry === null) {
       continue;
@@ -120,10 +174,9 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
     const model = typeof bucket.modelId === "string" ? bucket.modelId : "";
     const kind = typeof bucket.tokenType === "string" ? bucket.tokenType.toLowerCase() : "";
     const name = sanitizeId(model || kind || "quota");
-    if (!name || seen.has(name)) {
+    if (!name) {
       continue;
     }
-    seen.add(name);
     // NOT `scoped`: Google reports no plan-wide window, so these buckets ARE the plan
     // (`LimitWindow.scoped`, decision 80). The fullest of them speaks for the account
     // and the label names the model, so the warning says which one it came from.
@@ -139,9 +192,75 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
     if (typeof bucket.resetTime === "string" && bucket.resetTime) {
       window.resetAt = bucket.resetTime;
     }
-    limits.push(window);
+    const known = byName.get(name);
+    if (!known || window.percent > known.percent) {
+      byName.set(name, window);
+    }
   }
+  const limits = [...byName.values()];
   return limits.length ? { limits } : {};
+}
+
+/**
+ * Turn a `retrieveUserQuotaSummary` answer into plan-wide pool windows.
+ *
+ * Antigravity 2.x groups its quota into pools with a 5-hour and a weekly window each
+ * ("Gemini Models", "Claude and GPT models"). Shape as lbjlaq/Antigravity-Manager
+ * reads it (quota.rs, 2026-09-20): `groups[].{displayName, buckets[].{bucketId,
+ * window, remainingFraction, resetTime, displayName}}`. These windows ARE the plan:
+ * where they exist, a model bucket is only part of it (decision 101).
+ *
+ * @param body the parsed answer
+ * @returns the pool windows, possibly none
+ */
+export function parseGeminiPools(body: unknown): LimitWindow[] {
+  const raw = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const pools: LimitWindow[] = [];
+  const seen = new Set<string>();
+  for (const group of Array.isArray(raw.groups) ? raw.groups : []) {
+    if (typeof group !== "object" || group === null) {
+      continue;
+    }
+    const entry = group as Record<string, unknown>;
+    const groupName = typeof entry.displayName === "string" ? entry.displayName : "";
+    for (const bucket of Array.isArray(entry.buckets) ? entry.buckets : []) {
+      if (typeof bucket !== "object" || bucket === null) {
+        continue;
+      }
+      const data = bucket as Record<string, unknown>;
+      const fraction = finiteNumber(data.remainingFraction);
+      if (fraction === undefined) {
+        continue;
+      }
+      const part =
+        (typeof data.displayName === "string" && data.displayName) ||
+        (typeof data.window === "string" && data.window) ||
+        (typeof data.bucketId === "string" && data.bucketId) ||
+        "";
+      const key =
+        (typeof data.bucketId === "string" && data.bucketId) ||
+        (typeof data.window === "string" && data.window) ||
+        part;
+      const name = sanitizeId(`pool-${groupName || "quota"}-${key || "window"}`);
+      if (!name || seen.has(name)) {
+        continue;
+      }
+      seen.add(name);
+      const label = [groupName, part].filter(Boolean).join(" ") || "Quota pool";
+      const window: LimitWindow = {
+        name,
+        label,
+        labelKey: "nameWindowPool",
+        labelArg: label,
+        percent: Math.round((1 - Math.min(Math.max(fraction, 0), 1)) * 1000) / 10,
+      };
+      if (typeof data.resetTime === "string" && data.resetTime) {
+        window.resetAt = data.resetTime;
+      }
+      pools.push(window);
+    }
+  }
+  return pools;
 }
 
 /**
@@ -151,6 +270,8 @@ export function parseGeminiQuota(body: unknown): UsageSnapshot {
  * @param post the JSON POST seam
  * @param postForm the form POST seam (token refresh)
  * @param now clock (ms)
+ * @param intervalSec the adapter's poll interval — sets how often the pool summary
+ *   is asked for (at most every 15 minutes, whatever the user configured)
  * @returns the provider
  */
 export function geminiSubProvider(
@@ -158,7 +279,17 @@ export function geminiSubProvider(
   post: JsonPost,
   postForm: FormPost,
   now: () => number = Date.now,
+  intervalSec = 300,
 ): UsageProvider {
+  // The last pool answer. Kept when the second call fails, like the ChatGPT voucher
+  // values: the scoping of the model buckets must not flip between rounds — that
+  // would switch which window drives the warning, round by round.
+  let pools: LimitWindow[] = [];
+  // Counts down to the next pool call; 0 = ask on this round (so the first round of
+  // a process does). Every ~15 minutes: Google answers bursts with 429, and a second
+  // call per round would double the requests of every Google account (decision 54's
+  // reasoning, applied here).
+  let sincePools = 0;
   return {
     kind: "gemini-sub",
     fetch: async (): Promise<UsageSnapshot> => {
@@ -186,24 +317,73 @@ export function geminiSubProvider(
           // NOT `auth`: the sign-in worked, the account simply has no Code-Assist
           // project. Reporting it as a rejected sign-in sent the user through a
           // sign-in that cannot change the answer.
-          throw new FetchError(
-            "service",
-            "Google returned no project for this account — a Google AI subscription (Pro/Ultra) is required",
-          );
+          throw new FetchError("service", noProjectReason(info));
         }
         const previous = tokens;
         tokens = { ...tokens, accountRef: info.project };
         // Same gate: a sign-out during the lookup must not write the file back.
         await store.replace(previous, tokens);
       }
-      return parseGeminiQuota(
+      const snapshot = parseGeminiQuota(
         await withAuthRetry(
           tokens,
           store,
           current => refreshGeminiTokens(current, postForm, now()),
-          current => callCodeAssist("retrieveUserQuota", { project: current.accountRef }, current.accessToken, post),
+          async current => {
+            try {
+              return await callCodeAssist(
+                "retrieveUserQuota",
+                { project: current.accountRef },
+                current.accessToken,
+                post,
+              );
+            } catch (e) {
+              // A 403 here is Google saying the quota query is not permitted for this
+              // account (CodexBar `fetchQuotaBucketsIfPermitted`) — not a dead
+              // sign-in. As `auth` it refreshed, got the same 403 and reported
+              // "sign-in rejected" with a notification that no new sign-in can answer
+              // (decision 102).
+              if (e instanceof FetchError && e.kind === "auth" && e.status === 403) {
+                throw new FetchError(
+                  "service",
+                  `Google does not permit the quota query for this account — ${errorText(e)}`,
+                  {
+                    status: 403,
+                  },
+                );
+              }
+              throw e;
+            }
+          },
         ),
       );
+      const poolEvery = Math.max(1, Math.round(900 / Math.max(1, intervalSec)));
+      const due = sincePools <= 0;
+      sincePools = due ? poolEvery - 1 : sincePools - 1;
+      if (due) {
+        try {
+          const current = (await store.load()) ?? tokens;
+          const fresh = parseGeminiPools(
+            await callCodeAssist(
+              "retrieveUserQuotaSummary",
+              { project: current.accountRef },
+              current.accessToken,
+              post,
+            ),
+          );
+          if (fresh.length > 0) {
+            pools = fresh;
+          }
+        } catch {
+          // Best effort: the model buckets stand on their own, the last pools stay.
+        }
+      }
+      if (pools.length === 0) {
+        return snapshot;
+      }
+      // Pools present: they are the plan, the model buckets only a part of it.
+      const models = (snapshot.limits ?? []).map(window => ({ ...window, scoped: true }));
+      return { ...snapshot, limits: [...pools, ...models] };
     },
   };
 }

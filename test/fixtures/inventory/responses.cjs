@@ -175,6 +175,35 @@ function routes() {
       match: ":loadCodeAssist",
       body: { cloudaicompanionProject: "fixture-project", paidTier: { id: "ultra", name: "Google AI Ultra" } },
     },
+    // Antigravity 2.x quota pools, shape as lbjlaq/Antigravity-Manager reads them
+    // (quota.rs 2026-09-20). BEFORE ":retrieveUserQuota": the table matches by
+    // substring, and that one is a prefix of this.
+    {
+      match: ":retrieveUserQuotaSummary",
+      body: {
+        groups: [
+          {
+            displayName: "Gemini Models",
+            buckets: [
+              {
+                bucketId: "gemini-5h",
+                window: "5h",
+                displayName: "5 hours",
+                remainingFraction: 0.6,
+                resetTime: "2026-09-07T00:00:00Z",
+              },
+              {
+                bucketId: "gemini-week",
+                window: "weekly",
+                displayName: "Week",
+                remainingFraction: 0.8,
+                resetTime: "2026-09-10T00:00:00Z",
+              },
+            ],
+          },
+        ],
+      },
+    },
     {
       match: ":retrieveUserQuota",
       body: {

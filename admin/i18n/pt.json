@@ -58,6 +58,7 @@
   "nameWindowModelWeek": "Semana (%s)",
   "nameWindowModelSession": "Sessão (%s)",
   "nameWindowQuota": "Quota de %s",
+  "nameWindowPool": "Grupo: %s",
   "nameWindowOther": "Limite: %s",
   "descUnreach": "Verdadeiro enquanto esta conta não fornece dados. Uma limitação mantém os últimos valores e deixa falso.",
   "descLastError": "Porque esta conta não fornece nada. Vazio enquanto tudo corre bem; \"Unknown\" enquanto o adaptador nada tem a comunicar.",

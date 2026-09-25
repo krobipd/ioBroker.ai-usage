@@ -58,6 +58,7 @@
   "nameWindowModelWeek": "Week (%s)",
   "nameWindowModelSession": "Sessie (%s)",
   "nameWindowQuota": "Quotum %s",
+  "nameWindowPool": "Pool: %s",
   "nameWindowOther": "Limiet: %s",
   "descUnreach": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",
   "descLastError": "Waarom dit account niets levert. Leeg zolang alles werkt; \"Unknown\" zolang de adapter zelf niets te melden heeft.",

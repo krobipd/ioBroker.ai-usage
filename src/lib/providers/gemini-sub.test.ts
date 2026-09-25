@@ -1,6 +1,13 @@
 import { FetchError, type TokenSet, type TokenStore } from "../provider";
 import { buildGeminiAuthorizeUrl, extractGeminiCode, generateGeminiPkce } from "./gemini-auth";
-import { GEMINI_IDENTITY, geminiSubProvider, parseCodeAssist, parseGeminiQuota } from "./gemini-sub";
+import {
+  GEMINI_IDENTITY,
+  geminiSubProvider,
+  noProjectReason,
+  parseCodeAssist,
+  parseGeminiPools,
+  parseGeminiQuota,
+} from "./gemini-sub";
 
 /**
  * A token store backed by memory.
@@ -117,7 +124,28 @@ describe("parseCodeAssist", () => {
         currentTier: { id: "free-tier", name: "Free" },
         paidTier: { id: "ultra", name: "Google AI Ultra" },
       }),
-    ).toEqual({ project: "proj-1", tier: "Google AI Ultra" });
+    ).toEqual({ project: "proj-1", tier: "Google AI Ultra", hasCurrentTier: true, ineligible: [] });
+  });
+
+  test("without a project, the reason is Google's own (decision 99)", () => {
+    // gemini-cli `setup.ts` tells these apart; "subscription required" for all of
+    // them misled a paying user who had just never set the account up.
+    expect(
+      noProjectReason(
+        parseCodeAssist({
+          ineligibleTiers: [
+            { reasonCode: "VALIDATION_REQUIRED", reasonMessage: "Verify", validationUrl: "https://g.co/verify" },
+          ],
+        }),
+      ),
+    ).toBe("Google asks for a one-time account verification — https://g.co/verify");
+    expect(
+      noProjectReason(
+        parseCodeAssist({ ineligibleTiers: [{ reasonCode: "RESTRICTED_AGE", reasonMessage: "Too young" }] }),
+      ),
+    ).toBe("Google does not offer Code Assist to this account — Too young");
+    expect(noProjectReason(parseCodeAssist({}))).toContain("not set up for Code Assist yet");
+    expect(noProjectReason(parseCodeAssist({ currentTier: { id: "standard-tier" } }))).toContain("subscription");
   });
 });
 
@@ -145,7 +173,7 @@ describe("geminiSubProvider", () => {
     expect(snapshot.limits?.[0].percent).toBe(50);
   });
 
-  test("an account without a project is reported as needing a subscription", async () => {
+  test("an account without a project is reported with Google's own reason, as a service answer", async () => {
     const provider = geminiSubProvider(
       memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000 }),
       () => Promise.resolve({ ineligibleTiers: [{ reasonCode: "INELIGIBLE_ACCOUNT" }] }),
@@ -154,7 +182,11 @@ describe("geminiSubProvider", () => {
     );
     // NOT `auth`: the sign-in worked, the account simply has no Code-Assist project
     // — sending the user through a sign-in cannot change that answer.
-    await expect(provider.fetch()).rejects.toMatchObject({ kind: "service", message: /subscription/ });
+    // `toThrow` for the text: `toMatchObject({ message })` never looks at an Error's
+    // message (it is not enumerable) — the check it replaced passed on any text.
+    const failure = provider.fetch();
+    await expect(failure).rejects.toMatchObject({ kind: "service" });
+    await expect(failure).rejects.toThrow(/INELIGIBLE_ACCOUNT/);
   });
 
   test("the second host is tried when the first one fails on transport", async () => {
@@ -172,7 +204,8 @@ describe("geminiSubProvider", () => {
       () => 0,
     );
     await provider.fetch();
-    expect(tried).toHaveLength(2);
+    // The quota call only — the pool summary follows on its own hosts.
+    expect(tried.filter(url => url.endsWith(":retrieveUserQuota"))).toHaveLength(2);
     expect(tried[0]).toContain("daily-cloudcode-pa");
     expect(tried[1]).toContain("//cloudcode-pa");
   });
@@ -211,5 +244,130 @@ describe("an account without a Code-Assist project", () => {
       () => 0,
     );
     await expect(provider.fetch()).rejects.toMatchObject({ kind: "service" });
+  });
+});
+
+describe("audit 2026-09-25 — Google", () => {
+  const signedIn = (): TokenStore & { saved: TokenSet[] } =>
+    memoryStore({ accessToken: "a", refreshToken: "r", expiresAt: 10 * 60_000, accountRef: "proj-1" });
+
+  const POOLS = {
+    groups: [
+      {
+        displayName: "Gemini Models",
+        buckets: [
+          { bucketId: "g-5h", window: "5h", displayName: "5 hours", remainingFraction: 0.1 },
+          { bucketId: "g-week", window: "weekly", displayName: "Week", remainingFraction: 0.5 },
+        ],
+      },
+    ],
+  };
+
+  test("R12: the same model twice — the fuller bucket stands for it", () => {
+    const snapshot = parseGeminiQuota({
+      buckets: [
+        { modelId: "m", remainingFraction: 0.9 },
+        { modelId: "m", remainingFraction: 0 },
+      ],
+    });
+    expect(snapshot.limits?.map(window => window.percent)).toEqual([100]);
+  });
+
+  test("A9: a 403 on the quota query is Google saying no, not a dead sign-in", async () => {
+    let refreshes = 0;
+    const provider = geminiSubProvider(
+      signedIn(),
+      () => Promise.reject(new FetchError("auth", "HTTP 403 — PERMISSION_DENIED", { status: 403 })),
+      () => {
+        refreshes++;
+        return Promise.resolve({ access_token: "b", expires_in: 3600 });
+      },
+      () => 0,
+    );
+    const failure = provider.fetch();
+    await expect(failure).rejects.toMatchObject({ kind: "service" });
+    await expect(failure).rejects.toThrow(/does not permit/);
+    expect(refreshes).toBe(0);
+  });
+
+  test("A9: a 401 still refreshes once, as before", async () => {
+    let calls = 0;
+    let refreshes = 0;
+    const provider = geminiSubProvider(
+      signedIn(),
+      url => {
+        if (url.endsWith(":retrieveUserQuota")) {
+          calls++;
+          return calls === 1
+            ? Promise.reject(new FetchError("auth", "HTTP 401", { status: 401 }))
+            : Promise.resolve({ buckets: [{ modelId: "m", remainingFraction: 0.5 }] });
+        }
+        return Promise.resolve({});
+      },
+      () => {
+        refreshes++;
+        return Promise.resolve({ access_token: "b", expires_in: 3600 });
+      },
+      () => 0,
+    );
+    await provider.fetch();
+    expect(refreshes).toBe(1);
+  });
+
+  test("P-D3: the pools are parsed as plan-wide windows", () => {
+    const pools = parseGeminiPools(POOLS);
+    expect(pools.map(window => [window.name, window.percent, window.scoped, window.labelKey])).toEqual([
+      ["pool-Gemini_Models-g-5h", 90, undefined, "nameWindowPool"],
+      ["pool-Gemini_Models-g-week", 50, undefined, "nameWindowPool"],
+    ]);
+    expect(parseGeminiPools({})).toEqual([]);
+    expect(parseGeminiPools({ groups: [{ buckets: [{ bucketId: "x" }] }] })).toEqual([]);
+  });
+
+  test("P-D3: with pools the model buckets become a part of the plan, and stay so when a later call fails", async () => {
+    let summaryCalls = 0;
+    const provider = geminiSubProvider(
+      signedIn(),
+      url => {
+        if (url.endsWith(":retrieveUserQuotaSummary")) {
+          summaryCalls++;
+          return summaryCalls === 1 ? Promise.resolve(POOLS) : Promise.reject(new FetchError("rate-limit", "429"));
+        }
+        return Promise.resolve({ buckets: [{ modelId: "gemini-3-pro", remainingFraction: 0 }] });
+      },
+      () => Promise.resolve({}),
+      () => 0,
+      60, // one pool call every 15 rounds
+    );
+    const first = await provider.fetch();
+    expect(first.limits?.map(window => [window.name, window.scoped ?? false])).toEqual([
+      ["pool-Gemini_Models-g-5h", false],
+      ["pool-Gemini_Models-g-week", false],
+      ["gemini-3-pro", true],
+    ]);
+    // Rounds 2..15 do not ask; round 16 does and fails — the pools stay.
+    for (let round = 2; round <= 16; round++) {
+      const snapshot = await provider.fetch();
+      expect(snapshot.limits?.find(window => window.name === "gemini-3-pro")?.scoped).toBe(true);
+    }
+    // Round 1 asked once (the first host answered); round 16 asked both hosts, like
+    // every Code-Assist call on a failure; the rounds between did not ask at all.
+    expect(summaryCalls).toBe(3);
+  });
+
+  test("P-D3: without pools the model buckets are the plan", async () => {
+    const provider = geminiSubProvider(
+      signedIn(),
+      url =>
+        url.endsWith(":retrieveUserQuotaSummary")
+          ? Promise.reject(new FetchError("service", "HTTP 404", { status: 404 }))
+          : Promise.resolve({ buckets: [{ modelId: "gemini-3-pro", remainingFraction: 0.2 }] }),
+      () => Promise.resolve({}),
+      () => 0,
+    );
+    const snapshot = await provider.fetch();
+    expect(snapshot.limits?.map(window => [window.name, window.percent, window.scoped])).toEqual([
+      ["gemini-3-pro", 80, undefined],
+    ]);
   });
 });

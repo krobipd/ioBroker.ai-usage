@@ -58,6 +58,7 @@
   "nameWindowModelWeek": "一周（%s）",
   "nameWindowModelSession": "会话（%s）",
   "nameWindowQuota": "%s 配额",
+  "nameWindowPool": "配额池：%s",
   "nameWindowOther": "限额：%s",
   "descUnreach": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。",
   "descLastError": "此账户为何没有数据。一切正常时为空；适配器自身无可报告时显示“Unknown”。",

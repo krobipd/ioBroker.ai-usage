@@ -232,9 +232,9 @@ describe("device-code sign-in", () => {
 
   test("a transport failure is NOT swallowed as waiting", async () => {
     const handle: DeviceCodeStart = { userCode: "A", deviceAuthId: "d", intervalSec: 5, expiresAt: 0 };
-    await expect(pollDeviceCode(handle, () => Promise.reject(new FetchError("network", "boom")))).rejects.toMatchObject(
-      { kind: "network", message: "boom" },
-    );
+    const failure = pollDeviceCode(handle, () => Promise.reject(new FetchError("network", "boom")));
+    await expect(failure).rejects.toMatchObject({ kind: "network" });
+    await expect(failure).rejects.toThrow("boom");
   });
 });
 

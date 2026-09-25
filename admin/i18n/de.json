@@ -58,6 +58,7 @@
   "nameWindowModelWeek": "Woche (%s)",
   "nameWindowModelSession": "Sitzung (%s)",
   "nameWindowQuota": "Kontingent %s",
+  "nameWindowPool": "Pool: %s",
   "nameWindowOther": "Limit: %s",
   "descUnreach": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",
   "descLastError": "Warum dieses Konto nichts liefert. Leer, solange alles läuft; „Unknown\", solange der Adapter selbst nichts zu melden hat.",

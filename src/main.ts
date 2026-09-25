@@ -787,7 +787,9 @@ export class AiUsageAdapter extends utils.Adapter {
           provider: chatgptSubProvider(this.tokenStore(account.provider), postJson, getJson, Date.now, intervalSec),
         };
       case "gemini-sub":
-        return { provider: geminiSubProvider(this.tokenStore(account.provider), postJson, postForm) };
+        return {
+          provider: geminiSubProvider(this.tokenStore(account.provider), postJson, postForm, Date.now, intervalSec),
+        };
       default: {
         const resolved = await this.resolveKey(account);
         return resolved.key ? { provider: this.keyProvider(account, resolved.key) } : { reason: resolved.reason };

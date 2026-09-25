@@ -3891,6 +3891,244 @@
     "native": {},
     "_id": "ai-usage.0.gemini.limits.gemini-3-pro.resetAt"
   },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models 5 hours",
+        "en": "Pool: Gemini Models 5 hours",
+        "es": "Grupo: Gemini Models 5 hours",
+        "fr": "Pool : Gemini Models 5 hours",
+        "it": "Pool: Gemini Models 5 hours",
+        "nl": "Pool: Gemini Models 5 hours",
+        "pl": "Pula: Gemini Models 5 hours",
+        "pt": "Grupo: Gemini Models 5 hours",
+        "ru": "Пул: Gemini Models 5 hours",
+        "uk": "Пул: Gemini Models 5 hours",
+        "zh-cn": "配额池：Gemini Models 5 hours"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h"
+  },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models 5 hours ist gerade das gültige Limit",
+        "en": "Pool: Gemini Models 5 hours is the limit in force",
+        "es": "Grupo: Gemini Models 5 hours es el límite vigente",
+        "fr": "Pool : Gemini Models 5 hours est la limite en vigueur",
+        "it": "Pool: Gemini Models 5 hours è il limite in vigore",
+        "nl": "Pool: Gemini Models 5 hours is de geldende limiet",
+        "pl": "Pula: Gemini Models 5 hours to obowiązujący limit",
+        "pt": "Grupo: Gemini Models 5 hours é o limite em vigor",
+        "ru": "Пул: Gemini Models 5 hours — действующий лимит",
+        "uk": "Пул: Gemini Models 5 hours — чинний ліміт",
+        "zh-cn": "配额池：Gemini Models 5 hours 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h.active"
+  },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models 5 hours verbraucht",
+        "en": "Pool: Gemini Models 5 hours used",
+        "es": "Grupo: Gemini Models 5 hours utilizado",
+        "fr": "Pool : Gemini Models 5 hours utilisé",
+        "it": "Pool: Gemini Models 5 hours utilizzato",
+        "nl": "Pool: Gemini Models 5 hours verbruikt",
+        "pl": "Pula: Gemini Models 5 hours wykorzystane",
+        "pt": "Grupo: Gemini Models 5 hours utilizado",
+        "ru": "Пул: Gemini Models 5 hours использовано",
+        "uk": "Пул: Gemini Models 5 hours використано",
+        "zh-cn": "配额池：Gemini Models 5 hours 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h.percent"
+  },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models 5 hours wird zurückgesetzt am",
+        "en": "Pool: Gemini Models 5 hours resets at",
+        "es": "Grupo: Gemini Models 5 hours se reinicia el",
+        "fr": "Pool : Gemini Models 5 hours est réinitialisé le",
+        "it": "Pool: Gemini Models 5 hours si azzera il",
+        "nl": "Pool: Gemini Models 5 hours wordt gereset op",
+        "pl": "Pula: Gemini Models 5 hours zeruje się",
+        "pt": "Grupo: Gemini Models 5 hours é reiniciado em",
+        "ru": "Пул: Gemini Models 5 hours сбрасывается",
+        "uk": "Пул: Gemini Models 5 hours скидається",
+        "zh-cn": "配额池：Gemini Models 5 hours 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-5h.resetAt"
+  },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models Week",
+        "en": "Pool: Gemini Models Week",
+        "es": "Grupo: Gemini Models Week",
+        "fr": "Pool : Gemini Models Week",
+        "it": "Pool: Gemini Models Week",
+        "nl": "Pool: Gemini Models Week",
+        "pl": "Pula: Gemini Models Week",
+        "pt": "Grupo: Gemini Models Week",
+        "ru": "Пул: Gemini Models Week",
+        "uk": "Пул: Gemini Models Week",
+        "zh-cn": "配额池：Gemini Models Week"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week"
+  },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models Week ist gerade das gültige Limit",
+        "en": "Pool: Gemini Models Week is the limit in force",
+        "es": "Grupo: Gemini Models Week es el límite vigente",
+        "fr": "Pool : Gemini Models Week est la limite en vigueur",
+        "it": "Pool: Gemini Models Week è il limite in vigore",
+        "nl": "Pool: Gemini Models Week is de geldende limiet",
+        "pl": "Pula: Gemini Models Week to obowiązujący limit",
+        "pt": "Grupo: Gemini Models Week é o limite em vigor",
+        "ru": "Пул: Gemini Models Week — действующий лимит",
+        "uk": "Пул: Gemini Models Week — чинний ліміт",
+        "zh-cn": "配额池：Gemini Models Week 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week.active"
+  },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models Week verbraucht",
+        "en": "Pool: Gemini Models Week used",
+        "es": "Grupo: Gemini Models Week utilizado",
+        "fr": "Pool : Gemini Models Week utilisé",
+        "it": "Pool: Gemini Models Week utilizzato",
+        "nl": "Pool: Gemini Models Week verbruikt",
+        "pl": "Pula: Gemini Models Week wykorzystane",
+        "pt": "Grupo: Gemini Models Week utilizado",
+        "ru": "Пул: Gemini Models Week использовано",
+        "uk": "Пул: Gemini Models Week використано",
+        "zh-cn": "配额池：Gemini Models Week 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week.percent"
+  },
+  "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Pool: Gemini Models Week wird zurückgesetzt am",
+        "en": "Pool: Gemini Models Week resets at",
+        "es": "Grupo: Gemini Models Week se reinicia el",
+        "fr": "Pool : Gemini Models Week est réinitialisé le",
+        "it": "Pool: Gemini Models Week si azzera il",
+        "nl": "Pool: Gemini Models Week wordt gereset op",
+        "pl": "Pula: Gemini Models Week zeruje się",
+        "pt": "Grupo: Gemini Models Week é reiniciado em",
+        "ru": "Пул: Gemini Models Week сбрасывается",
+        "uk": "Пул: Gemini Models Week скидається",
+        "zh-cn": "配额池：Gemini Models Week 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.gemini.limits.pool-Gemini_Models-gemini-week.resetAt"
+  },
   "ai-usage.0.gemini.warning": {
     "type": "state",
     "common": {

@@ -58,6 +58,7 @@
   "nameWindowModelWeek": "Week (%s)",
   "nameWindowModelSession": "Session (%s)",
   "nameWindowQuota": "%s quota",
+  "nameWindowPool": "Pool: %s",
   "nameWindowOther": "Limit: %s",
   "descUnreach": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",
   "descLastError": "Why this account delivers nothing. Empty while all is well; \"Unknown\" while the adapter itself has nothing to report.",

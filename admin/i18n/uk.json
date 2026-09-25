@@ -58,6 +58,7 @@
   "nameWindowModelWeek": "Тиждень (%s)",
   "nameWindowModelSession": "Сесія (%s)",
   "nameWindowQuota": "Квота %s",
+  "nameWindowPool": "Пул: %s",
   "nameWindowOther": "Ліміт: %s",
   "descUnreach": "Істина, поки цей акаунт не надає дані. Обмеження зберігає останні значення і лишає хибність.",
   "descLastError": "Чому цей акаунт нічого не надає. Порожньо, коли все гаразд; «Unknown», поки адаптеру немає про що повідомити.",

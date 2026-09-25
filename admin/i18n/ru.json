@@ -58,6 +58,7 @@
   "nameWindowModelWeek": "Неделя (%s)",
   "nameWindowModelSession": "Сессия (%s)",
   "nameWindowQuota": "Квота %s",
+  "nameWindowPool": "Пул: %s",
   "nameWindowOther": "Лимит: %s",
   "descUnreach": "Истина, пока этот аккаунт не передаёт данные. Троттлинг сохраняет последние значения и оставляет ложь.",
   "descLastError": "Почему аккаунт ничего не передаёт. Пусто, когда всё в порядке; «Unknown», пока адаптеру нечего сообщить.",
