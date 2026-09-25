@@ -49,9 +49,10 @@ export function parseDeepSeekBalance(body: unknown): UsageSnapshot {
  *
  * @param apiKey the DeepSeek API key
  * @param fetchJson the JSON-GET seam (tests inject a fake)
+ * @param userAgent the adapter's own identity for this request
  * @returns the provider
  */
-export function deepSeekProvider(apiKey: string, fetchJson: JsonFetch = getJson): UsageProvider {
+export function deepSeekProvider(apiKey: string, fetchJson: JsonFetch = getJson, userAgent?: string): UsageProvider {
   return {
     kind: "deepseek",
     fetch: async (): Promise<UsageSnapshot> =>
@@ -59,6 +60,7 @@ export function deepSeekProvider(apiKey: string, fetchJson: JsonFetch = getJson)
         await fetchJson("https://api.deepseek.com/user/balance", {
           Authorization: `Bearer ${apiKey}`,
           Accept: "application/json",
+          ...(userAgent ? { "User-Agent": userAgent } : {}),
         }),
       ),
   };

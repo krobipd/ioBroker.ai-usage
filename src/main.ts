@@ -806,15 +806,20 @@ export class AiUsageAdapter extends utils.Adapter {
    */
   private keyProvider(account: AccountConfig, key: string): UsageProvider | undefined {
     const warn = (m: string): void => this.log.warn(`${account.name}: ${m}`);
+    // The adapter's own name on the key accounts' official APIs — Anthropic's Admin
+    // API guide asks integrations to identify themselves (decision 104). NOT on the
+    // three subscriptions: there the client identity decides the throttle bucket
+    // (decisions 20 and 25).
+    const userAgent = `ioBroker.ai-usage/${this.version ?? "unknown"}`;
     switch (account.provider) {
       case "openrouter":
-        return openRouterProvider(key);
+        return openRouterProvider(key, getJson, Date.now, userAgent);
       case "deepseek":
-        return deepSeekProvider(key);
+        return deepSeekProvider(key, getJson, userAgent);
       case "openai":
-        return openAiProvider(key, getJson, Date.now, warn);
+        return openAiProvider(key, getJson, Date.now, warn, userAgent);
       case "anthropic-api":
-        return anthropicApiProvider(key, getJson, Date.now, warn);
+        return anthropicApiProvider(key, getJson, Date.now, warn, userAgent);
       default:
         return undefined;
     }

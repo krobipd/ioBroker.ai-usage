@@ -97,6 +97,8 @@ export function parseAnthropicReports(usageBuckets: unknown[], costBuckets: unkn
  * @param fetchJson the JSON-GET seam
  * @param now clock (ms) — injected for tests
  * @param warn where a partial report is reported to
+ * @param userAgent the adapter's own identity for these requests (Anthropic's
+ *   Admin API guide asks integrations to name themselves)
  * @returns the provider
  */
 export function anthropicApiProvider(
@@ -104,11 +106,16 @@ export function anthropicApiProvider(
   fetchJson: JsonFetch = getJson,
   now: () => number = Date.now,
   warn: (message: string) => void = () => undefined,
+  userAgent?: string,
 ): UsageProvider {
   return {
     kind: "anthropic-api",
     fetch: async (): Promise<UsageSnapshot> => {
-      const headers = { "x-api-key": adminKey, "anthropic-version": "2023-06-01" };
+      const headers = {
+        "x-api-key": adminKey,
+        "anthropic-version": "2023-06-01",
+        ...(userAgent ? { "User-Agent": userAgent } : {}),
+      };
       const start = encodeURIComponent(monthStartIso(now()));
       const truncated = (report: string): ((pages: number) => void) => {
         return pages =>

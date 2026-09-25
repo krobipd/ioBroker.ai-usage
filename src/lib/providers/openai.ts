@@ -118,6 +118,8 @@ export function parseOpenAiReports(usageBuckets: unknown[], costBuckets: unknown
  * @param fetchJson the JSON-GET seam
  * @param now clock (ms) — injected for tests
  * @param warn where a partial report is reported to
+ * @param userAgent the adapter's own identity for these requests (Anthropic's
+ *   Admin API guide asks integrations to name themselves)
  * @returns the provider
  */
 export function openAiProvider(
@@ -125,11 +127,12 @@ export function openAiProvider(
   fetchJson: JsonFetch = getJson,
   now: () => number = Date.now,
   warn: (message: string) => void = () => undefined,
+  userAgent?: string,
 ): UsageProvider {
   return {
     kind: "openai",
     fetch: async (): Promise<UsageSnapshot> => {
-      const headers = { Authorization: `Bearer ${adminKey}` };
+      const headers = { Authorization: `Bearer ${adminKey}`, ...(userAgent ? { "User-Agent": userAgent } : {}) };
       const start = monthStartUnix(now());
       // A truncated report means the month sums below are incomplete — that has to
       // reach the user's log, not be swallowed into a wrong number.

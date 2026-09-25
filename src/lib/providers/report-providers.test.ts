@@ -1,6 +1,7 @@
 import { FetchError } from "../provider";
 import { anthropicApiProvider, parseAnthropicReports } from "./anthropic-api";
 import { fetchAllPages, isToday, monthStartIso, monthStartUnix, projectMonth } from "./report-utils";
+import { deepSeekProvider } from "./deepseek";
 import { openAiProvider, parseOpenAiReports } from "./openai";
 
 /** 2026-08-25 12:00 UTC. */
@@ -355,5 +356,21 @@ describe("report providers ask for full pages", () => {
     await provider.fetch();
     expect(warnings).toHaveLength(2); // usage report and cost report
     expect(warnings[0]).toContain("partial");
+  });
+});
+
+describe("the key accounts name the adapter (decision 104)", () => {
+  test("OpenAI, Anthropic and DeepSeek send the adapter's own User-Agent", async () => {
+    const seen: Record<string, string>[] = [];
+    const fetchJson = (_url: string, headers: Record<string, string>): Promise<unknown> => {
+      seen.push(headers);
+      return Promise.resolve({ data: [], is_available: true, balance_infos: [] });
+    };
+    const ua = "ioBroker.ai-usage/0.16.0";
+    await openAiProvider("k", fetchJson, () => Date.UTC(2026, 8, 4), undefined, ua).fetch();
+    await anthropicApiProvider("k", fetchJson, () => Date.UTC(2026, 8, 4), undefined, ua).fetch();
+    await deepSeekProvider("k", fetchJson, ua).fetch();
+    expect(seen.length).toBeGreaterThanOrEqual(5);
+    expect(seen.every(headers => headers["User-Agent"] === ua)).toBe(true);
   });
 });
