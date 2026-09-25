@@ -182,8 +182,7 @@ describe("geminiSubProvider", () => {
     );
     // NOT `auth`: the sign-in worked, the account simply has no Code-Assist project
     // — sending the user through a sign-in cannot change that answer.
-    // `toThrow` for the text: `toMatchObject({ message })` never looks at an Error's
-    // message (it is not enumerable) — the check it replaced passed on any text.
+    // `toThrow` checks the message text itself.
     const failure = provider.fetch();
     await expect(failure).rejects.toMatchObject({ kind: "service" });
     await expect(failure).rejects.toThrow(/INELIGIBLE_ACCOUNT/);
