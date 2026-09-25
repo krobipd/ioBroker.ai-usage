@@ -201,17 +201,24 @@ test/standards/                → iobroker-adapter-checks (Repo-Standards)
 test/inventory.js              → Objekt-Inventar aus Fixtures ÜBER ALLE SIEBEN KONTOARTEN
                                  (`npm run test:inventory`) + Upgrade-Suite (INVENTORY_PREVIOUS)
 test/fixtures/inventory/       → die Anbieter-Antworten + der `fetch`-Ersatz für den Adapter-Prozess
+src-admin/src/*.test.ts(x)     → EIGENE vitest-Suite der Konfigseite (jsdom, echte ConfigGeneric;
+                                 `npm run test:admin`, seit 0.16.0)
 ```
 
 `src/lib/http.test.ts` (seit 0.11.0) nagelt die Status→Fehlerklasse-Abbildung fest, das Rückgrat der
 Entscheidungen 11 und 21: sie war bei 6,25 % Zeilen-Deckung und ALLE sechs Mutationen überlebten
 (Audit 2026-09-04). `http.ts` ist das einzige Modul ohne injizierte Naht — deshalb `vi.stubGlobal`.
-`src-admin/src/rows.test.ts` (seit 0.11.0) prüft die zweite, bis dahin ungetestete Kopie der
-Zeilen-Logik im Konfig-Panel — die Datei liegt bei ihrem Code, wird vom ROOT-Testlauf gefahren
-(`vitest.config.mts` nimmt `src-admin/src/**` mit auf) und steht seit 2026-09-05 auch in
+`src-admin/src/rows.test.ts` (seit 0.11.0) prüft die Zeilen-Logik des Konfig-Panels, die seit 0.16.0
+die geteilten Regeln aus `src/lib` importiert statt sie zu kopieren — die Datei liegt bei ihrem Code, wird
+vom ROOT-Testlauf gefahren (`vitest.config.mts` nimmt `src-admin/src/**/*.test.ts` mit auf) und steht seit 2026-09-05 auch in
 `coverage.include`: vitest 5 wertet das Muster STRIKT aus, ohne die zweite Zeile fiel die Datei
 still aus der Messung ([[reference_vitest5_deckung_und_pool]]); `src/lib/i18n.test.ts` beweist Vollständigkeit und
 Platzhalter-Konsistenz der elf Sprachdateien und dass jeder im Quelltext benutzte Schlüssel existiert.
+
+Seit 0.16.0 hat die Komponente zusätzlich eine EIGENE Suite (`src-admin/vitest.config.ts`, jsdom,
+`src-admin/src/ConfigPanel.test.tsx`): der Nadel-Harness schickt Mutationen unter `src-admin/` nur dann an
+Tests der Komponente, wenn dort package.json UND eine vitest-Konfiguration liegen — vorher überlebte jede
+Nadel in der `.tsx`. Die Karte wird instanziiert (nicht gemountet), `setState` synchron nachgebildet.
 
 `src/lib/sign-in-manager.test.ts` (seit 0.12.0, 17 Tests) deckt die drei Anmelde-Flüsse ab — bis dahin
 lagen sie in `main.ts` und damit außerhalb jedes Tests: der Gerätecode-Fluss, der Zeitfenster-Ablauf,
@@ -221,12 +228,7 @@ an der das kein Gate auffing.
 
 `src/main.test.ts` (seit 0.8.0) deckt die Adapter-Schicht ab — Zugangsdaten-Ablage, Anmelde-Wege,
 Aufräumen, Start-Schnappschuss, Abschalten; ai-usage war der einzige Adapter der Flotte ohne, und
-genau dort saßen vier der acht Fehler des 0.8.0-Audits. Ein Test in `pure-helpers.test.ts` nagelt
-die ZWEITE Kopie der Kennungs-Regel im Konfig-Panel an die des Adapters.
-
-```
-
-```
+genau dort saßen vier der acht Fehler des 0.8.0-Audits.
 
 **Gates, die es vor 0.11.0 nicht gab** (alle drei fanden beim ersten Lauf etwas):
 `npm run lint:admin` + `npm run check:admin` (die Komponente hat eine eigene Lint-Konfiguration und
