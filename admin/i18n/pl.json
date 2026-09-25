@@ -56,6 +56,7 @@
   "nameWindowWeek": "Tydzień (wszystkie modele)",
   "nameWindowWeekShort": "Tydzień",
   "nameWindowModelWeek": "Tydzień (%s)",
+  "nameWindowModelSession": "Sesja (%s)",
   "nameWindowQuota": "Limit %s",
   "nameWindowOther": "Limit: %s",
   "descUnreach": "Prawda, dopóki to konto nie dostarcza danych. Ograniczenie zachowuje ostatnie wartości i pozostawia fałsz.",

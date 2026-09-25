@@ -56,6 +56,7 @@
   "nameWindowWeek": "Woche (alle Modelle)",
   "nameWindowWeekShort": "Woche",
   "nameWindowModelWeek": "Woche (%s)",
+  "nameWindowModelSession": "Sitzung (%s)",
   "nameWindowQuota": "Kontingent %s",
   "nameWindowOther": "Limit: %s",
   "descUnreach": "Wahr, solange dieses Konto keine Daten liefert. Eine Drosselung hält die letzten Werte und lässt es falsch.",

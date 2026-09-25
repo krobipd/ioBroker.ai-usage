@@ -1,5 +1,5 @@
 import type { PostOptions } from "./http";
-import type { TokenSet, TokenStore } from "./provider";
+import { FetchError, type TokenSet, type TokenStore } from "./provider";
 import { SignInManager, type SignInDeps } from "./sign-in-manager";
 import { SIGN_IN_FLOWS } from "./sign-in";
 
@@ -207,10 +207,18 @@ describe("the device-code flow", () => {
     expect(started).toMatchObject({ status: "awaiting-device", userCode: "ABCD-1234" });
     expect(h.intervals()).toBe(1);
 
-    // Not confirmed yet: the endpoint answers with nothing usable.
-    h.answers.push({});
+    // Not confirmed yet: the endpoint answers 403 or 404 — both are a wait, the way
+    // openai/codex polls (decision 93). A 404 used to end the sign-in right here.
+    h.answers.push(() => {
+      throw new FetchError("auth", "HTTP 403", { status: 403 });
+    });
+    await h.tick();
+    h.answers.push(() => {
+      throw new FetchError("service", "HTTP 404", { status: 404 });
+    });
     await h.tick();
     expect(await h.deps.store("chatgpt-sub").load()).toBeNull();
+    expect(await manager.state("chatgpt-sub")).toMatchObject({ status: "awaiting-device" });
 
     h.answers.push({ authorization_code: "c", code_verifier: "v" });
     h.answers.push({ access_token: "at", refresh_token: "rt" });

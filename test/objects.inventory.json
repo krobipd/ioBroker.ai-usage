@@ -50,7 +50,7 @@
       "role": "value",
       "read": true,
       "write": false,
-      "unit": "USD"
+      "unit": ""
     },
     "native": {},
     "_id": "ai-usage.0.chatgpt.credits.remaining"
@@ -317,41 +317,41 @@
     "native": {},
     "_id": "ai-usage.0.chatgpt.limits"
   },
-  "ai-usage.0.chatgpt.limits.GPT-5_Pro": {
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session": {
     "type": "channel",
     "common": {
       "name": {
-        "de": "Limit: GPT-5 Pro",
-        "en": "Limit: GPT-5 Pro",
-        "es": "Límite: GPT-5 Pro",
-        "fr": "Limite : GPT-5 Pro",
-        "it": "Limite: GPT-5 Pro",
-        "nl": "Limiet: GPT-5 Pro",
-        "pl": "Limit: GPT-5 Pro",
-        "pt": "Limite: GPT-5 Pro",
-        "ru": "Лимит: GPT-5 Pro",
-        "uk": "Ліміт: GPT-5 Pro",
-        "zh-cn": "限额：GPT-5 Pro"
+        "de": "Sitzung (GPT-5.3-Codex-Spark)",
+        "en": "Session (GPT-5.3-Codex-Spark)",
+        "es": "Sesión (GPT-5.3-Codex-Spark)",
+        "fr": "Session (GPT-5.3-Codex-Spark)",
+        "it": "Sessione (GPT-5.3-Codex-Spark)",
+        "nl": "Sessie (GPT-5.3-Codex-Spark)",
+        "pl": "Sesja (GPT-5.3-Codex-Spark)",
+        "pt": "Sessão (GPT-5.3-Codex-Spark)",
+        "ru": "Сессия (GPT-5.3-Codex-Spark)",
+        "uk": "Сесія (GPT-5.3-Codex-Spark)",
+        "zh-cn": "会话（GPT-5.3-Codex-Spark）"
       }
     },
     "native": {},
-    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro"
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session"
   },
-  "ai-usage.0.chatgpt.limits.GPT-5_Pro.active": {
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session.active": {
     "type": "state",
     "common": {
       "name": {
-        "de": "Limit: GPT-5 Pro ist gerade das gültige Limit",
-        "en": "Limit: GPT-5 Pro is the limit in force",
-        "es": "Límite: GPT-5 Pro es el límite vigente",
-        "fr": "Limite : GPT-5 Pro est la limite en vigueur",
-        "it": "Limite: GPT-5 Pro è il limite in vigore",
-        "nl": "Limiet: GPT-5 Pro is de geldende limiet",
-        "pl": "Limit: GPT-5 Pro to obowiązujący limit",
-        "pt": "Limite: GPT-5 Pro é o limite em vigor",
-        "ru": "Лимит: GPT-5 Pro — действующий лимит",
-        "uk": "Ліміт: GPT-5 Pro — чинний ліміт",
-        "zh-cn": "限额：GPT-5 Pro 是当前生效的限额"
+        "de": "Sitzung (GPT-5.3-Codex-Spark) ist gerade das gültige Limit",
+        "en": "Session (GPT-5.3-Codex-Spark) is the limit in force",
+        "es": "Sesión (GPT-5.3-Codex-Spark) es el límite vigente",
+        "fr": "Session (GPT-5.3-Codex-Spark) est la limite en vigueur",
+        "it": "Sessione (GPT-5.3-Codex-Spark) è il limite in vigore",
+        "nl": "Sessie (GPT-5.3-Codex-Spark) is de geldende limiet",
+        "pl": "Sesja (GPT-5.3-Codex-Spark) to obowiązujący limit",
+        "pt": "Sessão (GPT-5.3-Codex-Spark) é o limite em vigor",
+        "ru": "Сессия (GPT-5.3-Codex-Spark) — действующий лимит",
+        "uk": "Сесія (GPT-5.3-Codex-Spark) — чинний ліміт",
+        "zh-cn": "会话（GPT-5.3-Codex-Spark） 是当前生效的限额"
       },
       "type": "boolean",
       "role": "indicator",
@@ -372,23 +372,23 @@
       }
     },
     "native": {},
-    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro.active"
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session.active"
   },
-  "ai-usage.0.chatgpt.limits.GPT-5_Pro.percent": {
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session.percent": {
     "type": "state",
     "common": {
       "name": {
-        "de": "Limit: GPT-5 Pro verbraucht",
-        "en": "Limit: GPT-5 Pro used",
-        "es": "Límite: GPT-5 Pro utilizado",
-        "fr": "Limite : GPT-5 Pro utilisé",
-        "it": "Limite: GPT-5 Pro utilizzato",
-        "nl": "Limiet: GPT-5 Pro verbruikt",
-        "pl": "Limit: GPT-5 Pro wykorzystane",
-        "pt": "Limite: GPT-5 Pro utilizado",
-        "ru": "Лимит: GPT-5 Pro использовано",
-        "uk": "Ліміт: GPT-5 Pro використано",
-        "zh-cn": "限额：GPT-5 Pro 已使用"
+        "de": "Sitzung (GPT-5.3-Codex-Spark) verbraucht",
+        "en": "Session (GPT-5.3-Codex-Spark) used",
+        "es": "Sesión (GPT-5.3-Codex-Spark) utilizado",
+        "fr": "Session (GPT-5.3-Codex-Spark) utilisé",
+        "it": "Sessione (GPT-5.3-Codex-Spark) utilizzato",
+        "nl": "Sessie (GPT-5.3-Codex-Spark) verbruikt",
+        "pl": "Sesja (GPT-5.3-Codex-Spark) wykorzystane",
+        "pt": "Sessão (GPT-5.3-Codex-Spark) utilizado",
+        "ru": "Сессия (GPT-5.3-Codex-Spark) использовано",
+        "uk": "Сесія (GPT-5.3-Codex-Spark) використано",
+        "zh-cn": "会话（GPT-5.3-Codex-Spark） 已使用"
       },
       "type": "number",
       "role": "value",
@@ -397,23 +397,23 @@
       "unit": "%"
     },
     "native": {},
-    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro.percent"
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session.percent"
   },
-  "ai-usage.0.chatgpt.limits.GPT-5_Pro.resetAt": {
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session.resetAt": {
     "type": "state",
     "common": {
       "name": {
-        "de": "Limit: GPT-5 Pro wird zurückgesetzt am",
-        "en": "Limit: GPT-5 Pro resets at",
-        "es": "Límite: GPT-5 Pro se reinicia el",
-        "fr": "Limite : GPT-5 Pro est réinitialisé le",
-        "it": "Limite: GPT-5 Pro si azzera il",
-        "nl": "Limiet: GPT-5 Pro wordt gereset op",
-        "pl": "Limit: GPT-5 Pro zeruje się",
-        "pt": "Limite: GPT-5 Pro é reiniciado em",
-        "ru": "Лимит: GPT-5 Pro сбрасывается",
-        "uk": "Ліміт: GPT-5 Pro скидається",
-        "zh-cn": "限额：GPT-5 Pro 重置时间"
+        "de": "Sitzung (GPT-5.3-Codex-Spark) wird zurückgesetzt am",
+        "en": "Session (GPT-5.3-Codex-Spark) resets at",
+        "es": "Sesión (GPT-5.3-Codex-Spark) se reinicia el",
+        "fr": "Session (GPT-5.3-Codex-Spark) est réinitialisé le",
+        "it": "Sessione (GPT-5.3-Codex-Spark) si azzera il",
+        "nl": "Sessie (GPT-5.3-Codex-Spark) wordt gereset op",
+        "pl": "Sesja (GPT-5.3-Codex-Spark) zeruje się",
+        "pt": "Sessão (GPT-5.3-Codex-Spark) é reiniciado em",
+        "ru": "Сессия (GPT-5.3-Codex-Spark) сбрасывается",
+        "uk": "Сесія (GPT-5.3-Codex-Spark) скидається",
+        "zh-cn": "会话（GPT-5.3-Codex-Spark） 重置时间"
       },
       "type": "string",
       "role": "date",
@@ -434,7 +434,126 @@
       }
     },
     "native": {},
-    "_id": "ai-usage.0.chatgpt.limits.GPT-5_Pro.resetAt"
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-session.resetAt"
+  },
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Woche (GPT-5.3-Codex-Spark)",
+        "en": "Week (GPT-5.3-Codex-Spark)",
+        "es": "Semana (GPT-5.3-Codex-Spark)",
+        "fr": "Semaine (GPT-5.3-Codex-Spark)",
+        "it": "Settimana (GPT-5.3-Codex-Spark)",
+        "nl": "Week (GPT-5.3-Codex-Spark)",
+        "pl": "Tydzień (GPT-5.3-Codex-Spark)",
+        "pt": "Semana (GPT-5.3-Codex-Spark)",
+        "ru": "Неделя (GPT-5.3-Codex-Spark)",
+        "uk": "Тиждень (GPT-5.3-Codex-Spark)",
+        "zh-cn": "一周（GPT-5.3-Codex-Spark）"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week"
+  },
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week.active": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (GPT-5.3-Codex-Spark) ist gerade das gültige Limit",
+        "en": "Week (GPT-5.3-Codex-Spark) is the limit in force",
+        "es": "Semana (GPT-5.3-Codex-Spark) es el límite vigente",
+        "fr": "Semaine (GPT-5.3-Codex-Spark) est la limite en vigueur",
+        "it": "Settimana (GPT-5.3-Codex-Spark) è il limite in vigore",
+        "nl": "Week (GPT-5.3-Codex-Spark) is de geldende limiet",
+        "pl": "Tydzień (GPT-5.3-Codex-Spark) to obowiązujący limit",
+        "pt": "Semana (GPT-5.3-Codex-Spark) é o limite em vigor",
+        "ru": "Неделя (GPT-5.3-Codex-Spark) — действующий лимит",
+        "uk": "Тиждень (GPT-5.3-Codex-Spark) — чинний ліміт",
+        "zh-cn": "一周（GPT-5.3-Codex-Spark） 是当前生效的限额"
+      },
+      "type": "boolean",
+      "role": "indicator",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wahr, solange dieses Fenster das Limit ist, an das das Konto als Nächstes stößt. Genau ein Fenster je Konto trägt es.",
+        "en": "True while this window is the limit the account runs into next. Exactly one window per account carries it.",
+        "es": "Verdadero mientras esta ventana sea el límite con el que la cuenta topará primero. Exactamente una ventana por cuenta.",
+        "fr": "Vrai tant que cette fenêtre est la limite que le compte atteindra en premier. Exactement une fenêtre par compte.",
+        "it": "Vero finché questa finestra è il limite che l'account incontra per primo. Esattamente una finestra per account.",
+        "nl": "Waar zolang dit venster de limiet is waar het account als volgende tegenaan loopt. Precies één venster per account.",
+        "pl": "Prawda, dopóki to okno jest limitem, na który konto natrafi jako pierwszy. Dokładnie jedno okno na konto.",
+        "pt": "Verdadeiro enquanto esta janela for o limite que a conta atinge a seguir. Exatamente uma janela por conta o tem.",
+        "ru": "Истина, пока это окно — тот лимит, в который аккаунт упрётся следующим. Ровно одно окно на аккаунт.",
+        "uk": "Істина, поки це вікно є лімітом, у який акаунт упреться наступним. Рівно одне вікно на акаунт.",
+        "zh-cn": "当此窗口是该账户接下来会触及的限额时为真。每个账户恰有一个窗口为真。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week.active"
+  },
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week.percent": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (GPT-5.3-Codex-Spark) verbraucht",
+        "en": "Week (GPT-5.3-Codex-Spark) used",
+        "es": "Semana (GPT-5.3-Codex-Spark) utilizado",
+        "fr": "Semaine (GPT-5.3-Codex-Spark) utilisé",
+        "it": "Settimana (GPT-5.3-Codex-Spark) utilizzato",
+        "nl": "Week (GPT-5.3-Codex-Spark) verbruikt",
+        "pl": "Tydzień (GPT-5.3-Codex-Spark) wykorzystane",
+        "pt": "Semana (GPT-5.3-Codex-Spark) utilizado",
+        "ru": "Неделя (GPT-5.3-Codex-Spark) использовано",
+        "uk": "Тиждень (GPT-5.3-Codex-Spark) використано",
+        "zh-cn": "一周（GPT-5.3-Codex-Spark） 已使用"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%"
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week.percent"
+  },
+  "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week.resetAt": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Woche (GPT-5.3-Codex-Spark) wird zurückgesetzt am",
+        "en": "Week (GPT-5.3-Codex-Spark) resets at",
+        "es": "Semana (GPT-5.3-Codex-Spark) se reinicia el",
+        "fr": "Semaine (GPT-5.3-Codex-Spark) est réinitialisé le",
+        "it": "Settimana (GPT-5.3-Codex-Spark) si azzera il",
+        "nl": "Week (GPT-5.3-Codex-Spark) wordt gereset op",
+        "pl": "Tydzień (GPT-5.3-Codex-Spark) zeruje się",
+        "pt": "Semana (GPT-5.3-Codex-Spark) é reiniciado em",
+        "ru": "Неделя (GPT-5.3-Codex-Spark) сбрасывается",
+        "uk": "Тиждень (GPT-5.3-Codex-Spark) скидається",
+        "zh-cn": "一周（GPT-5.3-Codex-Spark） 重置时间"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Wann dieses Fenster von vorn beginnt. Leer, solange kein Fenster läuft — der Anbieter meldet dann keinen Zeitpunkt.",
+        "en": "When this window starts over. Empty while no window is running — the provider reports no reset time then.",
+        "es": "Cuándo vuelve a empezar esta ventana. Vacío mientras no hay ventana en curso — el proveedor no indica entonces una hora.",
+        "fr": "Quand cette fenêtre recommence. Vide tant qu'aucune fenêtre n'est en cours — le fournisseur n'indique alors aucune heure.",
+        "it": "Quando questa finestra riparte. Vuoto finché nessuna finestra è in corso — il provider non indica allora un orario.",
+        "nl": "Wanneer dit venster opnieuw begint. Leeg zolang er geen venster loopt — de aanbieder meldt dan geen tijdstip.",
+        "pl": "Kiedy to okno zaczyna się od nowa. Puste, dopóki żadne okno nie trwa — dostawca nie podaje wtedy godziny.",
+        "pt": "Quando esta janela recomeça. Vazio enquanto nenhuma janela decorre — o fornecedor não indica então um momento.",
+        "ru": "Когда это окно начнётся заново. Пусто, пока окно не идёт — провайдер тогда не сообщает времени сброса.",
+        "uk": "Коли це вікно почнеться заново. Порожньо, поки вікно не триває — провайдер тоді не повідомляє час.",
+        "zh-cn": "此窗口何时重新开始。没有窗口在运行时为空——供应商此时不提供重置时间。"
+      }
+    },
+    "native": {},
+    "_id": "ai-usage.0.chatgpt.limits.gpt_5_3_codex_spark-week.resetAt"
   },
   "ai-usage.0.chatgpt.limits.session": {
     "type": "channel",

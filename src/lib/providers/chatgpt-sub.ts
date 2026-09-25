@@ -35,6 +35,7 @@ export const CHATGPT_RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/r
  * @param label the English label for log lines
  * @param labelKey i18n key for the translated object name
  * @param labelArg the provider-named part substituted into that key, where there is one
+ * @param lockedReason why the provider closed this window, where it says so
  * @returns the window, or undefined when unusable
  */
 function readWindow(
@@ -43,6 +44,7 @@ function readWindow(
   label: string,
   labelKey: string,
   labelArg?: string,
+  lockedReason?: string,
 ): LimitWindow | undefined {
   if (typeof raw !== "object" || raw === null) {
     return undefined;
@@ -63,7 +65,39 @@ function readWindow(
     const ms = resetAt > 1e12 ? resetAt : resetAt * 1000;
     window.resetAt = new Date(ms).toISOString();
   }
+  if (lockedReason) {
+    window.lockedReason = lockedReason;
+  }
   return window;
+}
+
+/**
+ * Why the provider stopped this status block, or undefined while it lets work go on.
+ *
+ * The ChatGPT answer says it outright, next to the percentages (openai/codex,
+ * `RateLimitStatusDetails`: `allowed`, `limit_reached`; the payload's
+ * `rate_limit_reached_type`; `SpendControlStatusDetails.reached`): a workspace whose
+ * credits are used up, or whose spend control stopped it, is locked at any
+ * percentage. That is the counterpart of Claude's `locked_reason` (decision 36) —
+ * read here, it feeds `limitReached` exactly the same way (decision 90).
+ *
+ * @param status the `rate_limit` block (of the plan or of one additional limit)
+ * @param reachedType the payload's `rate_limit_reached_type`, where it applies
+ * @param spendReached whether the workspace's spend control stopped the account
+ * @returns the reason, or undefined
+ */
+function lockOf(status: unknown, reachedType?: unknown, spendReached = false): string | undefined {
+  const block = (typeof status === "object" && status !== null ? status : {}) as Record<string, unknown>;
+  if (typeof reachedType === "string" && reachedType) {
+    return reachedType.replace(/_/g, " ");
+  }
+  if (spendReached) {
+    return "spend control limit reached";
+  }
+  if (block.limit_reached === true || block.allowed === false) {
+    return "usage limit reached";
+  }
+  return undefined;
 }
 
 /** The top-level keys a `/wham/usage` answer is recognised by — presence, not value. */
@@ -96,39 +130,62 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
   }
   const limits: LimitWindow[] = [];
   const rateLimit = (raw.rate_limit ?? {}) as Record<string, unknown>;
-  const session = readWindow(rateLimit.primary_window, "session", "Session (5 h)", "nameWindowSession");
-  const week = readWindow(rateLimit.secondary_window, "week", "Week", "nameWindowWeekShort");
+  const spend = (raw.spend_control ?? {}) as Record<string, unknown>;
+  const planLock = lockOf(rateLimit, raw.rate_limit_reached_type, spend.reached === true);
+  const session = readWindow(
+    rateLimit.primary_window,
+    "session",
+    "Session (5 h)",
+    "nameWindowSession",
+    undefined,
+    planLock,
+  );
+  const week = readWindow(rateLimit.secondary_window, "week", "Week", "nameWindowWeekShort", undefined, planLock);
   if (session) {
     limits.push(session);
   }
   if (week) {
     limits.push(week);
   }
+  // One entry per metered feature (a model like GPT-5.3-Codex-Spark), and each entry
+  // is a STATUS BLOCK of its own — `{ allowed, limit_reached, primary_window,
+  // secondary_window }` (openai/codex `AdditionalRateLimitDetails.rate_limit:
+  // RateLimitStatusDetails`), not a window. Read as a window, `used_percent` was
+  // looked for one level too high and every entry vanished (decision 91).
   for (const extra of Array.isArray(raw.additional_rate_limits) ? raw.additional_rate_limits : []) {
     if (typeof extra !== "object" || extra === null) {
       continue;
     }
     const entry = extra as Record<string, unknown>;
     const label = typeof entry.limit_name === "string" ? entry.limit_name : "";
-    // The name becomes an object-id segment, so it must survive sanitizing and must
-    // not collide with a window already collected — a name of "Session" would
-    // otherwise overwrite the 5-hour window with an unrelated counter. `sanitizeId`
-    // is the adapter's ONE id rule; this used to be a second, lower-cased one, so
-    // the same window name produced a different path here than anywhere else.
-    const name = sanitizeId(label);
-    // Case-insensitive: ioBroker ids are case-sensitive, so "Session" and
-    // "session" would both be created — two nodes for one thing, and the reader
-    // has to guess which is the 5-hour window.
-    if (!name || limits.some(window => window.name.toLowerCase() === name.toLowerCase())) {
+    const feature = typeof entry.metered_feature === "string" ? entry.metered_feature : "";
+    // The metered feature is the stable key; the display name may be reworded. It
+    // becomes an object-id segment, through the adapter's ONE id rule.
+    const base = sanitizeId(feature || label);
+    if (!base) {
       continue;
     }
-    // The provider named this one — it rides in as the `%s` of a translated frame.
-    const window = readWindow(entry.rate_limit, name, label, "nameWindowOther", label);
-    if (window) {
-      // These sit next to the plan-wide session/week windows and cover one model
-      // each — reported, but never the reason for a warning (LimitWindow.scoped).
-      window.scoped = true;
-      limits.push(window);
+    const status = entry.rate_limit;
+    const block = (typeof status === "object" && status !== null ? status : {}) as Record<string, unknown>;
+    const lock = lockOf(status);
+    const shown = label || feature;
+    for (const [suffix, raw5, key, english] of [
+      ["session", block.primary_window, "nameWindowModelSession", `Session (${shown})`],
+      ["week", block.secondary_window, "nameWindowModelWeek", `Week (${shown})`],
+    ] as const) {
+      const name = `${base}-${suffix}`;
+      // Case-insensitive: ioBroker ids are case-sensitive, so two spellings of one
+      // name would both be created — two nodes for one thing.
+      if (limits.some(window => window.name.toLowerCase() === name.toLowerCase())) {
+        continue;
+      }
+      const window = readWindow(raw5, name, english, key, shown, lock);
+      if (window) {
+        // These sit next to the plan-wide session/week windows and cover one model
+        // each — reported, but never the reason for a warning (LimitWindow.scoped).
+        window.scoped = true;
+        limits.push(window);
+      }
     }
   }
 
@@ -140,7 +197,10 @@ export function parseChatgptUsage(body: unknown): UsageSnapshot {
   const credits = (raw.credits ?? {}) as Record<string, unknown>;
   const balance = finiteNumber(credits.balance);
   if (balance !== undefined && credits.unlimited !== true) {
-    snapshot.credits = { remaining: balance, currency: "USD" };
+    // Codex credits are a unit of their own, not dollars: OpenAI meters them per
+    // token on a rate card, and the usage-credit balance is kept apart from the
+    // ChatGPT wallet (decision 92). Pieces, so they never enter a money sum.
+    snapshot.credits = { remaining: balance, currency: "credits", pieces: true };
   }
   return snapshot;
 }
@@ -284,7 +344,7 @@ export function chatgptSubProvider(
           }),
           now(),
         );
-        const credits = snapshot.credits ?? { currency: "USD" };
+        const credits = snapshot.credits ?? { currency: "credits", pieces: true };
         credits.resetCredits = vouchers.count;
         credits.resetCreditsNextExpiry = vouchers.nextExpiry;
         snapshot.credits = credits;

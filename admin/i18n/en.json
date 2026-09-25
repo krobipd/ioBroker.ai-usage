@@ -56,6 +56,7 @@
   "nameWindowWeek": "Week (all models)",
   "nameWindowWeekShort": "Week",
   "nameWindowModelWeek": "Week (%s)",
+  "nameWindowModelSession": "Session (%s)",
   "nameWindowQuota": "%s quota",
   "nameWindowOther": "Limit: %s",
   "descUnreach": "True while this account is not delivering data. A throttle keeps the last values and leaves it false.",

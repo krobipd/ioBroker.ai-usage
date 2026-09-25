@@ -149,10 +149,23 @@ function routes() {
           primary_window: { used_percent: 31, reset_at: todayUnix() + 5 * 3600, window_minutes: 300 },
           secondary_window: { used_percent: 66, reset_at: todayUnix() + 7 * 86400, window_minutes: 10080 },
         },
+        // The additional limits in the shape openai/codex models them
+        // (`AdditionalRateLimitDetails` → `RateLimitStatusDetails`), with the
+        // feature id and the name CodexBar's fixture carries.
         additional_rate_limits: [
-          { limit_name: "GPT-5 Pro", rate_limit: { used_percent: 12, reset_at: todayUnix() + 86400 } },
+          {
+            limit_name: "GPT-5.3-Codex-Spark",
+            metered_feature: "gpt_5_3_codex_spark",
+            rate_limit: {
+              allowed: true,
+              limit_reached: false,
+              primary_window: { used_percent: 12, limit_window_seconds: 18000, reset_at: todayUnix() + 5 * 3600 },
+              secondary_window: { used_percent: 30, limit_window_seconds: 604800, reset_at: todayUnix() + 7 * 86400 },
+            },
+          },
         ],
-        credits: { balance: 42.5, unlimited: false },
+        spend_control: { reached: false },
+        credits: { has_credits: true, unlimited: false, balance: 42.5 },
       },
     },
 

@@ -103,8 +103,11 @@ export type DevicePollResult = { status: "pending" } | { status: "ready"; code: 
 /**
  * Ask once whether the user confirmed the code.
  *
- * "Not confirmed yet" arrives as an auth failure (403/404 in the CLI) — that is a
- * WAIT, not an error, so it must not bubble up as a broken sign-in.
+ * "Not confirmed yet" arrives as 403 or 404 — openai/codex `poll_for_token` keeps
+ * waiting on `FORBIDDEN || NOT_FOUND`. That is a WAIT, not an error. The 403 is an
+ * auth failure here; the 404 is filed as a service fault by the shared classifier,
+ * so it is recognised by its status — reading only the class ended the sign-in on
+ * the first 404 while the user was still typing the code (decision 93).
  *
  * @param start the handle from {@link startDeviceCode}
  * @param post the JSON POST seam
@@ -118,7 +121,7 @@ export async function pollDeviceCode(start: DeviceCodeStart, post: JsonPost): Pr
       user_code: start.userCode,
     });
   } catch (e) {
-    if (e instanceof FetchError && e.kind === "auth") {
+    if (e instanceof FetchError && (e.kind === "auth" || e.status === 404)) {
       return { status: "pending" };
     }
     throw e;

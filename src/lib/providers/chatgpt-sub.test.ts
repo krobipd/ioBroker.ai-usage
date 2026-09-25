@@ -57,7 +57,8 @@ describe("parseChatgptUsage", () => {
       },
       { name: "week", label: "Week", labelKey: "nameWindowWeekShort", percent: 5, resetAt: "2025-01-03T16:00:00.000Z" },
     ]);
-    expect(snapshot.credits).toEqual({ remaining: 150, currency: "USD" });
+    // Codex credits are a unit of their own, not dollars (decision 92).
+    expect(snapshot.credits).toEqual({ remaining: 150, currency: "credits", pieces: true });
   });
 
   test("a null window is left out instead of being reported as 0 %", () => {
@@ -74,48 +75,113 @@ describe("parseChatgptUsage", () => {
     expect(snapshot.credits).toBeUndefined();
   });
 
-  test("an extra limit is added under its own name", () => {
+  // The shape of an additional limit, as openai/codex models it
+  // (`AdditionalRateLimitDetails`, `RateLimitStatusDetails`) and CodexBar's fixture
+  // carries it. The flat `{ rate_limit: { used_percent } }` these tests used before
+  // was invented — and exactly as invented as the parser it confirmed (decision 91).
+  const spark = (
+    primary: number | null,
+    secondary: number | null,
+    extra: Record<string, unknown> = {},
+  ): Record<string, unknown> => ({
+    limit_name: "GPT-5.3-Codex-Spark",
+    metered_feature: "gpt_5_3_codex_spark",
+    rate_limit: {
+      allowed: true,
+      limit_reached: false,
+      primary_window:
+        primary === null ? null : { used_percent: primary, limit_window_seconds: 18000, reset_at: 1735401600 },
+      secondary_window:
+        secondary === null ? null : { used_percent: secondary, limit_window_seconds: 604800, reset_at: 1735920000 },
+      ...extra,
+    },
+  });
+
+  test("an additional limit yields its 5-hour and its weekly window, both model-scoped", () => {
     const snapshot = parseChatgptUsage({
       rate_limit: { primary_window: { used_percent: 10 } },
-      additional_rate_limits: [{ limit_name: "GPT-5 Pro", rate_limit: { used_percent: 60 } }],
+      additional_rate_limits: [spark(100, 40)],
     });
     expect(snapshot.limits).toEqual([
       { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 10 },
       {
-        name: "GPT-5_Pro",
-        label: "GPT-5 Pro",
-        labelKey: "nameWindowOther",
-        labelArg: "GPT-5 Pro",
-        percent: 60,
+        name: "gpt_5_3_codex_spark-session",
+        label: "Session (GPT-5.3-Codex-Spark)",
+        labelKey: "nameWindowModelSession",
+        labelArg: "GPT-5.3-Codex-Spark",
+        percent: 100,
+        resetAt: "2024-12-28T16:00:00.000Z",
+        scoped: true,
+      },
+      {
+        name: "gpt_5_3_codex_spark-week",
+        label: "Week (GPT-5.3-Codex-Spark)",
+        labelKey: "nameWindowModelWeek",
+        labelArg: "GPT-5.3-Codex-Spark",
+        percent: 40,
+        resetAt: "2025-01-03T16:00:00.000Z",
         scoped: true,
       },
     ]);
   });
 
-  test("the window id follows the adapter's ONE id rule, not a second one", () => {
-    // It used to lower-case and kebab its own way, so the same window name became
-    // a different path here than anywhere else in the tree.
+  test("the metered feature names the window, through the adapter's ONE id rule", () => {
+    // The display name may be reworded; the feature is the stable key. Without one
+    // the name is used, sanitised the same way as everywhere else in the tree.
     const snapshot = parseChatgptUsage({
-      additional_rate_limits: [{ limit_name: "GPT-5 Pro", rate_limit: { used_percent: 60 } }],
+      additional_rate_limits: [{ ...spark(60, null), metered_feature: undefined, limit_name: "GPT-5 Pro" }],
     });
-    expect(snapshot.limits?.[0].name).toBe(sanitizeId("GPT-5 Pro"));
+    expect(snapshot.limits?.[0].name).toBe(`${sanitizeId("GPT-5 Pro")}-session`);
   });
 
-  test("an extra limit cannot overwrite a window that is already there", () => {
-    const snapshot = parseChatgptUsage({
-      rate_limit: { primary_window: { used_percent: 10 } },
-      additional_rate_limits: [{ limit_name: "Session", rate_limit: { used_percent: 99 } }],
-    });
-    expect(snapshot.limits).toEqual([
-      { name: "session", label: "Session (5 h)", labelKey: "nameWindowSession", percent: 10 },
+  test("the same feature twice creates one window, not two nodes for one thing", () => {
+    const snapshot = parseChatgptUsage({ additional_rate_limits: [spark(10, null), spark(99, null)] });
+    expect(snapshot.limits?.map(window => [window.name, window.percent])).toEqual([
+      ["gpt_5_3_codex_spark-session", 10],
     ]);
   });
 
-  test("an extra limit whose name carries no usable characters is skipped", () => {
+  test("an additional limit whose name carries no usable characters is skipped", () => {
     const snapshot = parseChatgptUsage({
-      additional_rate_limits: [{ limit_name: "###", rate_limit: { used_percent: 20 } }],
+      additional_rate_limits: [{ ...spark(20, 20), metered_feature: "###", limit_name: "###" }],
     });
     expect(snapshot.limits).toBeUndefined();
+  });
+
+  test("the retired flat shape produces nothing instead of a window it never was", () => {
+    const snapshot = parseChatgptUsage({
+      additional_rate_limits: [{ limit_name: "GPT-5 Pro", rate_limit: { used_percent: 60 } }],
+    });
+    expect(snapshot.limits).toBeUndefined();
+  });
+
+  test("the provider's own stop reaches the plan-wide windows as a lock (decision 90)", () => {
+    const windows = { primary_window: { used_percent: 40 }, secondary_window: { used_percent: 30 } };
+    for (const [body, reason] of [
+      [{ rate_limit: { ...windows, limit_reached: true } }, "usage limit reached"],
+      [{ rate_limit: { ...windows, allowed: false } }, "usage limit reached"],
+      [{ rate_limit: windows, spend_control: { reached: true } }, "spend control limit reached"],
+      [
+        { rate_limit: windows, rate_limit_reached_type: "workspace_member_credits_depleted" },
+        "workspace member credits depleted",
+      ],
+    ] as const) {
+      const snapshot = parseChatgptUsage(body);
+      expect(snapshot.limits?.map(window => window.lockedReason)).toEqual([reason, reason]);
+    }
+    // Allowed and not reached: no lock.
+    const open = parseChatgptUsage({ rate_limit: { ...windows, allowed: true, limit_reached: false } });
+    expect(open.limits?.every(window => window.lockedReason === undefined)).toBe(true);
+  });
+
+  test("an additional limit that is used up carries its own lock, still model-scoped", () => {
+    const snapshot = parseChatgptUsage({
+      additional_rate_limits: [spark(100, 100, { allowed: false, limit_reached: true })],
+    });
+    expect(snapshot.limits?.map(window => [window.lockedReason, window.scoped])).toEqual([
+      ["usage limit reached", true],
+      ["usage limit reached", true],
+    ]);
   });
 
   test("a body carrying NONE of the known fields is a service fault", () => {
@@ -149,6 +215,19 @@ describe("device-code sign-in", () => {
     const handle: DeviceCodeStart = { userCode: "A", deviceAuthId: "d", intervalSec: 5, expiresAt: 0 };
     const result = await pollDeviceCode(handle, () => Promise.reject(new FetchError("auth", "HTTP 403")));
     expect(result.status).toBe("pending");
+  });
+
+  test("a 404 before the confirmation is waiting too — the way Codex polls", async () => {
+    // openai/codex `poll_for_token`: `FORBIDDEN || NOT_FOUND` → keep polling. The
+    // shared classifier files a 404 as a service fault; its status says otherwise.
+    const handle: DeviceCodeStart = { userCode: "A", deviceAuthId: "d", intervalSec: 5, expiresAt: 0 };
+    const result = await pollDeviceCode(handle, () =>
+      Promise.reject(new FetchError("service", "HTTP 404", { status: 404 })),
+    );
+    expect(result.status).toBe("pending");
+    await expect(
+      pollDeviceCode(handle, () => Promise.reject(new FetchError("service", "HTTP 500", { status: 500 }))),
+    ).rejects.toMatchObject({ kind: "service" });
   });
 
   test("a transport failure is NOT swallowed as waiting", async () => {

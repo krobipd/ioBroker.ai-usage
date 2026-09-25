@@ -56,6 +56,7 @@
   "nameWindowWeek": "Week (alle modellen)",
   "nameWindowWeekShort": "Week",
   "nameWindowModelWeek": "Week (%s)",
+  "nameWindowModelSession": "Sessie (%s)",
   "nameWindowQuota": "Quotum %s",
   "nameWindowOther": "Limiet: %s",
   "descUnreach": "Waar zolang dit account geen gegevens levert. Een beperking behoudt de laatste waarden en laat het onwaar.",

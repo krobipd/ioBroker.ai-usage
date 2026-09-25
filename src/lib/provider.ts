@@ -139,7 +139,8 @@ export interface CreditInfo {
   resetCredits?: number;
   /**
    * When the next available reset voucher expires (ISO timestamp); empty string
-   * while none is held — the datapoint stays, only its value empties.
+   * while none is held — the datapoint stays, and the tree writes it without a
+   * value (decision 72).
    */
   resetCreditsNextExpiry?: string;
 }

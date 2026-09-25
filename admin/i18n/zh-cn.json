@@ -56,6 +56,7 @@
   "nameWindowWeek": "一周（所有模型）",
   "nameWindowWeekShort": "一周",
   "nameWindowModelWeek": "一周（%s）",
+  "nameWindowModelSession": "会话（%s）",
   "nameWindowQuota": "%s 配额",
   "nameWindowOther": "限额：%s",
   "descUnreach": "当此账户未提供数据时为真。限流会保留最后的数值并保持为假。",
