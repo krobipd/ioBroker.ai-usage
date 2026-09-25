@@ -333,7 +333,7 @@ export class AiUsageAdapter extends utils.Adapter {
       raw = await readFile(file, "utf8");
     } catch (e) {
       if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") {
-        this.log.warn(`${PROVIDER_LABELS[provider] ?? provider}: cannot open the stored sign-in (${String(e)})`);
+        this.log.warn(`${PROVIDER_LABELS[provider] ?? provider}: cannot open the stored sign-in (${errorText(e)})`);
       }
       return null; // never signed in — the provider reports that no sign-in exists
     }

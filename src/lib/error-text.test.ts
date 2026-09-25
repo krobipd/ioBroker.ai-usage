@@ -61,6 +61,36 @@ describe("errorText", () => {
     expect(text.endsWith("…")).toBe(true);
   });
 
+  test("an Error without a message contributes its string code", () => {
+    // `http.get` to localhost rejects with an AggregateError: message "", reason in `code`.
+    const refused = Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" });
+    expect(errorText(refused)).toBe("ECONNREFUSED");
+  });
+
+  test("one level of cause is carried, the way fetch hides its real reason", () => {
+    const root = Object.assign(new Error("getaddrinfo ENOTFOUND host"), { code: "ENOTFOUND" });
+    expect(errorText(new TypeError("fetch failed", { cause: root }))).toBe("fetch failed (getaddrinfo ENOTFOUND host)");
+    // A cause the message already names is not repeated.
+    expect(errorText(new Error("boom: EPIPE", { cause: "EPIPE" }))).toBe("boom: EPIPE");
+    // A cause without a message of its own falls back to its code.
+    const inner = Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" });
+    expect(errorText(new TypeError("fetch failed", { cause: inner }))).toBe("fetch failed (ECONNREFUSED)");
+  });
+
+  test("a thrown function renders as its tag, never as its source text", () => {
+    expect(errorText(() => "secret source")).toBe("[object Function]");
+  });
+
+  test("a getter that throws cannot turn the explanation into a second failure", () => {
+    const hostile = new Error("x");
+    Object.defineProperty(hostile, "message", {
+      get() {
+        throw new Error("getter");
+      },
+    });
+    expect(errorText(hostile)).toBe("[object Error]");
+  });
+
   test("null, undefined and symbols stay readable", () => {
     expect(errorText(null)).toBe("null");
     expect(errorText(undefined)).toBe("undefined");

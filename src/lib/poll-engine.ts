@@ -830,11 +830,17 @@ export class PollEngine {
    */
   private async writeAccountStatus(runtime: AccountRuntime): Promise<void> {
     const { config } = runtime;
-    const delivering = isDelivering(runtime.state);
-    await Promise.all([
-      this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering),
-      this.deps.setStateChanged(`${config.id}.info.error`, runtime.error),
-    ]);
+    try {
+      const delivering = isDelivering(runtime.state);
+      await Promise.all([
+        this.deps.setStateChanged(`${config.id}.info.unreach`, !delivering),
+        this.deps.setStateChanged(`${config.id}.info.error`, runtime.error),
+      ]);
+    } catch (e) {
+      // Dropped with `void` by the caller: a rejection here would be unhandled and
+      // end the instance. The states database going down is logged, not fatal.
+      this.deps.log.debug(`${config.name}: could not write the status (${errorText(e)})`);
+    }
   }
 
   /** Recompute and write the totals + info.connection. */
