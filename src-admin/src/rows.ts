@@ -1,3 +1,15 @@
+import { PROVIDERS } from "../../src/lib/provider.js";
+import { accountId, clampThreshold } from "../../src/lib/pure-helpers.js";
+
+/**
+ * The adapter's own rules, imported — not copied. The panel used to carry a second
+ * copy of the id rule, the provider list and the threshold clamp, and the threshold
+ * copy did drift (the page clamped, the adapter fell back to 80). A relative import
+ * lands in the Module-Federation bundle like any other source (fleet rule,
+ * `admin-component.md`); both modules are free of Node imports.
+ */
+export { accountId };
+
 /** The eleven languages this adapter ships — the i18n files under `src/i18n/`. */
 const SUPPORTED_LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"] as const;
 
@@ -48,38 +60,6 @@ export interface KeyProviderOffer {
   needsAdminKey: boolean;
 }
 
-/** Fixed object id per subscription — must match `SUBSCRIPTION_IDS` in the adapter. */
-const SUBSCRIPTION_IDS: Record<string, string> = {
-  "claude-sub": "claude",
-  "chatgpt-sub": "chatgpt",
-  "gemini-sub": "gemini",
-};
-
-/**
- * The object id of one account — the same rule the adapter uses in `pure-helpers.ts`.
- *
- * Kept as a second copy on purpose: the admin panel is its own bundle and cannot
- * import from the adapter's sources. Both sides must change together, which is why
- * the rule is deliberately tiny.
- *
- * @param provider the provider kind
- * @param credentialId the central credential id, for key-based accounts
- * @returns the id, or an empty string when nothing fits
- */
-export function accountId(provider: string, credentialId: string): string {
-  const fixed = SUBSCRIPTION_IDS[provider];
-  if (fixed) {
-    return fixed;
-  }
-  const suffix = credentialId
-    .replace(/^system\.credentials\./, "")
-    .trim()
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .replace(/_{2,}/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return suffix ? `${suffix}-api` : "";
-}
-
 /** How a row's service status is shown: which colour, which label. */
 export interface ServiceBadge {
   /** Translation key of the label. */
@@ -93,10 +73,11 @@ export interface ServiceBadge {
 /**
  * Turn an account's two status states into the badge shown in its row.
  *
- * `unreach` is the AI service itself being unreachable — that is the red case. A
- * rejected sign-in or a throttle leave the service reachable but stop the data, so
- * they are amber with the reason on hover. Nothing known yet shows nothing at all
- * rather than a guess.
+ * `unreach` is true whenever the account does NOT deliver — no connection, a broken
+ * service, a rejected or missing sign-in, a missing key: all red, with the reason.
+ * The one amber case is a throttle: the account still counts as delivering (its
+ * last values stay valid) and `info.error` says why it waits. Nothing known yet shows
+ * nothing at all rather than a guess.
  *
  * @param unreach value of `<account>.info.unreach`
  * @param error value of `<account>.info.error`
@@ -154,13 +135,12 @@ export function offerForCredential(suffix: string, name: string): KeyProviderOff
   return null;
 }
 
-/** Every key-based provider, for the manual picker when the name gives nothing away. */
-export const KEY_PROVIDERS: KeyProviderOffer[] = [
-  { provider: "openrouter", label: "OpenRouter", needsAdminKey: false },
-  { provider: "deepseek", label: "DeepSeek", needsAdminKey: false },
-  { provider: "openai", label: "OpenAI", needsAdminKey: true },
-  { provider: "anthropic-api", label: "Anthropic", needsAdminKey: true },
-];
+/** Every key-based provider, for the manual picker — from the adapter's one catalogue. */
+export const KEY_PROVIDERS: KeyProviderOffer[] = PROVIDERS.filter(entry => entry.flow === undefined).map(entry => ({
+  provider: entry.kind,
+  label: entry.label,
+  needsAdminKey: entry.needsAdminKey === true,
+}));
 
 /**
  * The row of one subscription, if it is switched on.
@@ -227,9 +207,140 @@ export function setThreshold(
   match: { provider?: string; credentialId?: string },
   raw: string,
 ): AccountRow[] {
-  const value = Math.min(100, Math.max(10, Math.round(Number(raw)) || 80));
+  // The adapter's own rule — the copy that lived here clamped while the adapter fell back to 80.
+  const value = clampThreshold(raw);
   return rows.map(row => {
     const hit = match.credentialId ? row.credentialId === match.credentialId : row.provider === match.provider;
     return hit ? { ...row, warnThreshold: value } : row;
   });
+}
+
+/**
+ * Rows that are switched on but whose stored key is gone from the credential storage.
+ *
+ * The page drew key rows only from the storage, so such a row was invisible — it
+ * could not even be switched off, while the adapter warned on every start and
+ * `info.error` asked the user to pick a key on a page that showed nothing to pick
+ * (decision 105).
+ *
+ * @param rows the configured rows
+ * @param credentials what the storage holds
+ * @returns the key rows without a matching storage entry
+ */
+export function orphanRows(rows: AccountRow[], credentials: CredentialEntry[]): AccountRow[] {
+  const known = new Set(credentials.map(entry => entry.id));
+  return rows.filter(
+    row => !SUBSCRIPTIONS.some(entry => entry.provider === row.provider) && !known.has(row.credentialId),
+  );
+}
+
+/** What the credential part of the page shows. */
+export type CredentialListState = "loading" | "unreadable" | "empty" | "list";
+
+/**
+ * What the credential part of the page shows.
+ *
+ * A failed read is not "nothing stored": saying so hid every switched-on key row
+ * behind "no AI credentials stored yet" — the same mistake the sign-in status had
+ * made with a transport miss (krobi, live 2026-09-01), in its second place.
+ *
+ * @param loaded whether the read finished
+ * @param failed whether it failed
+ * @param count how many entries it brought
+ * @returns the state
+ */
+export function credentialListState(loaded: boolean, failed: boolean, count: number): CredentialListState {
+  if (!loaded) {
+    return "loading";
+  }
+  if (failed) {
+    return "unreadable";
+  }
+  return count === 0 ? "empty" : "list";
+}
+
+/**
+ * How long the page waits for the adapter's answer to one command (ms).
+ *
+ * `socket.sendTo` itself never gives up (socket-client 5.2.1: `commandTimeout:
+ * false`), so without a deadline a lost answer left a button spinning until the page
+ * was reloaded. The actions get longer: the adapter itself may wait up to 15 s for
+ * the provider inside them (decision 106).
+ *
+ * @param command the message command
+ * @returns the deadline
+ */
+export function answerDeadline(command: string): number {
+  return command === "signInStatus" ? 10_000 : 30_000;
+}
+
+/**
+ * A promise that settles with `null` once the deadline passed.
+ *
+ * @param promise what to wait for
+ * @param ms the deadline
+ * @returns the result, or null when it came too late
+ */
+export function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>(resolve => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
+/** What decides whether the page must ask for the sign-in status again. */
+export interface PanelFacts {
+  /** Whether the instance runs. */
+  alive: boolean;
+  /** Whether the form has unsaved changes. */
+  changed: boolean;
+  /** The switched-on subscriptions. */
+  subscriptions: string[];
+}
+
+/**
+ * Whether the page must ask for the sign-in status at once.
+ *
+ * After starting the instance, after saving, or when a subscription was switched
+ * on, the answer is new — waiting for the 30-second beat left a spinner (or a stale
+ * paste form of an attempt the restarted adapter no longer knows) standing that long.
+ *
+ * @param before the facts before the update
+ * @param after the facts after it
+ * @returns true when the status has to be asked now
+ */
+export function needsSignInRefresh(before: PanelFacts, after: PanelFacts): boolean {
+  return (
+    (!before.alive && after.alive) ||
+    (before.changed && !after.changed) ||
+    before.subscriptions.join("|") !== after.subscriptions.join("|")
+  );
+}
+
+/**
+ * Merge status answers into the known states — older answers never win.
+ *
+ * A status round that started before a user action may come back after it; its
+ * answer described the old state and put the paste form or "signed in" back over
+ * what the action had just shown. Every provider carries a sequence number that each
+ * action raises; an answer from before the current number is dropped.
+ *
+ * @param known the states shown now
+ * @param answers the answers of one status round, with the sequence each was asked at
+ * @param current the current sequence per provider
+ * @returns the merged states
+ */
+export function mergeSignIn<S>(
+  known: Record<string, S>,
+  answers: { provider: string; answer: S | null; sequence: number }[],
+  current: Record<string, number>,
+): Record<string, S> {
+  const merged = { ...known };
+  for (const { provider, answer, sequence } of answers) {
+    if (answer && sequence === (current[provider] ?? 0)) {
+      merged[provider] = answer;
+    }
+  }
+  return merged;
 }

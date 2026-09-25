@@ -23,18 +23,26 @@ import SmartToyIcon from "@mui/icons-material/SmartToy";
 import { ConfigGeneric, type ConfigGenericProps, type ConfigGenericState } from "@iobroker/json-config";
 import { I18n } from "@iobroker/gui-components";
 
+import type { SignInState } from "../../src/lib/sign-in.js";
 import {
   KEY_PROVIDERS,
   SUBSCRIPTIONS,
+  answerDeadline,
+  credentialListState,
+  mergeSignIn,
+  needsSignInRefresh,
   offerForCredential,
+  orphanRows,
   setThreshold,
   subscriptionRow,
   accountId,
   serviceBadge,
   toggleCredential,
   toggleSubscription,
+  withDeadline,
   type AccountRow,
   type CredentialEntry,
+  type PanelFacts,
 } from "./rows";
 
 /**
@@ -45,17 +53,15 @@ import {
  */
 const SORT_KEY_END = "\uFFFF";
 
-/** What the adapter reports about one subscription's sign-in. */
-type SignInState =
-  | { status: "signed-in" }
-  | { status: "signed-out" }
-  | { status: "awaiting-paste"; url: string; flow: "paste-code" | "paste-url" }
-  | { status: "awaiting-device"; userCode: string; verificationUrl: string; expiresAt: number }
-  | { status: "failed"; reason: string };
-
 interface PanelState extends ConfigGenericState {
   credentials: CredentialEntry[];
   credentialsLoaded: boolean;
+  /** Whether reading the credential storage failed — never shown as "nothing stored". */
+  credentialsFailed: boolean;
+  /** What the user is typing into a threshold field, per row, until it is committed. */
+  thresholdDrafts: Record<string, string>;
+  /** The outcome of the last copy click, per button. */
+  copied: Record<string, "ok" | "manual">;
   /** Sign-in state per subscription provider. */
   signIn: Record<string, SignInState>;
   /** What the user typed into a paste field, per provider. */
@@ -87,6 +93,8 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   private subscribed: string[] = [];
   /** True once the card is gone — a late answer must not call setState. */
   private unmounted = false;
+  /** Raised by every user action per provider — a status answer from before it is stale. */
+  private readonly sequence: Record<string, number> = {};
 
   constructor(props: ConfigGenericProps) {
     super(props);
@@ -94,6 +102,9 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       ...this.state,
       credentials: [],
       credentialsLoaded: false,
+      credentialsFailed: false,
+      thresholdDrafts: {},
+      copied: {},
       signIn: {},
       drafts: {},
       providerChoice: {},
@@ -111,9 +122,29 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     this.scheduleSignInPoll();
   }
 
-  componentDidUpdate(): void {
+  componentDidUpdate(previous: ConfigGenericProps): void {
     // Rows come and go while the user switches accounts on and off.
     void this.syncSubscriptions();
+    // Started, saved, or a subscription switched on: the status is new NOW, not in
+    // up to thirty seconds (decision 107).
+    if (needsSignInRefresh(this.factsOf(previous), this.factsOf(this.props))) {
+      void this.refreshSignIn().finally(() => this.scheduleSignInPoll());
+    }
+  }
+
+  /**
+   * The facts that decide whether the sign-in status must be asked again.
+   *
+   * @param props the props to read
+   */
+  private factsOf(props: ConfigGenericProps): PanelFacts {
+    const rows = ConfigGeneric.getValue(props.data, "accounts") as unknown;
+    const list = Array.isArray(rows) ? (rows as AccountRow[]) : [];
+    return {
+      alive: !!props.alive,
+      changed: !!props.changed,
+      subscriptions: SUBSCRIPTIONS.filter(entry => subscriptionRow(list, entry.provider)).map(entry => entry.provider),
+    };
   }
 
   componentWillUnmount(): void {
@@ -238,9 +269,10 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
-      this.setState({ credentials, credentialsLoaded: true });
+      this.setState({ credentials, credentialsLoaded: true, credentialsFailed: false });
     } catch {
-      this.setState({ credentialsLoaded: true });
+      // A failed read is not "nothing stored" (decision 105).
+      this.setState({ credentialsLoaded: true, credentialsFailed: true });
     }
   }
 
@@ -268,6 +300,62 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   }
 
   /**
+   * The account's reason in plain sight — the badge's hover title alone reached
+   * neither a keyboard nor a touch screen.
+   *
+   * @param provider the provider kind
+   * @param credentialId the credential id for key-based accounts
+   */
+  private renderReason(provider: string, credentialId: string): React.JSX.Element | null {
+    const id = accountId(provider, credentialId);
+    const badge = serviceBadge(this.state.serviceState[`${id}.unreach`], this.state.serviceState[`${id}.error`]);
+    if (!badge?.title) {
+      return null;
+    }
+    return (
+      <Typography
+        variant="caption"
+        sx={{ display: "block", pl: 6, pb: 1, opacity: 0.8 }}
+      >
+        {badge.title}
+      </Typography>
+    );
+  }
+
+  /**
+   * One switched-on key row whose stored key is gone — shown so it can be switched off.
+   *
+   * @param row the orphaned row
+   */
+  private renderOrphanRow(row: AccountRow): React.JSX.Element {
+    return (
+      <Box
+        key={`orphan-${row.credentialId || row.name}`}
+        sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}
+      >
+        <Avatar sx={{ width: 28, height: 28, bgcolor: "transparent" }}>
+          <SmartToyIcon fontSize="small" />
+        </Avatar>
+        <Box sx={{ minWidth: 180 }}>
+          <Typography>{row.name}</Typography>
+          <Typography
+            variant="caption"
+            sx={{ color: "warning.main" }}
+          >
+            {I18n.t("aiu_keyMissing")}
+          </Typography>
+        </Box>
+        <Switch
+          checked
+          onChange={() => this.commit(this.accounts().filter(entry => entry !== row))}
+          slotProps={{ input: { "aria-label": row.name } }}
+          sx={{ ml: "auto" }}
+        />
+      </Box>
+    );
+  }
+
+  /**
    * Ask the adapter for the sign-in state of every switched-on subscription.
    *
    * A transport miss NEVER overwrites a known state: the status poll runs every
@@ -281,20 +369,17 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
       return;
     }
     const answers = await Promise.all(
-      SUBSCRIPTIONS.filter(entry => subscriptionRow(this.accounts(), entry.provider)).map(async entry => ({
-        provider: entry.provider,
-        answer: await this.ask("signInStatus", entry.provider),
-      })),
+      SUBSCRIPTIONS.filter(entry => subscriptionRow(this.accounts(), entry.provider)).map(async entry => {
+        // Taken BEFORE asking: an action the user starts meanwhile raises it, and
+        // this answer then describes a state that is already gone (decision 108).
+        const sequence = this.sequence[entry.provider] ?? 0;
+        return { provider: entry.provider, answer: await this.ask("signInStatus", entry.provider), sequence };
+      }),
     );
-    this.setState(prev => {
-      const signIn = { ...prev.signIn };
-      for (const { provider, answer } of answers) {
-        if (answer) {
-          signIn[provider] = answer;
-        }
-      }
-      return { signIn };
-    });
+    if (this.unmounted) {
+      return;
+    }
+    this.setState(prev => ({ signIn: mergeSignIn(prev.signIn, answers, this.sequence) }));
   }
 
   /**
@@ -314,10 +399,15 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
   private async ask(command: string, provider: string, value?: string): Promise<SignInState | null> {
     const ctx = this.props.oContext;
     try {
-      const answer = await ctx.socket.sendTo(`${ctx.adapterName}.${ctx.instance}`, command, {
-        provider,
-        value,
-      });
+      // `sendTo` never gives up on its own — a lost answer used to leave the row
+      // spinning until the page was reloaded (decision 106).
+      const answer = await withDeadline(
+        ctx.socket.sendTo(`${ctx.adapterName}.${ctx.instance}`, command, {
+          provider,
+          value,
+        }),
+        answerDeadline(command),
+      );
       if (!answer) {
         return null;
       }
@@ -338,8 +428,12 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
    * @param value the pasted value
    */
   private async run(command: string, provider: string, value?: string): Promise<void> {
+    this.sequence[provider] = (this.sequence[provider] ?? 0) + 1;
     this.setState({ busy: provider });
     const answer = await this.ask(command, provider, value);
+    if (this.unmounted) {
+      return;
+    }
     // Unlike the background status poll, an explicit click deserves an answer:
     // no answer at all is shown as exactly that, never silently swallowed.
     const shown: SignInState | null = answer ?? { status: "failed", reason: I18n.t("aiu_noAnswer") };
@@ -384,17 +478,89 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
     row: AccountRow,
     match: { provider?: string; credentialId?: string },
   ): React.JSX.Element {
+    // Controlled: after the blur the field shows what was STORED. Uncontrolled, it
+    // kept showing the 5 the user typed while 10 was saved.
+    const draft = this.state.thresholdDrafts[key];
     return (
       <TextField
         key={key}
         size="small"
         type="number"
         label={I18n.t("aiu_warnAt")}
-        defaultValue={row.warnThreshold || 80}
-        onBlur={e => this.commit(setThreshold(this.accounts(), match, e.target.value))}
+        value={draft ?? String(row.warnThreshold || 80)}
+        onChange={e => {
+          const text = e.target.value;
+          this.setState(prev => ({ thresholdDrafts: { ...prev.thresholdDrafts, [key]: text } }));
+        }}
+        onBlur={e => {
+          const text = e.target.value;
+          this.commit(setThreshold(this.accounts(), match, text));
+          this.setState(prev => {
+            const thresholdDrafts = { ...prev.thresholdDrafts };
+            delete thresholdDrafts[key];
+            return { thresholdDrafts };
+          });
+        }}
         slotProps={{ htmlInput: { min: 10, max: 100, style: { width: 60 } }, inputLabel: { shrink: true } }}
         sx={{ ml: "auto" }}
       />
+    );
+  }
+
+  /**
+   * Copy a text to the clipboard — also where the Clipboard API is missing.
+   *
+   * `navigator.clipboard` exists in a secure context only (HTTPS or localhost). The
+   * admin runs on `http://<ip>:8081` by default, where both copy buttons silently
+   * did nothing (decision 109). The fallback selects the text in a hidden field and
+   * copies that; what happened is shown next to the button.
+   *
+   * @param key which button
+   * @param text what to copy
+   */
+  private async copy(key: string, text: string): Promise<void> {
+    let copied = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } else {
+        const field = document.createElement("textarea");
+        field.value = text;
+        field.setAttribute("readonly", "");
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.appendChild(field);
+        field.select();
+        copied = document.execCommand("copy");
+        document.body.removeChild(field);
+      }
+    } catch {
+      copied = false;
+    }
+    if (!this.unmounted) {
+      this.setState(prev => ({ copied: { ...prev.copied, [key]: copied ? "ok" : "manual" } }));
+    }
+  }
+
+  /**
+   * What the last copy click did, next to its button.
+   *
+   * @param key which button
+   */
+  private renderCopied(key: string): React.JSX.Element | null {
+    const outcome = this.state.copied[key];
+    if (!outcome) {
+      return null;
+    }
+    return (
+      <Typography
+        variant="caption"
+        role="status"
+        sx={{ color: outcome === "ok" ? "success.main" : "warning.main" }}
+      >
+        {I18n.t(outcome === "ok" ? "aiu_copied" : "aiu_copyManual")}
+      </Typography>
     );
   }
 
@@ -446,10 +612,11 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
             <Button
               size="small"
               startIcon={<ContentCopyIcon />}
-              onClick={() => void navigator.clipboard?.writeText(state.userCode)}
+              onClick={() => void this.copy(`${provider}-code`, state.userCode)}
             >
               {I18n.t("aiu_copyCode")}
             </Button>
+            {this.renderCopied(`${provider}-code`)}
             <Button
               variant="contained"
               startIcon={<LoginIcon />}
@@ -483,10 +650,11 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
             <Button
               variant="outlined"
               startIcon={<ContentCopyIcon />}
-              onClick={() => void navigator.clipboard?.writeText(state.url)}
+              onClick={() => void this.copy(`${provider}-link`, state.url)}
             >
               {I18n.t("aiu_copyLink")}
             </Button>
+            {this.renderCopied(`${provider}-link`)}
           </Box>
           {isGoogle ? <Alert severity="warning">{I18n.t("aiu_googleErrorPageHint")}</Alert> : null}
           <Typography variant="body2">{I18n.t(isGoogle ? "aiu_googleStep2" : "aiu_claudeStep2")}</Typography>
@@ -562,9 +730,11 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
             onChange={e =>
               this.commit(toggleSubscription(this.accounts(), entry.provider, e.target.checked, entry.label))
             }
+            slotProps={{ input: { "aria-label": entry.label } }}
             sx={{ ml: row ? 0 : "auto" }}
           />
         </Box>
+        {row ? this.renderReason(entry.provider, "") : null}
         {row ? (
           <Box sx={{ pl: 6, py: 1.5, borderBottom: 1, borderColor: "divider" }}>
             {this.renderSignIn(entry.provider)}
@@ -638,9 +808,11 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
             checked={!!row}
             disabled={!chosen}
             onChange={e => this.commit(toggleCredential(rows, credential, chosen, e.target.checked))}
+            slotProps={{ input: { "aria-label": credential.name } }}
             sx={{ ml: row ? 0 : "auto" }}
           />
         </Box>
+        {row ? this.renderReason(row.provider, credential.id) : null}
         {row && needsAdminKey ? (
           <Alert
             severity="info"
@@ -650,6 +822,47 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
           </Alert>
         ) : null}
       </Box>
+    );
+  }
+
+  /** The key rows, or what stands in their place while there are none to show. */
+  private renderCredentials(): React.JSX.Element {
+    const state = credentialListState(
+      this.state.credentialsLoaded,
+      this.state.credentialsFailed,
+      this.state.credentials.length,
+    );
+    if (state === "loading") {
+      return (
+        <CircularProgress
+          size={24}
+          sx={{ mt: 1 }}
+        />
+      );
+    }
+    // Only once the storage WAS read: a failed read cannot tell which keys are gone.
+    const orphans = state === "unreadable" ? [] : orphanRows(this.accounts(), this.state.credentials);
+    return (
+      <>
+        {this.state.credentials.map(credential => this.renderCredentialRow(credential))}
+        {orphans.map(row => this.renderOrphanRow(row))}
+        {state === "unreadable" ? (
+          <Alert
+            severity="warning"
+            sx={{ mt: 1 }}
+          >
+            {I18n.t("aiu_credentialsUnreadable")}
+          </Alert>
+        ) : null}
+        {state === "empty" ? (
+          <Alert
+            severity="info"
+            sx={{ mt: 1 }}
+          >
+            {I18n.t("aiu_noCredentials")}
+          </Alert>
+        ) : null}
+      </>
     );
   }
 
@@ -674,22 +887,7 @@ export default class ConfigPanel extends ConfigGeneric<ConfigGenericProps, Panel
               {I18n.t("aiu_storedHint")}
             </Typography>
             {SUBSCRIPTIONS.map(entry => this.renderSubscriptionRow(entry))}
-            {!this.state.credentialsLoaded ? (
-              <CircularProgress
-                size={24}
-                sx={{ mt: 1 }}
-              />
-            ) : (
-              this.state.credentials.map(credential => this.renderCredentialRow(credential))
-            )}
-            {this.state.credentialsLoaded && this.state.credentials.length === 0 ? (
-              <Alert
-                severity="info"
-                sx={{ mt: 1 }}
-              >
-                {I18n.t("aiu_noCredentials")}
-              </Alert>
-            ) : null}
+            {this.renderCredentials()}
           </CardContent>
         </Card>
       </Box>

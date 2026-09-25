@@ -1,1 +1,1 @@
-import{n as e,t}from"./assets/virtual_mf-REMOTE_ENTRY_ID___mfe_internal__AiUsageComponentSet__customComponents_js-x_0QZXBR.js";export{t as get,e as init};
+import{n as e,t}from"./assets/virtual_mf-REMOTE_ENTRY_ID___mfe_internal__AiUsageComponentSet__customComponents_js-D-xtRWld.js";export{t as get,e as init};

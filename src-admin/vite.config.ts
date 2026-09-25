@@ -7,6 +7,10 @@ import { readFileSync } from "node:fs";
 const config = {
   plugins: [
     federation({
+      // The panel imports the adapter's own rules from ../src/lib; the plugin's type
+      // step would compile them under rootDir src-admin/src and fail (TS6059). The
+      // admin loads the remote at runtime — nothing consumes its types (fleet form).
+      dts: false,
       manifest: true,
       name: "AiUsageComponentSet",
       filename: "customComponents.js",

@@ -170,29 +170,6 @@ describe("datapointBalanceLine", () => {
   });
 });
 
-describe("the admin panel's copy of the id rule", () => {
-  test("produces the same id as the adapter, for every shape that matters", async () => {
-    // The settings page is its own bundle and carries a second copy of this rule.
-    // Nothing forced the two to agree — this does. A drift would move a whole
-    // object tree the moment the panel and the adapter disagree on one id.
-    const panel = (await import("../../src-admin/src/rows.js")) as { accountId: typeof accountId };
-    const cases: [string, string][] = [
-      ["claude-sub", ""],
-      ["chatgpt-sub", "system.credentials.ignored"],
-      ["gemini-sub", ""],
-      ["openrouter", "system.credentials.My Router"],
-      ["deepseek", "system.credentials.deep_seek"],
-      ["openai", "system.credentials.öäü"],
-      ["anthropic-api", "system.credentials."],
-      ["openrouter", ""],
-      ["not-a-provider", "system.credentials.x"],
-    ];
-    for (const [provider, credentialId] of cases) {
-      expect(panel.accountId(provider, credentialId)).toBe(accountId(provider, credentialId));
-    }
-  });
-});
-
 describe("the provider catalogue is the single source", () => {
   test("kinds, ids, labels and flows all come from the same table", () => {
     // They used to live in five places — the kind union, the kind list, the id map

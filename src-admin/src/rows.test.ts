@@ -1,7 +1,15 @@
+import { accountId as adapterAccountId } from "../../src/lib/pure-helpers.js";
+import { PROVIDERS } from "../../src/lib/provider.js";
 import {
   KEY_PROVIDERS,
   SUBSCRIPTIONS,
   accountId,
+  answerDeadline,
+  credentialListState,
+  mergeSignIn,
+  needsSignInRefresh,
+  orphanRows,
+  withDeadline,
   offerForCredential,
   serviceBadge,
   setThreshold,
@@ -14,9 +22,10 @@ import {
 } from "./rows";
 
 /**
- * The config panel is its own bundle and cannot import from the adapter's sources,
- * so `rows.ts` holds a second copy of rules the backend also has. A second copy that
- * nobody tests is a second copy that drifts — these tests pin the half the user sees.
+ * `rows.ts` is the panel's pure logic. The rules it shares with the adapter (the id
+ * rule, the provider list, the threshold clamp) are IMPORTED from `src/lib` — there
+ * is no second copy left to drift (decision 110); these tests pin what the page does
+ * with them.
  */
 
 const credential = (over: Partial<CredentialEntry> = {}): CredentialEntry => ({
@@ -159,6 +168,12 @@ describe("setThreshold", () => {
     expect(setThreshold(rows, { provider: "claude-sub" }, "55")[0].warnThreshold).toBe(55);
   });
 
+  test("0 is clamped like any other number below the range", () => {
+    // It used to become 80 (`Math.round(0) || 80`) while 5 became 10.
+    const rows = toggleSubscription([], "claude-sub", true, "Claude");
+    expect(setThreshold(rows, { provider: "claude-sub" }, "0")[0].warnThreshold).toBe(10);
+  });
+
   test("unusable input falls back to the default instead of writing NaN", () => {
     const rows = toggleSubscription([], "claude-sub", true, "Claude");
     expect(setThreshold(rows, { provider: "claude-sub" }, "")[0].warnThreshold).toBe(80);
@@ -202,5 +217,71 @@ describe("supportedLanguage", () => {
     for (const lang of ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk"]) {
       expect(supportedLanguage(lang)).toBe(lang);
     }
+  });
+});
+
+describe("audit 2026-09-25 — the panel", () => {
+  test("the id rule and the provider list are the adapter's own, not a copy", () => {
+    expect(accountId).toBe(adapterAccountId);
+    expect(KEY_PROVIDERS.map(entry => entry.provider)).toEqual(
+      PROVIDERS.filter(entry => !entry.flow).map(entry => entry.kind),
+    );
+  });
+
+  test("F14: a switched-on key row whose stored key is gone is found", () => {
+    const rows = toggleCredential(
+      toggleSubscription([], "claude-sub", true, "Claude"),
+      credential(),
+      "openrouter",
+      true,
+    );
+    expect(orphanRows(rows, [credential()])).toEqual([]);
+    expect(orphanRows(rows, [])).toEqual([rows[1]]);
+  });
+
+  test("F15: a failed read is never shown as nothing stored", () => {
+    expect(credentialListState(false, false, 0)).toBe("loading");
+    expect(credentialListState(true, true, 0)).toBe("unreadable");
+    expect(credentialListState(true, false, 0)).toBe("empty");
+    expect(credentialListState(true, false, 2)).toBe("list");
+  });
+
+  test("F16: an answer that never comes ends as null after the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const never = withDeadline(new Promise<string>(() => undefined), 10_000);
+      vi.advanceTimersByTime(10_000);
+      expect(await never).toBeNull();
+      expect(await withDeadline(Promise.resolve("ok"), 10_000)).toBe("ok");
+    } finally {
+      vi.useRealTimers();
+    }
+    // Actions get more than the adapter's own 15 s wait for the provider.
+    expect(answerDeadline("signInStatus")).toBe(10_000);
+    expect(answerDeadline("signInSubmit")).toBeGreaterThan(15_000);
+    expect(answerDeadline("signInStart")).toBeGreaterThan(15_000);
+  });
+
+  test("R18: start, save and a newly switched-on subscription ask again at once", () => {
+    const base = { alive: true, changed: false, subscriptions: ["claude-sub"] };
+    expect(needsSignInRefresh({ ...base, alive: false }, base)).toBe(true);
+    expect(needsSignInRefresh({ ...base, changed: true }, base)).toBe(true);
+    expect(needsSignInRefresh(base, { ...base, subscriptions: ["claude-sub", "chatgpt-sub"] })).toBe(true);
+    expect(needsSignInRefresh(base, { ...base })).toBe(false);
+    expect(needsSignInRefresh(base, { ...base, changed: true })).toBe(false);
+  });
+
+  test("R19: a status answer from before a user action does not overwrite it", () => {
+    const known = { "claude-sub": { status: "awaiting-paste" } };
+    const merged = mergeSignIn(
+      known,
+      [
+        { provider: "claude-sub", answer: { status: "signed-out" }, sequence: 0 },
+        { provider: "chatgpt-sub", answer: { status: "signed-in" }, sequence: 0 },
+        { provider: "gemini-sub", answer: null, sequence: 0 },
+      ],
+      { "claude-sub": 1 },
+    );
+    expect(merged).toEqual({ "claude-sub": { status: "awaiting-paste" }, "chatgpt-sub": { status: "signed-in" } });
   });
 });

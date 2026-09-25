@@ -20,8 +20,18 @@ export default defineConfig({
       // gemessen — auch nicht, wenn ein Test es importiert. Unter vitest 4 rutschte
       // `src-admin/src` still mit hinein; ohne die zweite Zeile faellt es heraus und
       // die Prozentzahl STEIGT, weil weniger gemessen wird.
-      include: ["src/**/*.ts", "src-admin/src/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/**/*.d.ts"],
+      // `.tsx` too: the panel's own logic lives in ConfigPanel.tsx as well, and the
+      // `.ts`-only pattern left it out of the number entirely. The three bundle
+      // entry files carry no logic of their own.
+      include: ["src/**/*.ts", "src-admin/src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.ts",
+        "src/**/*.d.ts",
+        "src-admin/src/**/*.test.ts",
+        "src-admin/src/index.tsx",
+        "src-admin/src/App.tsx",
+        "src-admin/src/Components.tsx",
+      ],
     },
   },
 });
