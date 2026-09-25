@@ -27,7 +27,7 @@ subscriptions plus OpenRouter, DeepSeek, OpenAI and Anthropic API accounts. Need
 
 ## Sentry / Error reporting
 
-**This adapter uses Sentry libraries to automatically report exceptions and code errors to the developers.** Reporting only happens if you have enabled error reporting in the ioBroker diagnostics (**System settings → Diagnostics and error reporting**). Only an anonymous installation ID is transmitted — no name, e-mail address or IP address.
+**This adapter uses Sentry libraries to automatically report exceptions and code errors to the developers.** Reporting is active by default. It stays off when the ioBroker diagnostics setting is `none` (`diag` in the system configuration), when data reporting is disabled for this instance or its host (`disableDataReporting`), and on CI systems. A report contains the error with its stack trace and technical context such as versions and platform, plus an anonymous installation ID.
 
 For details and how to disable it, see the [Sentry plugin documentation](https://github.com/ioBroker/plugin-sentry#plugin-sentry). Error reporting requires js-controller 3.0 or newer.
 
@@ -178,16 +178,15 @@ so instead of pretending to be connected; signing in again is all it takes.
 - Fixed: The ChatGPT sign-in no longer breaks off while you are still typing the code
 - New: The adapter picks up a key that was changed or deleted in the credential storage while it runs
 - New: A workspace stopped by its used-up credits or its spend control counts as "limit reached" for ChatGPT
-- New: Google's quota pools are read where Antigravity reports them and speak for the account
+- New: Google's plan-wide quota pools (5-hour and weekly) are shown where Google reports them, and they decide the account's warning
 - Improved: `info.error` says why a key account has no key — none selected, deleted from the storage, or holding no key
 - Improved: Google accounts without a Code Assist project show Google's own reason, and a refused quota query no longer reports a rejected sign-in
 - Fixed: An Anthropic organisation account no longer fails for the whole 1st of every month
 - Fixed: The settings page no longer spins forever when the instance does not answer, and shows a key row whose stored key is gone
 - Fixed: Copying the sign-in code or link now works on plain http:// as well
 - Improved: Several notifications of different accounts are kept instead of the newest replacing the previous one
-- Improved: A network outage is no longer a warning in the log — the connection icon and `info.error` carry it
-- Improved: A throttle is logged once, not on every retry, and the retry follows the wait the provider asks for
-- Fixed: A shutdown during the startup no longer leaves timers or writes behind
+- Improved: After a throttle the next query waits as long as the provider asks, instead of retrying too early
+- Fixed: An instance stopped during its start no longer overwrites the stopped state of its accounts afterwards
 
 Only the Claude subscription runs against a real account here. The ChatGPT, OpenRouter, Google,
 DeepSeek and organisation changes follow the providers' references and their own tools' sources

@@ -10,13 +10,7 @@ export default [
           // the project service makes the parser refuse the whole run. Since the
           // root tsconfig includes `test/**/*.ts` (fleet master, 2026-09-07), the
           // repo-standards suite is covered there and must NOT be listed.
-          allowDefaultProject: [
-            "*.mjs",
-            "*.mts",
-            // The inventory fixtures: plain CommonJS the adapter process preloads,
-            // outside every tsconfig include but ours to keep clean.
-            "test/fixtures/inventory/*.cjs",
-          ],
+          allowDefaultProject: ["*.mjs", "*.mts"],
         },
         tsconfigRootDir: import.meta.dirname,
       },

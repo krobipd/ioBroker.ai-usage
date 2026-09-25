@@ -1,28 +1,25 @@
 // Root tsconfig to set the settings and power editor support for all TS files
 {
-	"extends": "@tsconfig/node22/tsconfig.json",
-	"compilerOptions": {
-		// do not compile anything, this file is just to configure type checking
-		// the compilation is configured in tsconfig.build.json
-		"noEmit": true,
+  // To update the compilation target, install a different version of @tsconfig/node... and reference it here
+  // https://github.com/tsconfig/bases
+  "extends": "@tsconfig/node22/tsconfig.json",
+  "compilerOptions": {
+    // do not compile anything, this file is just to configure type checking
+    // the compilation is configured in tsconfig.build.json
+    "noEmit": true,
 
-		// check JS files, but do not compile them => tsconfig.build.json
-		"allowJs": true,
-		"checkJs": true,
+    // check JS files, but do not compile them => tsconfig.build.json
+    "allowJs": true,
+    "checkJs": true,
 
-		// This is necessary for the automatic typing of the adapter config
-		"resolveJsonModule": true,
+    // This is necessary for the automatic typing of the adapter config
+    "resolveJsonModule": true,
 
-		// TS 6 no longer auto-includes globals like `describe`/`it` from
-		// @types packages — vitest globals need an explicit types entry.
-		"types": ["vitest/globals", "node"]
-	},
-	"include": [
-		"src/**/*.ts",
-		"test/**/*.ts"
-	],
-	"exclude": [
-		"build/**",
-		"node_modules/**"
-	]
+    // TS 6 no longer auto-includes globals like `describe`/`it` from
+    // @types packages — vitest globals (from
+    // `vitest.config.mts:test.globals=true`) need an explicit types entry.
+    "types": ["vitest/globals", "node"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["build/**", "node_modules/**"]
 }

@@ -25,6 +25,18 @@ const NS = `${ADAPTER}.0.`;
 const INVENTORY = path.join(__dirname, "objects.inventory.json");
 const VOLATILE = ["ts", "from", "user", "acl"];
 const COMPARED = ["name", "desc", "role", "type", "unit"];
+// Key order is no change: `extendObject` keeps an existing object's order while the
+// translations build their own, so a raw comparison reports a reached name as stale.
+const canonical = v =>
+  JSON.stringify(v, (_k, x) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(
+          Object.keys(x)
+            .sort()
+            .map(k => [k, x[k]]),
+        )
+      : x,
+  );
 
 /** The adapter process serves every provider answer from the fixture table. */
 const FIXTURE_ENV = { NODE_OPTIONS: `--require ${path.join(__dirname, "fixtures", "inventory", "fetch-hook.cjs")}` };
@@ -259,7 +271,7 @@ tests.integration(ADAPTER_DIR, {
               continue;
             }
             for (const f of COMPARED) {
-              if (JSON.stringify(got.common?.[f]) !== JSON.stringify(obj.common?.[f])) {
+              if (canonical(got.common?.[f]) !== canonical(obj.common?.[f])) {
                 stale.push(`${id}: ${f} still ${JSON.stringify(got.common?.[f])}`);
               }
             }
