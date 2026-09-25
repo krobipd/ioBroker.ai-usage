@@ -860,6 +860,44 @@ const wiring = (adapter: AiUsageAdapter): Wiring => adapter as unknown as Wiring
 const KEY_ROW = { name: "Router", provider: "openrouter", credentialId: "system.credentials.or", warnThreshold: 80 };
 
 describe("audit 2026-09-25 — the adapter layer", () => {
+  test("R21: one account's action-required message cannot push out another's", () => {
+    // js-controller 7.2.2 (`notificationHandler.ts`) keeps at most `limit` messages per
+    // instance and category and drops the oldest. With 1, the second account's
+    // rejected sign-in erased the first account's — ten covers a usual setup.
+    const manifest = JSON.parse(readFileSync(join(__dirname, "..", "io-package.json"), "utf8")) as {
+      notifications: { categories: { limit: number }[] }[];
+    };
+    expect(manifest.notifications[0].categories[0].limit).toBe(10);
+  });
+
+  test("K9: a key account names the adapter in the User-Agent of its request", async () => {
+    const adapter = makeAdapter();
+    const agents: (string | null)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        agents.push(new Headers(init.headers).get("user-agent"));
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: { usage: 1 } }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }),
+    );
+    try {
+      const built = await internals(adapter).makeProvider(
+        { provider: "openrouter", name: "Router", credentialId: "system.credentials.or" },
+        300,
+      );
+      await (built.provider as unknown as { fetch(): Promise<unknown> }).fetch();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(agents).toHaveLength(1);
+    expect(agents[0]).toMatch(/^ioBroker\.ai-usage\//);
+  });
+
   test("F6: with no account, the totals are zeroed and the trees the guard keeps lose their alarms", async () => {
     const adapter = makeAdapter();
     adapter.config = { accounts: [] } as unknown as ioBroker.AdapterConfig;

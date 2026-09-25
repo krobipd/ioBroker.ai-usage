@@ -1,5 +1,5 @@
 import { PollEngine, type EngineDeps } from "./poll-engine";
-import type { ObjectDef } from "./snapshot-tree";
+import { mapSnapshot, type ObjectDef } from "./snapshot-tree";
 import type { AccountConfig } from "./pure-helpers";
 import { FetchError, type LimitWindow, type UsageProvider, type UsageSnapshot } from "./provider";
 
@@ -1684,6 +1684,8 @@ describe("audit 2026-09-25 — the measured probes as tests", () => {
     await started;
     expect(h.states.get("k.info.error")).toBe("Unknown");
     expect(h.scheduled).toEqual([]);
+    // Only the object that was already on its way when the stop came; nothing after.
+    expect(h.objects).toHaveLength(1);
   });
 
   test("R3: a skeleton the database refuses does not stop the polling for good", async () => {
@@ -1984,5 +1986,122 @@ describe("audit 2026-09-25 — the measured probes as tests", () => {
     await engine.pollNow("a");
     expect(provider.fetches).toBe(2);
     expect(h.states.get("a.limits.week.percent")).toBe(5);
+  });
+});
+
+// The mutation run of 2026-09-25 found stop checks and a swap path that no test told
+// apart from their neighbours: each one here stops or swaps at exactly the point only
+// that check (or that call) covers.
+describe("each stop check on its own, and the key swap of an armed account", () => {
+  /**
+   * The objects a snapshot adds on top of the skeleton, in the order they are created.
+   *
+   * @param h the harness after `start()`
+   * @param snapshot the snapshot the round will deliver
+   * @returns the ids the round has to create
+   */
+  function freshIds(h: Harness, snapshot: UsageSnapshot): string[] {
+    return mapSnapshot("a", snapshot)
+      .objects.map(object => object.id)
+      .filter(id => !h.objects.includes(id));
+  }
+
+  test("a shutdown during a snapshot's first new object creates no further one", async () => {
+    const h = makeHarness();
+    const snapshot = planWindow(10);
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([snapshot])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    const fresh = freshIds(h, snapshot);
+    expect(fresh.length).toBeGreaterThan(1);
+    const upsert = h.deps.upsertObject;
+    h.deps.upsertObject = async def => {
+      await upsert(def);
+      if (def.id === fresh[0]) {
+        engine.stop();
+      }
+    };
+    await h.tick();
+    expect(h.objects.filter(id => fresh.includes(id))).toEqual([fresh[0]]);
+  });
+
+  test("a shutdown during a snapshot's LAST new object writes no value", async () => {
+    const h = makeHarness();
+    const snapshot = planWindow(10);
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([snapshot])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    const fresh = freshIds(h, snapshot);
+    const upsert = h.deps.upsertObject;
+    h.deps.upsertObject = async def => {
+      await upsert(def);
+      if (def.id === fresh[fresh.length - 1]) {
+        engine.stop();
+      }
+    };
+    await h.tick();
+    expect(h.objects).toContain(fresh[fresh.length - 1]);
+    expect(h.states.has("a.limits.week.percent")).toBe(false);
+  });
+
+  test("a shutdown during the first deletion of the sweep deletes nothing more", async () => {
+    const h = makeHarness();
+    h.existing.push("a.limits.old1.percent", "a.limits.old2.percent");
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([planWindow(10)])]]),
+      300,
+      h.deps,
+    );
+    await engine.start();
+    h.deps.deleteObject = id => {
+      h.deleted.push(id);
+      engine.stop();
+      return Promise.resolve();
+    };
+    await h.tick();
+    expect(h.deleted).toHaveLength(1);
+  });
+
+  test("a shutdown while the totals are created arms no timer", async () => {
+    const h = makeHarness();
+    const engine = new PollEngine(
+      [account({ id: "a", name: "A" })],
+      new Map([["a", scriptedProvider([])]]),
+      300,
+      h.deps,
+    );
+    const upsert = h.deps.upsertObject;
+    h.deps.upsertObject = async def => {
+      await upsert(def);
+      if (def.id.startsWith("total")) {
+        engine.stop();
+      }
+    };
+    await engine.start();
+    expect(h.objects.some(id => id.startsWith("total"))).toBe(true);
+    expect(h.scheduled).toEqual([]);
+  });
+
+  test("R15: a key replaced on an account that is already polling is asked at once", async () => {
+    const h = makeHarness();
+    const first = scriptedProvider([planWindow(10)]);
+    const engine = new PollEngine([account({ id: "k", name: "K" })], new Map([["k", first]]), 300, h.deps);
+    await engine.start();
+    await h.tick();
+    expect(first.fetches).toBe(1);
+    const second = scriptedProvider([planWindow(20)]);
+    await engine.setProvider("k", second);
+    // No tick: the new key answers now, not up to an interval later.
+    expect(second.fetches).toBe(1);
+    expect(h.states.get("k.limits.week.percent")).toBe(20);
   });
 });

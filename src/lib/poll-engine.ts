@@ -307,13 +307,12 @@ export class PollEngine {
 
   /** Create the static per-account and totals objects, then arm the poll cycles. */
   public async start(): Promise<void> {
+    // Decision 69 inside the engine: a shutdown that lands in the skeleton's waits
+    // must not let the start run on — it would overwrite the "Unknown" that
+    // `markAllOffline()` just wrote and arm timers the host refuses. The skeleton
+    // checks before every object it creates, so a stopped engine passes the
+    // remaining accounts without a single write.
     for (const runtime of this.runtimes) {
-      // Decision 69 inside the engine: a shutdown that lands in the skeleton's waits
-      // must not let the start run on — it would overwrite the "Unknown" that
-      // `markAllOffline()` just wrote and arm timers the host refuses.
-      if (this.stopped) {
-        return;
-      }
       await this.createAccountSkeletonSafe(runtime);
     }
     if (this.stopped) {

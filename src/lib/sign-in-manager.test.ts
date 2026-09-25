@@ -271,8 +271,36 @@ describe("the device-code flow", () => {
             release = () => resolve({ authorization_code: "c", code_verifier: "v" });
           })
         : Promise.resolve({ access_token: "at", refresh_token: "rt" });
-    h.deps.postForm = () => Promise.resolve({ access_token: "at", refresh_token: "rt" });
+    // Counted: the answer of an ended attempt must not even be exchanged — a code
+    // redeemed for nobody is a sign-in the user cannot see or revoke.
+    let exchanges = 0;
+    h.deps.postForm = () => {
+      exchanges++;
+      return Promise.resolve({ access_token: "at", refresh_token: "rt" });
+    };
     const tick = h.tick();
+    await manager.signOut("chatgpt-sub");
+    release();
+    await tick;
+    await new Promise(resolve => setImmediate(resolve));
+    expect(exchanges).toBe(0);
+    expect(h.stores.get("chatgpt-sub")?.value ?? null).toBeNull();
+    expect(h.signedIn).toEqual([]);
+  });
+
+  test("a sign-out while the code is being exchanged: the tokens are not stored", async () => {
+    const h = makeHarness();
+    const manager = new SignInManager(h.deps);
+    h.answers.push({ device_auth_id: "d-1", user_code: "C", interval: "5" });
+    await manager.start("chatgpt-sub");
+    h.deps.postJson = () => Promise.resolve({ authorization_code: "c", code_verifier: "v" });
+    let release = (): void => undefined;
+    h.deps.postForm = () =>
+      new Promise<unknown>(resolve => {
+        release = () => resolve({ access_token: "at", refresh_token: "rt" });
+      });
+    const tick = h.tick();
+    await new Promise(resolve => setImmediate(resolve));
     await manager.signOut("chatgpt-sub");
     release();
     await tick;
