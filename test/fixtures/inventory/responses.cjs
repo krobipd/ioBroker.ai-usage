@@ -186,9 +186,26 @@ function routes() {
     },
 
     // ---- Key accounts
+    // `GET /api/v1/key`, fields as the OpenRouter API reference lists them
+    // (openapi.json 2026-09-25): lifetime `usage`, the running period's `limit` /
+    // `limit_remaining` with its `limit_reset`, and the UTC day/week/month usage.
     {
-      match: "openrouter.ai/api/v1/auth/key",
-      body: { data: { label: "fixture", usage: 12.5, limit: 50, limit_remaining: 37.5, is_free_tier: false } },
+      match: "openrouter.ai/api/v1/key",
+      body: {
+        data: {
+          label: "fixture",
+          limit: 50,
+          limit_remaining: 37.5,
+          limit_reset: "monthly",
+          include_byok_in_limit: false,
+          usage: 112.5,
+          usage_daily: 1.25,
+          usage_weekly: 4.5,
+          usage_monthly: 12.5,
+          byok_usage: 0,
+          is_free_tier: false,
+        },
+      },
     },
     {
       match: "api.deepseek.com/user/balance",

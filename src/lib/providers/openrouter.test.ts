@@ -22,6 +22,32 @@ describe("parseOpenRouterKeyInfo", () => {
     expect(snapshot.credits?.percent).toBeUndefined();
   });
 
+  test("the percentage measures the RUNNING period against the limit, not the key's whole life", () => {
+    // Decision 94. `usage` is lifetime spend; `limit` restarts with `limit_reset`.
+    // A monthly limit of 100 with 250 spent over the key's life read as 250 %.
+    const snapshot = parseOpenRouterKeyInfo({
+      data: { usage: 250, limit: 100, limit_remaining: 80, limit_reset: "monthly", usage_monthly: 20 },
+    });
+    expect(snapshot.credits).toEqual({ used: 20, limit: 100, remaining: 80, percent: 20, currency: "USD" });
+    // The lifetime figure stays where its name says so.
+    expect(snapshot.costs?.total).toBe(250);
+  });
+
+  test("today's and this month's spend come from the key's own daily and monthly usage", () => {
+    // Decision 95 — "credit usage (in USD) for the current UTC day/month".
+    const now = Date.UTC(2026, 8, 10, 12);
+    const snapshot = parseOpenRouterKeyInfo(
+      { data: { usage: 90, usage_daily: 1.234, usage_monthly: 12, limit: null } },
+      now,
+    );
+    expect(snapshot.costs).toEqual({ total: 90, today: 1.23, month: 12, projectedMonth: 36, currency: "USD" });
+  });
+
+  test("without the daily/monthly figures no such datapoint is invented", () => {
+    const snapshot = parseOpenRouterKeyInfo({ data: { usage: 5 } });
+    expect(snapshot.costs).toEqual({ total: 5, currency: "USD" });
+  });
+
   test("an answer without a single usable figure creates no credits block", () => {
     // Decision 6: a capability without a usable value gets no datapoint. The block
     // used to be a plain literal, so an empty `data` still produced a bare channel.
@@ -47,7 +73,23 @@ describe("openRouterProvider", () => {
       return Promise.resolve({ data: { usage: 1 } });
     });
     await provider.fetch();
-    expect(calls[0].url).toBe("https://openrouter.ai/api/v1/auth/key");
+    // The path of the current API reference — `/auth/key` is no longer in it.
+    expect(calls[0].url).toBe("https://openrouter.ai/api/v1/key");
     expect(calls[0].headers.Authorization).toBe("Bearer sk-or-123");
+  });
+
+  test("the adapter's own identity rides along where it is given", async () => {
+    const calls: Record<string, string>[] = [];
+    const provider = openRouterProvider(
+      "k",
+      (_url, headers) => {
+        calls.push(headers);
+        return Promise.resolve({ data: { usage: 1 } });
+      },
+      () => 0,
+      "ioBroker.ai-usage/0.16.0",
+    );
+    await provider.fetch();
+    expect(calls[0]["User-Agent"]).toBe("ioBroker.ai-usage/0.16.0");
   });
 });
