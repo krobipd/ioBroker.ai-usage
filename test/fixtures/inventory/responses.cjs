@@ -55,7 +55,7 @@ const TOKENS = {
 function routes() {
   return [
     // ---- Claude subscription: token endpoint + usage (live shape, 2026-09-06)
-    { match: "console.anthropic.com/v1/oauth/token", body: TOKENS.claude },
+    { match: "platform.claude.com/v1/oauth/token", body: TOKENS.claude },
     {
       match: "api.anthropic.com/api/oauth/usage",
       body: {

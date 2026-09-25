@@ -11,7 +11,14 @@ import { FetchError, type TokenSet } from "../provider";
 export const CLAUDE_OAUTH = {
   clientId: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
   authorizeUrl: "https://claude.ai/oauth/authorize",
-  tokenUrl: "https://console.anthropic.com/v1/oauth/token",
+  /**
+   * The token endpoint Claude Code and CodexBar use today (Claude Code 2.1.282). The
+   * console address answers the same (measured 2026-09-25: 400 JSON, no redirect),
+   * but it is the one being retired — and a redirect would turn this POST into a
+   * GET without a body, ending every sign-in and refresh at once (decision 97). The
+   * redirect address stays: a browser follows redirects, a POST does not.
+   */
+  tokenUrl: "https://platform.claude.com/v1/oauth/token",
   redirectUri: "https://console.anthropic.com/oauth/code/callback",
   /**
    * Least privilege: the usage endpoint works with the profile scope alone —

@@ -189,6 +189,21 @@ export function parseClaudeUsage(body: unknown): UsageSnapshot {
 }
 
 /**
+ * The currency an extra-usage block is billed in.
+ *
+ * The answer names it (`extra_usage.currency`, and in the `spend` schema every money
+ * object carries its own) — an EU account is billed in EUR (CodexBar issue #97:
+ * "5,50 € spent with a 10 € monthly limit"). Written as USD, those euros were added
+ * to real dollars in `total.costs`, against decision 8 (decision 96).
+ *
+ * @param raw the currency the provider named
+ * @returns the upper-case code, USD where the answer names none
+ */
+function currencyOf(raw: unknown): string {
+  return typeof raw === "string" && raw.trim() ? raw.trim().toUpperCase() : "USD";
+}
+
+/**
  * Map the extra-usage block (either schema) onto credits + monthly costs.
  *
  * @param raw the usage response
@@ -205,14 +220,15 @@ function applyExtraUsage(raw: Record<string, unknown>, snapshot: UsageSnapshot):
     const divisor = 10 ** (finiteNumber(extra.decimal_places) ?? 2);
     const used = finiteNumber(extra.used_credits);
     const limit = finiteNumber(extra.monthly_limit);
+    const currency = currencyOf(extra.currency);
     snapshot.credits = {
       used: used !== undefined ? used / divisor : undefined,
       limit: limit !== undefined ? limit / divisor : undefined,
       percent: finiteNumber(extra.utilization),
-      currency: "USD",
+      currency,
     };
     if (snapshot.credits.used !== undefined) {
-      snapshot.costs = { month: snapshot.credits.used, currency: "USD" };
+      snapshot.costs = { month: snapshot.credits.used, currency };
     }
     return;
   }
@@ -223,14 +239,18 @@ function applyExtraUsage(raw: Record<string, unknown>, snapshot: UsageSnapshot):
       return amount !== undefined ? amount / 10 ** (finiteNumber(obj?.exponent) ?? 2) : undefined;
     };
     const used = money(spend.used);
+    const currency = currencyOf(
+      (spend.used as Record<string, unknown> | null | undefined)?.currency ??
+        (spend.limit as Record<string, unknown> | null | undefined)?.currency,
+    );
     snapshot.credits = {
       used,
       limit: money(spend.limit),
       percent: finiteNumber(spend.percent),
-      currency: "USD",
+      currency,
     };
     if (used !== undefined) {
-      snapshot.costs = { month: used, currency: "USD" };
+      snapshot.costs = { month: used, currency };
     }
   }
 }

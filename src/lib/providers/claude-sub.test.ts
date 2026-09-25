@@ -26,7 +26,7 @@ describe("claude-auth", () => {
       },
       1_000_000,
     );
-    expect(posts[0].url).toBe("https://console.anthropic.com/v1/oauth/token");
+    expect(posts[0].url).toBe("https://platform.claude.com/v1/oauth/token");
     expect(posts[0].body).toMatchObject({
       grant_type: "authorization_code",
       code: "the-code",
@@ -108,6 +108,26 @@ describe("parseClaudeUsage", () => {
     });
     expect(snapshot.credits).toMatchObject({ used: 3.2, limit: 20, percent: 16, currency: "USD" });
     expect(snapshot.costs).toEqual({ month: 3.2, currency: "USD" });
+  });
+
+  test("the extra usage is billed in the currency the account names (decision 96)", () => {
+    // An EU account: EUR must never be summed with dollars in total.costs.
+    const credits = parseClaudeUsage({
+      extra_usage: { is_enabled: true, used_credits: 550, monthly_limit: 1000, utilization: 55, currency: "eur" },
+    });
+    expect(credits.credits?.currency).toBe("EUR");
+    expect(credits.costs).toEqual({ month: 5.5, currency: "EUR" });
+    const spend = parseClaudeUsage({
+      spend: {
+        enabled: true,
+        used: { amount_minor: 7509, currency: "EUR", exponent: 2 },
+        limit: { amount_minor: 10000, currency: "EUR", exponent: 2 },
+        percent: 75,
+      },
+    });
+    expect(spend.costs).toEqual({ month: 75.09, currency: "EUR" });
+    // No currency in the answer: USD, as before.
+    expect(parseClaudeUsage({ extra_usage: { is_enabled: true, used_credits: 1 } }).costs?.currency).toBe("USD");
   });
 
   test("spend (money schema) maps amount_minor/exponent", () => {
