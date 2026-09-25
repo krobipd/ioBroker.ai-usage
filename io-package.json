@@ -330,7 +330,7 @@
           },
           "severity": "notify",
           "regex": [],
-          "limit": 1
+          "limit": 10
         }
       ]
     }
