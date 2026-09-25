@@ -1,6 +1,25 @@
 # Older Changelog — ioBroker.ai-usage
 
 Older changelog entries are moved here by the release tooling once the README list grows too long.
+## 0.12.0 (2026-09-06)
+
+- Fixed: An account that has not been signed in yet no longer reports a rejected sign-in — no warning, no notification, and the settings page keeps offering the sign-in button
+- Fixed: An account whose API key is missing or unreadable is now shown as not delivering, instead of leaving its old values standing as though they were current
+- Fixed: An answer arriving while the adapter shuts down can no longer mark an account as online again after the shutdown wrote it offline
+- Fixed: A throttled account counts as delivering everywhere now — the connection icon and the "reachable accounts" total no longer contradict each other
+- Fixed: A limit the provider reports as empty is no longer shown as 0 % used, and a Google quota without a value no longer reads as completely used up
+- Fixed: A rejected ChatGPT sign-in now says so at once instead of leaving you waiting for a quarter of an hour, and a Google account keeps delivering when one route is unavailable
+- Fixed: A Google account without an AI subscription says so, instead of asking for a sign-in that cannot change the answer
+- New: Every limit window shows whether it is the limit currently in force — with Claude the provider states it, elsewhere it is the window that speaks for the account
+- Improved: An account is reported as at its limit when the provider says the window is closed, not only when the percentage happens to reach 100
+- Improved: A window's reset time is written to the minute, so a recording of it no longer gains an entry on every single query, only on real changes
+- Improved: An account that is delivering again says so in the log, instead of leaving the warning about its outage standing as the last word on it
+- Improved: The settings page no longer asks the adapter for every status every four seconds — the values now arrive on their own as they change
+- Changed: "Balance sufficient for calls" now sits under credits, where it belongs; the datapoint at the old place is removed automatically
+- Changed: Each account node shows the readable provider name instead of the internal one — "Claude Max (Claude)" instead of "Claude Max (claude-sub)"
+- Fixed: A per-model folder is now named in your ioBroker language as well, instead of carrying the provider's bare model identifier as its only name
+- New: The datapoints whose meaning is not obvious from their name now carry a short explanation in eleven languages, shown in the object tree
+
 ## 0.11.0 (2026-09-05)
 
 - Fixed: Signing in from the instance settings works again — a leftover setting from an earlier version had silently closed the adapter's message channel, so none of the three flows reached it

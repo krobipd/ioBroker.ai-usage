@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "ai-usage",
-    "version": "0.15.0",
+    "version": "0.16.0",
     "news": {
+      "0.16.0": {
+        "en": "ChatGPT model limits and OpenRouter daily costs appear, OpenRouter limits and Claude euro costs count correctly, and alarms no longer stick when a key is removed.",
+        "de": "ChatGPT-Modell-Limits und OpenRouter-Tageskosten erscheinen, OpenRouter-Limits und Claude-Euro-Kosten zählen richtig, und Alarme bleiben nicht mehr stehen, wenn ein Schlüssel fehlt.",
+        "ru": "Появились лимиты моделей ChatGPT и дневные расходы OpenRouter, лимиты OpenRouter и расходы Claude в евро считаются верно, а тревоги не зависают при удалении ключа.",
+        "pt": "Aparecem os limites de modelos do ChatGPT e os custos diários do OpenRouter, os limites do OpenRouter e os custos do Claude em euros contam certo e os alarmes já não ficam presos.",
+        "nl": "ChatGPT-modellimieten en dagkosten van OpenRouter verschijnen, OpenRouter-limieten en Claude-kosten in euro tellen juist, en alarmen blijven niet meer hangen zonder sleutel.",
+        "fr": "Les limites par modèle de ChatGPT et les coûts du jour d'OpenRouter apparaissent, les limites OpenRouter et les coûts Claude en euros sont justes, les alertes ne restent plus bloquées.",
+        "it": "Compaiono i limiti per modello di ChatGPT e i costi giornalieri di OpenRouter, limiti OpenRouter e costi Claude in euro sono corretti e gli allarmi non restano più attivi.",
+        "es": "Aparecen los límites por modelo de ChatGPT y los costes diarios de OpenRouter, los límites de OpenRouter y los costes de Claude en euros cuentan bien y las alarmas ya no se quedan.",
+        "pl": "Pojawiają się limity modeli ChatGPT i dzienne koszty OpenRouter, limity OpenRouter i koszty Claude w euro liczą się poprawnie, a alarmy nie zostają po usunięciu klucza.",
+        "uk": "З'явилися ліміти моделей ChatGPT і денні витрати OpenRouter, ліміти OpenRouter і витрати Claude в євро рахуються правильно, а тривоги не зависають після видалення ключа.",
+        "zh-cn": "现在显示 ChatGPT 单模型限额和 OpenRouter 每日费用，OpenRouter 限额与 Claude 欧元费用计算正确，删除密钥后告警不再一直保留。"
+      },
       "0.15.0": {
         "en": "Model channels survive the turn of a month, a shutdown during startup no longer deletes objects afterwards, and error texts name the actual failure.",
         "de": "Modell-Kanäle überstehen den Monatswechsel, ein Abschalten während des Starts löscht danach keine Objekte mehr, und Fehlertexte nennen den echten Fehler.",
@@ -80,19 +93,6 @@
         "pl": "Logowanie z ustawień instancji znowu działa — stare ustawienie zamknęło kanał wiadomości adaptera. Nazwy obiektów są teraz dostępne w jedenastu językach.",
         "uk": "Вхід із налаштувань екземпляра знову працює — стара настройка закрила канал повідомлень адаптера. Назви обʼєктів тепер доступні одинадцятьма мовами.",
         "zh-cn": "实例设置中的登录再次可用——旧设置曾关闭了适配器的消息通道。对象名称现在提供十一种语言。"
-      },
-      "0.10.0": {
-        "en": "The reset-time datapoint no longer disappears and reappears. Claude is read with far fewer rejections, new sign-ins request only the profile permission, and ChatGPT shows its limit-reset credits.",
-        "de": "Der Reset-Zeitpunkt verschwindet nicht mehr, die Einstellungsseite zeigt Angemeldeten keinen Anmelde-Bildschirm mehr, Claude wird mit weniger Ablehnungen gelesen, ChatGPT zeigt Reset-Gutschriften.",
-        "ru": "Точка данных времени сброса больше не исчезает. Claude опрашивается с меньшим числом отказов, новые входы запрашивают только право профиля, ChatGPT показывает кредиты сброса лимита.",
-        "pt": "O momento de reposição já não desaparece. O Claude é lido com muito menos rejeições, novos inícios de sessão pedem apenas a permissão de perfil e o ChatGPT mostra os seus créditos de reposição.",
-        "nl": "De resettijd verdwijnt niet meer. Claude wordt met veel minder afwijzingen gelezen, nieuwe aanmeldingen vragen alleen het profielrecht en ChatGPT toont zijn reset-tegoeden.",
-        "fr": "L'heure de réinitialisation ne disparaît plus, les réglages ne montrent plus la connexion aux comptes connectés, Claude est lu avec moins de rejets, ChatGPT affiche ses crédits de réinitialisation.",
-        "it": "L'orario di reset non scompare più. Claude viene letto con molti meno rifiuti, i nuovi accessi richiedono solo il permesso del profilo e ChatGPT mostra i suoi crediti di reset.",
-        "es": "La hora de reinicio ya no desaparece. Claude se lee con muchos menos rechazos, los nuevos inicios de sesión solo piden el permiso de perfil y ChatGPT muestra sus créditos de reinicio.",
-        "pl": "Czas resetu już nie znika. Claude jest odczytywany ze znacznie mniejszą liczbą odrzuceń, nowe logowania proszą tylko o prawo profilu, a ChatGPT pokazuje swoje kredyty resetu.",
-        "uk": "Час скидання більше не зникає. Claude опитується зі значно меншою кількістю відмов, нові входи запитують лише право профілю, ChatGPT показує кредити скидання ліміту.",
-        "zh-cn": "重置时间数据点不再时隐时现。Claude 的读取被拒次数大幅减少，新登录只请求个人资料权限，ChatGPT 会显示其限额重置额度。"
       }
     },
     "plugins": {
