@@ -163,7 +163,7 @@ so instead of pretending to be connected; signing in again is all it takes.
     Placeholder for the next version (at the beginning of the line):
 -->
 
-### 0.16.0 (2026-09-25)
+### 0.16.0 (2026-09-25) — stable
 
 - Fixed: ChatGPT limits of a single model (such as GPT-5.3-Codex-Spark) were never shown — each now gets its own 5-hour and weekly window
 - Fixed: An OpenRouter key with a monthly limit counted its whole lifetime spend against that limit and could stay at "limit reached" for good
