@@ -12,8 +12,6 @@ updates:
       day: 'wednesday'
       timezone: 'Europe/Berlin'
     open-pull-requests-limit: 15
-    assignees:
-      - 'krobipd'
     versioning-strategy: 'increase'
     cooldown:
       default-days: 7
@@ -37,8 +35,6 @@ updates:
       interval: 'weekly'
       day: 'wednesday'
       timezone: 'Europe/Berlin'
-    assignees:
-      - 'krobipd'
     cooldown:
       default-days: 7
     ignore:
@@ -51,7 +47,5 @@ updates:
       day: 'wednesday'
       timezone: 'Europe/Berlin'
     open-pull-requests-limit: 15
-    assignees:
-      - 'krobipd'
     cooldown:
       default-days: 7
