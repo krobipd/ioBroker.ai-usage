@@ -1,11 +1,16 @@
 name: Dependabot Auto-Merge
 
+# Round 112: `pull_request`, not `pull_request_target` — GitHub blocks `pull_request_target` in public repositories by
+# default from 2026-11-02 (docs: securely-using-pull_request_target, "Default policy"), and the ioBroker bot template moved
+# the same way (yamaha #630). A run that Dependabot triggers gets the token rights its job names below and ONLY the
+# repository's Dependabot secrets — `LOCKFIX_DEPLOY_KEY` is a Dependabot secret (docs: troubleshooting Dependabot on
+# GitHub Actions).
 on:
-  pull_request_target:
+  pull_request:
 
-permissions:
-  pull-requests: write
-  contents: write
+# Round 110 (audit E-M8): no token rights at the top — each job names what it needs. The lockfile job pushes with the
+# deploy key and only reads with the token; only the merge job writes.
+permissions: {}
 
 jobs:
   # Dependabot regenerates package-lock.json on npm bumps and drops the nested
@@ -13,17 +18,23 @@ jobs:
   # the required check. Recompute the lockfile (script-free, no install) and push
   # it back with a deploy key — a non-GITHUB_TOKEN push re-triggers the PR check,
   # unlike the built-in token. In-repo PRs only (Dependabot branches are in-repo).
+  # Who opened the PR decides, not who triggered the run: GitHub's documented condition is the PR author
+  # (`github.event.pull_request.user.login`); `github.actor` is whoever caused the latest event.
   lockfile-fix:
     if: >
-      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       NPM_CONFIG_IGNORE_SCRIPTS: "true"
     steps:
+      # The commit Dependabot opened the PR with, not whatever the branch points to by now; a moved branch makes the
+      # push below fail instead of rewriting a commit nobody checked.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           ssh-key: ${{ secrets.LOCKFIX_DEPLOY_KEY }}
       - uses: actions/setup-node@v7
         with:
@@ -46,8 +57,13 @@ jobs:
           git push origin "HEAD:${HEAD_REF}"
 
   auto-merge:
-    if: github.actor == 'dependabot[bot]'
+    if: >
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
@@ -58,9 +74,11 @@ jobs:
       # github-actions bumps (incl. major) are CI-gated by the PR's own test run
       # and owned by Dependabot — auto-merge them all. npm majors stay gated
       # (manual / pre-release.py review) because breaking changes are real there.
-      - name: Auto-merge non-major updates, plus all github-actions updates
+      # Round 110 (audit E-M8): patch and minor are named — an empty update-type (metadata not readable) merged before.
+      - name: Auto-merge patch and minor updates, plus all github-actions updates
         if: >
-          steps.metadata.outputs.update-type != 'version-update:semver-major' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
           steps.metadata.outputs.package-ecosystem == 'github_actions'
         run: |
           gh pr merge --auto --squash "$PR_URL"
